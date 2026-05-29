@@ -3,6 +3,7 @@ package com.besome.sketch.design;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -61,6 +62,10 @@ public class DesignDrawer extends LinearLayout {
             designActivity.toAppCompatInjectionManager();
         } else if (id == R.id.item_manifest_manager) {
             designActivity.toAndroidManifestManager();
+        } else if (id == R.id.item_gradle_manager) {
+            Intent intent = new Intent(designActivity, pro.sketchware.activities.editor.gradle.ManageGradleActivity.class);
+            intent.putExtra("sc_id", DesignActivity.sc_id);
+            designActivity.startActivity(intent);
         } else if (id == R.id.item_used_custom_blocks) {
             designActivity.toCustomBlocksViewer();
         } else if (id == R.id.item_code_shrinking_manager) {
@@ -106,26 +111,20 @@ public class DesignDrawer extends LinearLayout {
         ScrollView scrollView = new ScrollView(context);
         scrollView.setFillViewport(true);
         scrollView.setClipToPadding(false);
-        // BUG FIX 1: Explicitly defining LayoutParams to prevent Android's strict measurement collapse
         addView(scrollView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f));
 
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(VERTICAL);
-        // BUG FIX 2: Added missing MATCH_PARENT to content so it expands correctly
         scrollView.addView(content, new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         UI.addSystemWindowInsetToPadding(scrollView, false, true, false, false);
         
-        // BUG FIX 3: Replaced UI inset with a safe custom listener that ignores Keyboard size
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this, (v, insets) -> {
             int bottomInset = insets.getSystemWindowInsetBottom();
             int rightInset = insets.getSystemWindowInsetRight();
-            
-            // If inset is huge (like > 150dp), it's the Keyboard. We ignore it so the drawer doesn't squish!
             if (bottomInset > SketchwareUtil.dpToPx(150)) {
                 bottomInset = 0; 
             }
-            
             v.setPadding(0, 0, rightInset, bottomInset + SketchwareUtil.dpToPx(4));
             return insets;
         });
@@ -143,6 +142,10 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_permission_manager, R.drawable.ic_mtrl_shield_check, R.string.text_title_menu_permission, R.string.text_subtitle_menu_permission, content);
         addDrawerItem(R.id.item_appcompat_manager, R.drawable.ic_mtrl_inject, R.string.design_drawer_menu_injection, R.string.design_drawer_menu_injection_subtitle, content);
         addDrawerItem(R.id.item_manifest_manager, R.drawable.ic_mtrl_deployed_code, R.string.design_drawer_menu_androidmanifest, R.string.design_drawer_menu_androidmanifest_subtitle, content);
+        
+        // Custom Gradle Item
+        addDrawerItem(R.id.item_gradle_manager, R.drawable.ic_mtrl_settings_applications, R.string.design_drawer_menu_gradle, R.string.design_drawer_menu_gradle_subtitle, content);
+
         addDrawerItem(R.id.item_used_custom_blocks, R.drawable.ic_mtrl_block, R.string.design_drawer_menu_customblocks, R.string.design_drawer_menu_customblocks_subtitle, content);
         addDrawerItem(R.id.item_code_shrinking_manager, R.drawable.ic_mtrl_shield_lock, R.string.design_drawer_menu_proguard, R.string.design_drawer_menu_proguard_subtitle, content);
         addDrawerItem(R.id.item_stringfog_manager, R.drawable.ic_mtrl_regular_expression, R.string.design_drawer_menu_stringfog, R.string.design_drawer_menu_stringfog_subtitle, content);
@@ -150,7 +153,7 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_xml_command_manager, R.drawable.ic_mtrl_code, R.string.design_drawer_menu_title_xml_command, R.string.design_drawer_menu_description_xml_command, content);
         addDrawerItem(R.id.item_logcat_reader, R.drawable.ic_mtrl_article, R.string.design_drawer_menu_title_logcat_reader, R.string.design_drawer_menu_subtitle_logcat_reader, content);
 
-        addDrawerDivider(this);
+        addDrawerDivider(content);
         addDrawerItem(R.id.item_collection_manager, R.drawable.ic_mtrl_bookmark, R.string.design_drawer_menu_title_collection, R.string.design_drawer_menu_description_collection, this);
     }
 
@@ -182,11 +185,12 @@ public class DesignDrawer extends LinearLayout {
         super.onMeasure(widthSpec, heightSpec);
     }
 
-    private void addDrawerItem(int id, int iconResId, int titleResId, int descriptionResId, ViewGroup view) {
+    private void addDrawerItem(int id, int iconResId, Object title, Object description, ViewGroup view) {
         DrawerItem drawerItem = new DrawerItem(getContext());
-        drawerItem.setContent(iconResId, Helper.getResString(drawerItem, titleResId), Helper.getResString(drawerItem, descriptionResId));
+        String titleStr = (title instanceof Integer) ? Helper.getResString(drawerItem, (Integer) title) : (String) title;
+        String descStr = (description instanceof Integer) ? Helper.getResString(drawerItem, (Integer) description) : (String) description;
+        drawerItem.setContent(iconResId, titleStr, descStr);
         drawerItem.setOnClickListener(id, drawerItemClickListener);
-        // BUG FIX 4: Explicitly provide LayoutParams so items stretch properly and don't glitch
         view.addView(drawerItem, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
@@ -195,12 +199,10 @@ public class DesignDrawer extends LinearLayout {
         subheader.setEllipsize(TextUtils.TruncateAt.END);
         subheader.setGravity(Gravity.CENTER_VERTICAL);
         subheader.setText(subheaderResId);
-
         LayoutParams textLp = new LayoutParams(LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         textLp.topMargin = SketchwareUtil.dpToPx(8);
         textLp.bottomMargin = SketchwareUtil.dpToPx(8);
         textLp.setMarginStart(SketchwareUtil.dpToPx(20));
-
         subheader.setLayoutParams(textLp);
         view.addView(subheader);
     }
@@ -209,11 +211,9 @@ public class DesignDrawer extends LinearLayout {
         MaterialDivider divider = new MaterialDivider(getContext());
         divider.setDividerInsetEnd(SketchwareUtil.dpToPx(20));
         divider.setDividerInsetStart(SketchwareUtil.dpToPx(20));
-
         LayoutParams dividerLp = new LayoutParams(LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         dividerLp.topMargin = SketchwareUtil.dpToPx(8);
         dividerLp.bottomMargin = SketchwareUtil.dpToPx(8);
-
         divider.setLayoutParams(dividerLp);
         view.addView(divider);
     }

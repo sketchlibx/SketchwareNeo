@@ -343,7 +343,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         UI.addSystemWindowInsetToMargin(binding.editor, true, false, true, true);
     }
 
-    @SuppressWarnings("deprecation")
     private void setupSearchPanel() {
         searchPanel = new LinearLayout(this);
         searchPanel.setOrientation(LinearLayout.VERTICAL);
@@ -408,10 +407,10 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         replaceBtn.setColorFilter(iconColor);
         replaceBtn.setPadding(16, 16, 16, 16);
         replaceBtn.setOnClickListener(v -> {
-            if (findEdit.getText().length() > 0) {
-                try { binding.editor.getSearcher().replaceThis(replaceEdit.getText().toString()); } catch (Exception ignored) {}
-            }
-        });
+    if (findEdit.getText().length() > 0) {
+        try { binding.editor.getSearcher().replaceThis(replaceEdit.getText().toString()); } catch (Exception ignored) {}
+    }
+});
         
         replaceAllBtn = new ImageView(this);
         replaceAllBtn.setImageResource(R.drawable.ic_done_all_white_24dp);

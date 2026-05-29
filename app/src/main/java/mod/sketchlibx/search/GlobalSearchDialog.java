@@ -11,8 +11,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,21 +21,28 @@ import com.besome.sketch.design.DesignActivity;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
-import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import pro.sketchware.R;
+import pro.sketchware.databinding.DialogGlobalSearchBinding;
+import pro.sketchware.databinding.ItemGlobalSearchResultBinding;
 
 public class GlobalSearchDialog extends BottomSheetDialogFragment {
 
     private final String sc_id;
     private final DesignActivity activity;
-    private RecyclerView recyclerView;
+    private DialogGlobalSearchBinding binding;
     private SearchAdapter adapter;
     private ProjectSearchEngine searchEngine;
-    private TextView searchInfo;
+
+    // Debouncing tools to prevent lag during fast typing
+    private final Handler searchHandler = new Handler(Looper.getMainLooper());
+    private Runnable searchRunnable;
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     public GlobalSearchDialog(String sc_id, DesignActivity activity) {
         this.sc_id = sc_id;
@@ -63,7 +68,6 @@ public class GlobalSearchDialog extends BottomSheetDialogFragment {
                 behavior.setSkipCollapsed(true);
             }
         });
-        // Ensures the dialog resizes itself above the soft keyboard
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         return dialog;
     }
@@ -71,44 +75,83 @@ public class GlobalSearchDialog extends BottomSheetDialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.dialog_global_search, container, false);
+        binding = DialogGlobalSearchBinding.inflate(inflater, container, false);
+        return binding.getRoot();
+    }
 
-        TextInputEditText searchBox = root.findViewById(R.id.edit_search);
-        recyclerView = root.findViewById(R.id.rv_search_results);
-        searchInfo = root.findViewById(getResources().getIdentifier("search_info", "id", getContext().getPackageName()));
-        
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
+        binding.rvSearchResults.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new SearchAdapter(new ArrayList<>());
-        recyclerView.setAdapter(adapter);
+        binding.rvSearchResults.setAdapter(adapter);
 
         searchEngine = new ProjectSearchEngine(sc_id);
 
-        searchBox.addTextChangedListener(new TextWatcher() {
+        binding.editSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
             @Override
             public void afterTextChanged(Editable s) {
-                String query = s.toString();
+                String query = s.toString().trim();
+                
+                // Cancel pending search
+                if (searchRunnable != null) {
+                    searchHandler.removeCallbacks(searchRunnable);
+                }
+
                 if (query.isEmpty()) {
-                    if (searchInfo != null) searchInfo.setVisibility(View.VISIBLE);
+                    showState(State.INFO);
                     adapter.updateData(new ArrayList<>());
                     return;
                 }
                 
-                if (searchInfo != null) searchInfo.setVisibility(View.GONE);
-                
-                new Thread(() -> {
-                    List<SearchResult> results = searchEngine.search(query);
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> adapter.updateData(results));
-                    }
-                }).start();
+                // Debounce search by 300ms for performance
+                searchRunnable = () -> performSearch(query);
+                searchHandler.postDelayed(searchRunnable, 300);
             }
         });
 
-        return root;
+        // Request focus automatically
+        binding.editSearch.requestFocus();
+    }
+
+    private void performSearch(String query) {
+        showState(State.LOADING);
+        executorService.execute(() -> {
+            List<SearchResult> results = searchEngine.search(query);
+            
+            // Check if fragment is still attached before updating UI
+            if (isAdded() && getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    adapter.updateData(results);
+                    if (results.isEmpty()) {
+                        showState(State.EMPTY);
+                    } else {
+                        showState(State.RESULTS);
+                    }
+                });
+            }
+        });
+    }
+
+    private enum State { INFO, LOADING, EMPTY, RESULTS }
+
+    private void showState(State state) {
+        binding.layoutInfo.setVisibility(state == State.INFO ? View.VISIBLE : View.GONE);
+        binding.layoutEmpty.setVisibility(state == State.EMPTY ? View.VISIBLE : View.GONE);
+        binding.rvSearchResults.setVisibility(state == State.RESULTS ? View.VISIBLE : View.GONE);
+        // Add a loading spinner layout if you want to implement State.LOADING visually
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (searchRunnable != null) searchHandler.removeCallbacks(searchRunnable);
+        executorService.shutdown();
+        binding = null; // Prevent memory leak
     }
 
     private class SearchAdapter extends RecyclerView.Adapter<SearchAdapter.ViewHolder> {
@@ -126,30 +169,34 @@ public class GlobalSearchDialog extends BottomSheetDialogFragment {
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_global_search_result, parent, false);
-            return new ViewHolder(view);
+            ItemGlobalSearchResultBinding itemBinding = ItemGlobalSearchResultBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
+            return new ViewHolder(itemBinding);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             SearchResult result = items.get(position);
             
-            holder.title.setText("[" + result.category + "] " + result.title);
-            holder.subtitle.setText(result.fileName + " • " + result.description);
+            holder.binding.tvTitle.setText(String.format("[%s] %s", result.category, result.title));
+            holder.binding.tvSubtitle.setText(String.format("%s • %s", result.fileName, result.description));
 
+            int iconRes = R.drawable.ic_mtrl_file;
             switch (result.category) {
-                case "View": holder.icon.setImageResource(R.drawable.ic_mtrl_screen); break;
-                case "Logic Block": holder.icon.setImageResource(R.drawable.ic_mtrl_puzzle); break;
+                case "View": iconRes = R.drawable.ic_mtrl_screen; break;
+                case "Logic Block": iconRes = R.drawable.ic_mtrl_puzzle; break;
                 case "Variable":
-                case "List": holder.icon.setImageResource(R.drawable.ic_mtrl_list); break;
-                case "Component": holder.icon.setImageResource(R.drawable.ic_mtrl_component); break;
-                default: holder.icon.setImageResource(R.drawable.ic_mtrl_file);
+                case "List": iconRes = R.drawable.ic_mtrl_list; break;
+                case "Component": iconRes = R.drawable.ic_mtrl_component; break;
             }
+            holder.binding.imgIcon.setImageResource(iconRes);
 
-            holder.itemView.setOnClickListener(v -> {
+            holder.binding.getRoot().setOnClickListener(v -> {
                 dismiss();
+                // Safe callback to avoid crashing if Activity is destroying
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    activity.handleSearchResult(result);
+                    if (activity != null && !activity.isFinishing()) {
+                        activity.handleSearchResult(result);
+                    }
                 }, 300);
             });
         }
@@ -160,13 +207,10 @@ public class GlobalSearchDialog extends BottomSheetDialogFragment {
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView title, subtitle;
-            ImageView icon;
-            public ViewHolder(@NonNull View itemView) {
-                super(itemView);
-                title = itemView.findViewById(R.id.tv_title);
-                subtitle = itemView.findViewById(R.id.tv_subtitle);
-                icon = itemView.findViewById(R.id.img_icon);
+            ItemGlobalSearchResultBinding binding;
+            public ViewHolder(@NonNull ItemGlobalSearchResultBinding binding) {
+                super(binding.getRoot());
+                this.binding = binding;
             }
         }
     }

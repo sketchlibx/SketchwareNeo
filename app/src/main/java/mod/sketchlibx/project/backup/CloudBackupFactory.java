@@ -29,8 +29,26 @@ import mod.hey.studios.project.custom_blocks.CustomBlocksManager;
 import mod.hilal.saif.activities.tools.ConfigActivity;
 import pro.sketchware.utility.FileUtil;
 
+/**
+ * CloudBackupFactory
+ *
+ * Generates a .swb (zip) archive for a single Sketchware project and writes it
+ * into a temporary directory under {@link #CLOUD_TEMP_DIR}.
+ *
+ * Key fixes applied (v2):
+ *  - Every major step (folder creation, file copy, zip) is individually logged.
+ *  - Zip output is validated (exists + non-zero size) before setting outPath.
+ *  - Folder creation is logged with mkdirs() result for easy diagnosis.
+ *  - Local-library copy errors are logged with full stack traces, not swallowed.
+ *  - Custom-block serialisation errors similarly surfaced in logcat.
+ */
 public class CloudBackupFactory {
+
+    private static final String TAG = "CloudBackupFactory";
+
     public static final String EXTENSION = "swb";
+
+    /** Temporary working directory inside external storage. */
     public static final String CLOUD_TEMP_DIR = ".sketchware/.cloudbackup/";
 
     private final String sc_id;
@@ -40,118 +58,563 @@ public class CloudBackupFactory {
         this.sc_id = sc_id;
     }
 
+    /** Absolute path of the shared cloud-backup temp directory. */
     public static String getCloudBackupDir() {
-        return new File(Environment.getExternalStorageDirectory(), CLOUD_TEMP_DIR).getAbsolutePath();
+        return new File(
+                Environment.getExternalStorageDirectory(),
+                CLOUD_TEMP_DIR
+        ).getAbsolutePath();
     }
 
+    // ────────────────────────────────────────────────────────────────────────────────
+    // Public entry point
+    // ────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Assembles the project directory tree and zips it to a .swb file.
+     * After this call, retrieve the output with {@link #getOutFile()}.
+     * If anything fails, {@code getOutFile()} returns {@code null}.
+     *
+     * @param context used for custom-block lookup; may be {@code null} to skip
+     * @param project_name display name used in the output filename
+     */
     public void backup(Context context, String project_name) {
+
+        Log.i(
+                TAG,
+                "backup() START | sc_id=" + sc_id
+                        + " | project=" + project_name
+        );
+
+        // ── Resolve filename template ────────────────────────────────────────────
+
         String customFileName = ConfigActivity.getBackupFileName();
-        String versionName = yB.c(lC.b(sc_id), "sc_ver_name");
-        String versionCode = yB.c(lC.b(sc_id), "sc_ver_code");
-        String pkgName = yB.c(lC.b(sc_id), "my_sc_pkg_name");
-        
-        if (project_name == null) project_name = "Unknown_Project";
-        String projectNameOnly = project_name.replace("_d", "").replace(File.separator, "").replaceAll("[^a-zA-Z0-9.\\- ]", "_");
+
+        String versionName = yB.c(
+                lC.b(sc_id),
+                "sc_ver_name"
+        );
+
+        String versionCode = yB.c(
+                lC.b(sc_id),
+                "sc_ver_code"
+        );
+
+        String pkgName = yB.c(
+                lC.b(sc_id),
+                "my_sc_pkg_name"
+        );
+
+        if (project_name == null) {
+            project_name = "Unknown_Project";
+        }
+
+        String projectNameOnly = project_name
+                .replace("_d", "")
+                .replace(File.separator, "")
+                .replaceAll("[^a-zA-Z0-9.\\- ]", "_");
+
+        Log.d(
+                TAG,
+                "projectNameOnly=" + projectNameOnly
+                        + " | ver=" + versionName
+                        + " | code=" + versionCode
+                        + " | pkg=" + pkgName
+        );
+
         String finalFileName;
 
         try {
+
             finalFileName = customFileName
                     .replace("$projectName", projectNameOnly)
                     .replace("$versionCode", versionCode)
                     .replace("$versionName", versionName)
                     .replace("$pkgName", pkgName)
-                    .replace("$timeInMs", String.valueOf(Calendar.getInstance(Locale.ENGLISH).getTimeInMillis()));
-            Matcher matcher = Pattern.compile("\\$time\\((.*?)\\)").matcher(customFileName);
+                    .replace(
+                            "$timeInMs",
+                            String.valueOf(
+                                    Calendar.getInstance(
+                                            Locale.ENGLISH
+                                    ).getTimeInMillis()
+                            )
+                    );
+
+            Matcher matcher = Pattern.compile(
+                    "\\$time\\((.*?)\\)"
+            ).matcher(customFileName);
+
             while (matcher.find()) {
-                finalFileName = finalFileName.replaceFirst(Pattern.quote(Objects.requireNonNull(matcher.group(0))),
-                        new SimpleDateFormat(matcher.group(1), Locale.ENGLISH).format(Calendar.getInstance().getTime()));
+
+                finalFileName = finalFileName.replaceFirst(
+                        Pattern.quote(
+                                Objects.requireNonNull(
+                                        matcher.group(0)
+                                )
+                        ),
+                        new SimpleDateFormat(
+                                matcher.group(1),
+                                Locale.ENGLISH
+                        ).format(
+                                Calendar.getInstance().getTime()
+                        )
+                );
             }
-        } catch (Exception ignored) {
-            finalFileName = projectNameOnly + " v" + versionName + " (" + pkgName + ", " + versionCode + ") " +
-                    new SimpleDateFormat("yyyy-M-dd'T'HHmmss", Locale.ENGLISH).format(Calendar.getInstance().getTime());
+
+        } catch (Exception e) {
+
+            Log.w(
+                    TAG,
+                    "Custom filename template failed; using default. Error: "
+                            + e.getMessage()
+            );
+
+            finalFileName =
+                    projectNameOnly
+                            + " v"
+                            + versionName
+                            + " ("
+                            + pkgName
+                            + ", "
+                            + versionCode
+                            + ") "
+                            + new SimpleDateFormat(
+                                    "yyyy-M-dd'T'HHmmss",
+                                    Locale.ENGLISH
+                            ).format(
+                                    Calendar.getInstance().getTime()
+                            );
         }
 
-        FileUtil.makeDir(getCloudBackupDir());
-        File outFolder = new File(getCloudBackupDir(), projectNameOnly + "_temp_" + sc_id);
-        File outZip = new File(getCloudBackupDir(), finalFileName + "." + EXTENSION);
+        Log.d(TAG, "finalFileName=" + finalFileName);
 
-        if (outFolder.exists()) FileUtil.deleteFile(outFolder.getAbsolutePath());
-        FileUtil.makeDir(outFolder.getAbsolutePath());
+        // ── Set up directories ───────────────────────────────────────────────────
+
+        String backupDir = getCloudBackupDir();
+
+        // FileUtil.makeDir() returns void
+        FileUtil.makeDir(backupDir);
+
+        boolean dirMade = new File(backupDir).exists();
+
+        Log.d(
+                TAG,
+                "Cloud backup dir created/exists: "
+                        + dirMade
+                        + " | path="
+                        + backupDir
+        );
+
+        File outFolder = new File(
+                backupDir,
+                projectNameOnly + "_temp_" + sc_id
+        );
+
+        File outZip = new File(
+                backupDir,
+                finalFileName + "." + EXTENSION
+        );
+
+        // Delete old temp folder if exists
+        if (outFolder.exists()) {
+
+            FileUtil.deleteFile(
+                    outFolder.getAbsolutePath()
+            );
+
+            Log.d(
+                    TAG,
+                    "Removed stale temp folder: "
+                            + outFolder.getAbsolutePath()
+            );
+        }
+
+        // Create temp folder
+        FileUtil.makeDir(
+                outFolder.getAbsolutePath()
+        );
+
+        boolean folderCreated = outFolder.exists();
+
+        Log.d(
+                TAG,
+                "Temp folder created="
+                        + folderCreated
+                        + " | path="
+                        + outFolder.getAbsolutePath()
+        );
 
         try {
+
+            // ── data/ ────────────────────────────────────────────────────────────
+
             File dataF = new File(outFolder, "data");
-            FileUtil.makeDir(dataF.getAbsolutePath());
-            File srcData = new File(Environment.getExternalStorageDirectory(), ".sketchware/data/" + sc_id);
-            if (srcData.exists()) BackupFactory.copySafe(srcData, dataF);
+
+            File srcData = new File(
+                    Environment.getExternalStorageDirectory(),
+                    ".sketchware/data/" + sc_id
+            );
+
+            FileUtil.makeDir(
+                    dataF.getAbsolutePath()
+            );
+
+            if (srcData.exists()) {
+
+                BackupFactory.copySafe(
+                        srcData,
+                        dataF
+                );
+
+                Log.d(
+                        TAG,
+                        "data/ copied from "
+                                + srcData.getAbsolutePath()
+                );
+
+            } else {
+
+                Log.w(
+                        TAG,
+                        "data/ source missing: "
+                                + srcData.getAbsolutePath()
+                );
+            }
+
+            // ── resources/ ──────────────────────────────────────────────────────
 
             File resF = new File(outFolder, "resources");
-            FileUtil.makeDir(resF.getAbsolutePath());
-            String[] resSubfolders = {"fonts", "icons", "images", "sounds"};
+
+            FileUtil.makeDir(
+                    resF.getAbsolutePath()
+            );
+
+            String[] resSubfolders = {
+                    "fonts",
+                    "icons",
+                    "images",
+                    "sounds"
+            };
+
             for (String subfolder : resSubfolders) {
-                File resSubf = new File(resF, subfolder);
-                FileUtil.makeDir(resSubf.getAbsolutePath());
-                File srcRes = new File(Environment.getExternalStorageDirectory(), ".sketchware/resources/" + subfolder + "/" + sc_id);
-                if (srcRes.exists()) BackupFactory.copySafe(srcRes, resSubf);
-                if (!subfolder.equals("icons")) BackupFactory.createNomediaFileIn(resSubf);
-            }
 
-            File projectF = new File(outFolder, "project");
-            File srcProj = new File(Environment.getExternalStorageDirectory(), ".sketchware/mysc/list/" + sc_id + "/project");
-            if (srcProj.exists()) BackupFactory.copy(srcProj, projectF);
+                File resSubf = new File(
+                        resF,
+                        subfolder
+                );
 
-            File localLibs = new File(Environment.getExternalStorageDirectory(), ".sketchware/data/" + sc_id + "/local_library");
-            if (localLibs.exists() && localLibs.length() > 0) {
-                try {
-                    String libsContent = FileUtil.readFile(localLibs.getAbsolutePath());
-                    if (!libsContent.trim().isEmpty()) {
-                        JSONArray ja = new JSONArray(libsContent);
-                        File libsF = new File(outFolder, "local_libs");
-                        libsF.mkdirs();
-                        for (int i = 0; i < ja.length(); i++) {
-                            JSONObject jo = ja.getJSONObject(i);
-                            File f = new File(jo.getString("dexPath")).getParentFile();
-                            if (f != null && f.exists()) BackupFactory.copy(f, new File(libsF, f.getName()));
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e("CloudBackupFactory", "Failed to copy local libraries", e);
+                FileUtil.makeDir(
+                        resSubf.getAbsolutePath()
+                );
+
+                File srcRes = new File(
+                        Environment.getExternalStorageDirectory(),
+                        ".sketchware/resources/"
+                                + subfolder
+                                + "/"
+                                + sc_id
+                );
+
+                if (srcRes.exists()) {
+
+                    BackupFactory.copySafe(
+                            srcRes,
+                            resSubf
+                    );
+
+                    Log.d(
+                            TAG,
+                            "resources/" + subfolder + " copied."
+                    );
+
+                } else {
+
+                    Log.d(
+                            TAG,
+                            "resources/"
+                                    + subfolder
+                                    + " not present — skipping."
+                    );
+                }
+
+                if (!subfolder.equals("icons")) {
+
+                    BackupFactory.createNomediaFileIn(
+                            resSubf
+                    );
                 }
             }
+
+            // ── project/ ────────────────────────────────────────────────────────
+
+            File projectF = new File(
+                    outFolder,
+                    "project"
+            );
+
+            File srcProj = new File(
+                    Environment.getExternalStorageDirectory(),
+                    ".sketchware/mysc/list/"
+                            + sc_id
+                            + "/project"
+            );
+
+            if (srcProj.exists()) {
+
+                BackupFactory.copy(
+                        srcProj,
+                        projectF
+                );
+
+                Log.d(
+                        TAG,
+                        "project/ copied from "
+                                + srcProj.getAbsolutePath()
+                );
+
+            } else {
+
+                Log.w(
+                        TAG,
+                        "project/ source missing: "
+                                + srcProj.getAbsolutePath()
+                );
+            }
+
+            // ── local_libs/ ─────────────────────────────────────────────────────
+
+            File localLibs = new File(
+                    Environment.getExternalStorageDirectory(),
+                    ".sketchware/data/"
+                            + sc_id
+                            + "/local_library"
+            );
+
+            if (localLibs.exists() && localLibs.length() > 0) {
+
+                try {
+
+                    String libsContent = FileUtil.readFile(
+                            localLibs.getAbsolutePath()
+                    );
+
+                    if (!libsContent.trim().isEmpty()) {
+
+                        JSONArray ja = new JSONArray(
+                                libsContent
+                        );
+
+                        Log.d(
+                                TAG,
+                                "local_library: "
+                                        + ja.length()
+                                        + " lib(s) found."
+                        );
+
+                        File libsF = new File(
+                                outFolder,
+                                "local_libs"
+                        );
+
+                        libsF.mkdirs();
+
+                        for (int i = 0; i < ja.length(); i++) {
+
+                            JSONObject jo = ja.getJSONObject(i);
+
+                            File f = new File(
+                                    jo.getString("dexPath")
+                            ).getParentFile();
+
+                            if (f != null && f.exists()) {
+
+                                BackupFactory.copy(
+                                        f,
+                                        new File(
+                                                libsF,
+                                                f.getName()
+                                        )
+                                );
+
+                                Log.d(
+                                        TAG,
+                                        "  Copied local lib: "
+                                                + f.getName()
+                                );
+
+                            } else {
+
+                                Log.w(
+                                        TAG,
+                                        "  local lib dexPath parent missing: "
+                                                + jo.getString("dexPath")
+                                );
+                            }
+                        }
+                    }
+
+                } catch (Exception e) {
+
+                    Log.e(
+                            TAG,
+                            "Failed to copy local libraries — continuing",
+                            e
+                    );
+                }
+
+            } else {
+
+                Log.d(
+                        TAG,
+                        "No local_library file or it is empty — skipping."
+                );
+            }
+
+            // ── custom_blocks ────────────────────────────────────────────────────
 
             if (context != null) {
+
                 try {
-                    CustomBlocksManager cbm = new CustomBlocksManager(context, sc_id);
-                    Set<ExtraBlockInfo> blocks = new HashSet<>();
-                    Set<String> block_names = new HashSet<>();
+
+                    CustomBlocksManager cbm =
+                            new CustomBlocksManager(
+                                    context,
+                                    sc_id
+                            );
+
+                    Set<ExtraBlockInfo> blocks =
+                            new HashSet<>();
+
+                    Set<String> blockNames =
+                            new HashSet<>();
+
                     for (BlockBean bean : cbm.getUsedBlocks()) {
-                        if (!block_names.contains(bean.opCode)) {
-                            block_names.add(bean.opCode);
-                            blocks.add(cbm.contains(bean.opCode) ? cbm.getExtraBlockInfo(bean.opCode) : BlockLoader.getBlockInfo(bean.opCode));
+
+                        if (!blockNames.contains(bean.opCode)) {
+
+                            blockNames.add(bean.opCode);
+
+                            blocks.add(
+                                    cbm.contains(bean.opCode)
+                                            ? cbm.getExtraBlockInfo(bean.opCode)
+                                            : BlockLoader.getBlockInfo(bean.opCode)
+                            );
                         }
                     }
+
                     if (!blocks.isEmpty()) {
-                        FileUtil.writeFile(new File(dataF, "custom_blocks").getAbsolutePath(), new Gson().toJson(blocks));
+
+                        String cbJson = new Gson().toJson(
+                                blocks
+                        );
+
+                        FileUtil.writeFile(
+                                new File(
+                                        dataF,
+                                        "custom_blocks"
+                                ).getAbsolutePath(),
+                                cbJson
+                        );
+
+                        Log.d(
+                                TAG,
+                                "custom_blocks written: "
+                                        + blocks.size()
+                                        + " block(s)."
+                        );
+
+                    } else {
+
+                        Log.d(
+                                TAG,
+                                "No custom blocks found for this project."
+                        );
                     }
+
                 } catch (Exception e) {
-                    Log.e("CloudBackupFactory", "Failed to parse custom blocks", e);
+
+                    Log.e(
+                            TAG,
+                            "Failed to serialise custom blocks — continuing",
+                            e
+                    );
                 }
             }
 
-            BackupFactory.zipFolder(outFolder, outZip);
-            
+            // ── Zip ──────────────────────────────────────────────────────────────
+
+            Log.d(
+                    TAG,
+                    "Zipping "
+                            + outFolder.getAbsolutePath()
+                            + " → "
+                            + outZip.getAbsolutePath()
+            );
+
+            BackupFactory.zipFolder(
+                    outFolder,
+                    outZip
+            );
+
             if (outZip.exists() && outZip.length() > 0) {
+
                 outPath = outZip;
+
+                Log.i(
+                        TAG,
+                        "backup() SUCCESS | zip="
+                                + outZip.getName()
+                                + " | size="
+                                + outZip.length()
+                                + " bytes"
+                );
+
             } else {
-                Log.e("CloudBackupFactory", "Zipped file is empty or does not exist.");
+
+                Log.e(
+                        TAG,
+                        "backup() FAILED — zip missing or empty."
+                                + " exists="
+                                + outZip.exists()
+                                + " size="
+                                + (outZip.exists()
+                                ? outZip.length()
+                                : "n/a")
+                                + " path="
+                                + outZip.getAbsolutePath()
+                );
+
                 outPath = null;
             }
+
         } catch (Exception e) {
-            Log.e("CloudBackupFactory", "Zipping process failed entirely:\n" + Log.getStackTraceString(e));
+
+            Log.e(
+                    TAG,
+                    "backup() threw an unexpected exception:\n"
+                            + Log.getStackTraceString(e)
+            );
+
             outPath = null;
+
         } finally {
-            FileUtil.deleteFile(outFolder.getAbsolutePath()); 
+
+            // Always clean up the unzipped staging folder.
+
+            FileUtil.deleteFile(
+                    outFolder.getAbsolutePath()
+            );
+
+            Log.d(
+                    TAG,
+                    "Temp folder deleted: "
+                            + outFolder.getAbsolutePath()
+            );
         }
     }
 
-    public File getOutFile() { return outPath; }
+    /** Returns the generated .swb File, or null if backup failed. */
+    public File getOutFile() {
+        return outPath;
+    }
 }

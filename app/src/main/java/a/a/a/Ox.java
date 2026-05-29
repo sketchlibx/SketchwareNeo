@@ -289,9 +289,15 @@ public class Ox {
 
         XmlBuilder widgetTag = convert.isEmpty() ? new XmlBuilder(viewBean.getClassInfo().getClassName()) :
                 new XmlBuilder(convert.replaceAll(" ", ""));
+                
+        // PRO FIX: Strict logic to map the correct explicit android:id to <include> tags, preventing layout ID overrides!
         if (convert.equals("include")) {
+            if (!toNotAdd.contains("android:id")) {
+                widgetTag.addAttribute("android", "id", "@+id/" + viewBean.id);
+            }
             if (!toNotAdd.contains("layout") && !injectHandler.contains("layout")) {
-                widgetTag.addAttribute("", "layout", "@layout/" + viewBean.id);
+                String layoutName = viewBean.customView != null && !viewBean.customView.isEmpty() ? viewBean.customView : viewBean.id;
+                widgetTag.addAttribute("", "layout", "@layout/" + layoutName);
             }
         } else {
             if (!toNotAdd.contains("android:id")) {

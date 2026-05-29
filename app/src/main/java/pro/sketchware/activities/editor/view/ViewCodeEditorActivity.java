@@ -92,14 +92,19 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                         dialog.setTitle(Helper.getResString(R.string.common_word_warning));
                         dialog.setMessage(Helper.getResString(R.string.src_code_editor_unsaved_changes_dialog_warning_message));
 
-                        dialog.setPositiveButton(Helper.getResString(R.string.common_word_exit), (v, which) -> {
+                        dialog.setPositiveButton("Save", (v, which) -> {
                             if (applyXmlChanges()) {
                                 v.dismiss();
                                 finish();
                             }
                         });
 
-                        dialog.setNegativeButton(Helper.getResString(R.string.common_word_cancel), null);
+                        dialog.setNegativeButton(Helper.getResString(R.string.common_word_exit), (v, which) -> {
+                            v.dismiss();
+                            finish();
+                        });
+                        
+                        dialog.setNeutralButton(Helper.getResString(R.string.common_word_cancel), null);
                         dialog.show();
                     } else {
                         if (isEdited) {
@@ -290,10 +295,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         replaceBtn.setColorFilter(iconColor);
         replaceBtn.setPadding(16, 16, 16, 16);
         replaceBtn.setOnClickListener(v -> {
-            if (findEdit.getText().length() > 0) {
-                try { editor.getSearcher().replaceThis(replaceEdit.getText().toString()); } catch (Exception ignored) {}
-            }
-        });
+    if (findEdit.getText().length() > 0) {
+        try { editor.getSearcher().replaceThis(replaceEdit.getText().toString()); } catch (Exception ignored) {}
+    }
+});
         
         replaceAllBtn = new ImageView(this);
         replaceAllBtn.setImageResource(R.drawable.ic_done_all_white_24dp);

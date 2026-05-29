@@ -17,6 +17,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.project.ProjectSettings;
 import pro.sketchware.R;
 
@@ -29,7 +30,6 @@ public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
     private ProjectSettings projectSettings;
 
     private MaterialSwitch cbForceAndroidX;
-    private MaterialSwitch cbKotlinConversion;
     private MaterialSwitch cbCustomJava;
     private MaterialSwitch cbCustomManifest;
     private MaterialSwitch cbMultiDex;
@@ -61,26 +61,21 @@ public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
         projectSettings = new ProjectSettings(sc_id);
 
         cbForceAndroidX = root.findViewById(R.id.switch_force_androidx);
-        cbKotlinConversion = root.findViewById(R.id.switch_java_to_kotlin);
         cbCustomJava = root.findViewById(R.id.switch_custom_java);
         cbCustomManifest = root.findViewById(R.id.switch_custom_manifest);
         cbMultiDex = root.findViewById(R.id.switch_multidex);
 
         LinearLayout rowForceAndroidX = root.findViewById(R.id.row_force_androidx);
-        LinearLayout rowKotlin = root.findViewById(R.id.row_java_to_kotlin);
         LinearLayout rowCustomJava = root.findViewById(R.id.row_custom_java);
         LinearLayout rowCustomManifest = root.findViewById(R.id.row_custom_manifest);
         LinearLayout rowMultiDex = root.findViewById(R.id.row_multidex);
 
         cbForceAndroidX.setChecked(projectSettings.getValue(ProjectSettings.SETTING_FORCE_ANDROIDX, "false").equals("true"));
-        cbKotlinConversion.setChecked(projectSettings.getValue(ProjectSettings.SETTING_JAVA_TO_KOTLIN, "false").equals("true"));
         cbCustomJava.setChecked(projectSettings.getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false").equals("true"));
         cbCustomManifest.setChecked(projectSettings.getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, "false").equals("true"));
-        
         cbMultiDex.setChecked(projectSettings.getValue("multidex", "false").equals("true"));
 
         rowForceAndroidX.setOnClickListener(v -> cbForceAndroidX.performClick());
-        rowKotlin.setOnClickListener(v -> cbKotlinConversion.performClick());
         rowCustomJava.setOnClickListener(v -> cbCustomJava.performClick());
         rowCustomManifest.setOnClickListener(v -> cbCustomManifest.performClick());
         rowMultiDex.setOnClickListener(v -> cbMultiDex.performClick());
@@ -105,10 +100,8 @@ public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
 
     private void saveSettings() {
         projectSettings.setValue(ProjectSettings.SETTING_FORCE_ANDROIDX, cbForceAndroidX.isChecked() ? "true" : "false");
-        projectSettings.setValue(ProjectSettings.SETTING_JAVA_TO_KOTLIN, cbKotlinConversion.isChecked() ? "true" : "false");
         projectSettings.setValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, cbCustomJava.isChecked() ? "true" : "false");
         projectSettings.setValue(ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, cbCustomManifest.isChecked() ? "true" : "false");
-        
         projectSettings.setValue("multidex", cbMultiDex.isChecked() ? "true" : "false");
     }
 }

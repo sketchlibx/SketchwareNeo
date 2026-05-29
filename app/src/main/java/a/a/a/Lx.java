@@ -2418,19 +2418,28 @@ public class Lx {
                 "    }\r\n" +
                 "}\r\n";
     }
-
     /**
      * @return Content of a <code>GoogleMapController.java</code> file, without indentation
      */
     public static String f(String packageName) {
         return "package " + packageName + ";\r\n" +
                 "\r\n" +
+                "import android.content.Context;\r\n" +
+                "import android.graphics.Bitmap;\r\n" +
+                "import android.graphics.Canvas;\r\n" +
+                "import android.graphics.drawable.Drawable;\r\n" +
+                "\r\n" +
+                "import androidx.core.content.ContextCompat;\r\n" +
+                "\r\n" +
                 "import com.google.android.gms.maps.CameraUpdateFactory;\r\n" +
                 "import com.google.android.gms.maps.GoogleMap;\r\n" +
                 "import com.google.android.gms.maps.MapView;\r\n" +
                 "import com.google.android.gms.maps.OnMapReadyCallback;\r\n" +
+                "import com.google.android.gms.maps.model.BitmapDescriptor;\r\n" +
                 "import com.google.android.gms.maps.model.BitmapDescriptorFactory;\r\n" +
+                "import com.google.android.gms.maps.model.CameraPosition;\r\n" +
                 "import com.google.android.gms.maps.model.LatLng;\r\n" +
+                "import com.google.android.gms.maps.model.LatLngBounds;\r\n" +
                 "import com.google.android.gms.maps.model.Marker;\r\n" +
                 "import com.google.android.gms.maps.model.MarkerOptions;\r\n" +
                 "\r\n" +
@@ -2438,123 +2447,143 @@ public class Lx {
                 "\r\n" +
                 "public class GoogleMapController {\r\n" +
                 "\r\n" +
-                "private GoogleMap googleMap;\r\n" +
-                "private MapView mapView;\r\n" +
-                "private HashMap<String, Marker> mapMarker;\r\n" +
-                "private GoogleMap.OnMarkerClickListener onMarkerClickListener;\r\n" +
+                "    private GoogleMap googleMap;\r\n" +
+                "    private final MapView mapView;\r\n" +
+                "    private final HashMap<String, Marker> mapMarker;\r\n" +
+                "    private GoogleMap.OnMarkerClickListener onMarkerClickListener;\r\n" +
                 "\r\n" +
-                "public GoogleMapController(MapView mapView, OnMapReadyCallback onMapReadyCallback) {\r\n" +
-                "this.mapView = mapView;\r\n" +
-                "mapMarker = new HashMap<>();\r\n" +
+                "    public GoogleMapController(MapView mapView, OnMapReadyCallback onMapReadyCallback) {\r\n" +
+                "        this.mapView = mapView;\r\n" +
+                "        mapMarker = new HashMap<>();\r\n" +
+                "        this.mapView.getMapAsync(onMapReadyCallback);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "this.mapView.getMapAsync(onMapReadyCallback);\r\n" +
-                "}\r\n" +
+                "    public void setGoogleMap(GoogleMap googleMap) {\r\n" +
+                "        this.googleMap = googleMap;\r\n" +
+                "        if (onMarkerClickListener != null) {\r\n" +
+                "            this.googleMap.setOnMarkerClickListener(onMarkerClickListener);\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setGoogleMap(GoogleMap googleMap) {\r\n" +
-                "this.googleMap = googleMap;\r\n" +
+                "    public GoogleMap getGoogleMap() {\r\n" +
+                "        return googleMap;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "if (onMarkerClickListener != null) {\r\n" +
-                "this.googleMap.setOnMarkerClickListener(onMarkerClickListener);\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "    public void setMapType(int mapType) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.setMapType(mapType);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public GoogleMap getGoogleMap() {\r\n" +
-                "return googleMap;\r\n" +
-                "}\r\n" +
+                "    public void setOnMarkerClickListener(GoogleMap.OnMarkerClickListener listener) {\r\n" +
+                "        this.onMarkerClickListener = listener;\r\n" +
+                "        if (googleMap != null) {\r\n" +
+                "            googleMap.setOnMarkerClickListener(listener);\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setMapType(int _mapType) {\r\n" +
-                "if (googleMap == null) return;\r\n" +
+                "    public void addMarker(String id, double lat, double lng) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        MarkerOptions markerOptions = new MarkerOptions();\r\n" +
+                "        markerOptions.position(new LatLng(lat, lng));\r\n" +
+                "        Marker marker = googleMap.addMarker(markerOptions);\r\n" +
+                "        if (marker != null) {\r\n" +
+                "            marker.setTag(id);\r\n" +
+                "            mapMarker.put(id, marker);\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "googleMap.setMapType(_mapType);\r\n" +
-                "}\r\n" +
+                "    public Marker getMarker(String id) {\r\n" +
+                "        return mapMarker.get(id);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setOnMarkerClickListener(GoogleMap.OnMarkerClickListener onMarkerClickListener) {\r\n" +
-                "this.onMarkerClickListener = onMarkerClickListener;\r\n" +
+                "    public void setMarkerInfo(String id, String title, String snippet) {\r\n" +
+                "        Marker marker = mapMarker.get(id);\r\n" +
+                "        if (marker == null) return;\r\n" +
+                "        marker.setTitle(title);\r\n" +
+                "        marker.setSnippet(snippet);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "if (googleMap != null) {\r\n" +
-                "this.googleMap.setOnMarkerClickListener(onMarkerClickListener);\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "    public void setMarkerPosition(String id, double lat, double lng) {\r\n" +
+                "        Marker marker = mapMarker.get(id);\r\n" +
+                "        if (marker == null) return;\r\n" +
+                "        marker.setPosition(new LatLng(lat, lng));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void addMarker(String id, double lat, double lng) {\r\n" +
-                "if (googleMap == null) return;\r\n" +
+                "    public void setMarkerColor(String id, float color, double alpha) {\r\n" +
+                "        Marker marker = mapMarker.get(id);\r\n" +
+                "        if (marker == null) return;\r\n" +
+                "        marker.setAlpha((float) alpha);\r\n" +
+                "        marker.setIcon(BitmapDescriptorFactory.defaultMarker(color));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "MarkerOptions markerOptions = new MarkerOptions();\r\n" +
-                "markerOptions.position(new LatLng(lat, lng));\r\n" +
-                "Marker marker = googleMap.addMarker(markerOptions);\r\n" +
-                "marker.setTag(id);\r\n" +
-                "mapMarker.put(id, marker);\r\n" +
-                "}\r\n" +
+                "    public void setMarkerIcon(String id, int resIcon) {\r\n" +
+                "        Marker marker = mapMarker.get(id);\r\n" +
+                "        if (marker == null) return;\r\n" +
+                "        marker.setIcon(BitmapDescriptorFactory.fromResource(resIcon));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public Marker getMarker(String id) {\r\n" +
-                "return mapMarker.get(id);\r\n" +
-                "}\r\n" +
+                "    public void setMarkerVisible(String id, boolean visible) {\r\n" +
+                "        Marker marker = mapMarker.get(id);\r\n" +
+                "        if (marker == null) return;\r\n" +
+                "        marker.setVisible(visible);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setMarkerInfo(String id, String title, String snippet) {\r\n" +
-                "Marker marker = mapMarker.get(id);\r\n" +
-                "if (marker == null) return;\r\n" +
+                "    public void moveCamera(double lat, double lng) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.newLatLng(new LatLng(lat, lng)));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "marker.setTitle(title);\r\n" +
-                "marker.setSnippet(snippet);\r\n" +
-                "}\r\n" +
+                "    public void moveCameraWithZoom(double lat, double lng, float zoom) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat, lng), zoom));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setMarkerPosition(String id, double lat, double lng) {\r\n" +
-                "Marker marker = mapMarker.get(id);\r\n" +
-                "if (marker == null) return;\r\n" +
+                "    public void zoomTo(double zoom) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.zoomTo((float) zoom));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "marker.setPosition(new LatLng(lat, lng));\r\n" +
-                "}\r\n" +
+                "    public void zoomIn() {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.zoomIn());\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setMarkerColor(String id, float color, double alpha) {\r\n" +
-                "Marker marker = mapMarker.get(id);\r\n" +
-                "if (marker == null) return;\r\n" +
+                "    public void zoomOut() {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.zoomOut());\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "marker.setAlpha((float) alpha);\r\n" +
-                "marker.setIcon(BitmapDescriptorFactory.defaultMarker(color));\r\n" +
-                "}\r\n" +
+                "    public void fitBounds(LatLng point1, LatLng point2, int paddingDp) {\r\n" +
+                "        if (googleMap == null) return;\r\n" +
+                "        LatLngBounds bounds = new LatLngBounds.Builder()\r\n" +
+                "            .include(point1)\r\n" +
+                "            .include(point2)\r\n" +
+                "            .build();\r\n" +
+                "        googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, paddingDp));\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setMarkerIcon(String id, int resIcon) {\r\n" +
-                "Marker marker = mapMarker.get(id);\r\n" +
-                "if (marker == null) return;\r\n" +
+                "    public static BitmapDescriptor vectorToBitmap(Context context, int resId) {\r\n" +
+                "        try {\r\n" +
+                "            Drawable drawable = ContextCompat.getDrawable(context, resId);\r\n" +
+                "            if (drawable == null) return BitmapDescriptorFactory.defaultMarker();\r\n" +
                 "\r\n" +
-                "marker.setIcon(BitmapDescriptorFactory.fromResource(resIcon));\r\n" +
-                "}\r\n" +
-                "\r\n" +
-                "public void setMarkerVisible(String id, boolean visible) {\r\n" +
-                "Marker marker = mapMarker.get(id);\r\n" +
-                "if (marker == null) return;\r\n" +
-                "\r\n" +
-                "marker.setVisible(visible);\r\n" +
-                "}\r\n" +
-                "\r\n" +
-                "\r\n" +
-                "public void moveCamera(double lat, double lng) {\r\n" +
-                "if (googleMap == null) return;\r\n" +
-                "\r\n" +
-                "googleMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(lat, lng)));\r\n" +
-                "}\r\n" +
-                "\r\n" +
-                "public void zoomTo(double zoom) {\r\n" +
-                "if (googleMap == null) return;\r\n" +
-                "\r\n" +
-                "googleMap.moveCamera(CameraUpdateFactory.zoomTo((float) zoom));\r\n" +
-                "}\r\n" +
-                "\r\n" +
-                "public void zoomIn() {\r\n" +
-                "if (googleMap == null) return;\r\n" +
-                "\r\n" +
-                "googleMap.moveCamera(CameraUpdateFactory.zoomIn());\r\n" +
-                "}\r\n" +
-                "\r\n" +
-                "public void zoomOut() {\r\n" +
-                "if (googleMap == null) return;\r\n" +
-                "\r\n" +
-                "googleMap.moveCamera(CameraUpdateFactory.zoomOut());\r\n" +
-                "}\r\n" +
+                "            Bitmap bitmap = Bitmap.createBitmap(\r\n" +
+                "                drawable.getIntrinsicWidth(),\r\n" +
+                "                drawable.getIntrinsicHeight(),\r\n" +
+                "                Bitmap.Config.ARGB_8888\r\n" +
+                "            );\r\n" +
+                "            Canvas canvas = new Canvas(bitmap);\r\n" +
+                "            drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());\r\n" +
+                "            drawable.draw(canvas);\r\n" +
+                "            return BitmapDescriptorFactory.fromBitmap(bitmap);\r\n" +
+                "        } catch (Exception e) {\r\n" +
+                "            return BitmapDescriptorFactory.defaultMarker();\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "}\r\n";
     }
-
-    /**
+    
+        /**
      * @return Content of a <code>RequestNetworkController.java</code> file, without indentation
      */
     public static String g(String packageName) {
@@ -2588,163 +2617,163 @@ public class Lx {
                 "import okhttp3.Response;\r\n" +
                 "\r\n" +
                 "public class RequestNetworkController {\r\n" +
-                "public static final String GET = \"GET\";\r\n" +
-                "public static final String POST = \"POST\";\r\n" +
-                "public static final String PUT = \"PUT\";\r\n" +
-                "public static final String DELETE = \"DELETE\";\r\n" +
+                "    public static final String GET = \"GET\";\r\n" +
+                "    public static final String POST = \"POST\";\r\n" +
+                "    public static final String PUT = \"PUT\";\r\n" +
+                "    public static final String DELETE = \"DELETE\";\r\n" +
                 "\r\n" +
-                "public static final int REQUEST_PARAM = 0;\r\n" +
-                "public static final int REQUEST_BODY = 1;\r\n" +
+                "    public static final int REQUEST_PARAM = 0;\r\n" +
+                "    public static final int REQUEST_BODY = 1;\r\n" +
                 "\r\n" +
-                "private static final int SOCKET_TIMEOUT = 15000;\r\n" +
-                "private static final int READ_TIMEOUT = 25000;\r\n" +
+                "    private static final int SOCKET_TIMEOUT = 15000;\r\n" +
+                "    private static final int READ_TIMEOUT = 25000;\r\n" +
                 "\r\n" +
-                "protected OkHttpClient client;\r\n" +
+                "    protected OkHttpClient client;\r\n" +
                 "\r\n" +
-                "private static RequestNetworkController mInstance;\r\n" +
+                "    private static RequestNetworkController mInstance;\r\n" +
                 "\r\n" +
-                "public static synchronized RequestNetworkController getInstance() {\r\n" +
-                "if(mInstance == null) {\r\n" +
-                "mInstance = new RequestNetworkController();\r\n" +
-                "}\r\n" +
-                "return mInstance;\r\n" +
-                "}\r\n" +
+                "    public static synchronized RequestNetworkController getInstance() {\r\n" +
+                "        if(mInstance == null) {\r\n" +
+                "            mInstance = new RequestNetworkController();\r\n" +
+                "        }\r\n" +
+                "        return mInstance;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "private OkHttpClient getClient() {\r\n" +
-                "if (client == null) {\r\n" +
-                "OkHttpClient.Builder builder = new OkHttpClient.Builder();\r\n" +
+                "    private OkHttpClient getClient() {\r\n" +
+                "        if (client == null) {\r\n" +
+                "            OkHttpClient.Builder builder = new OkHttpClient.Builder();\r\n" +
                 "\r\n" +
-                "try {\r\n" +
-                "final TrustManager[] trustAllCerts = new TrustManager[]{\r\n" +
-                "new X509TrustManager() {\r\n" +
-                "@Override\r\n" +
-                "public void checkClientTrusted(X509Certificate[] chain, String authType)\r\n" +
-                "throws CertificateException {\r\n" +
-                "}\r\n" +
+                "            try {\r\n" +
+                "                final TrustManager[] trustAllCerts = new TrustManager[]{\r\n" +
+                "                    new X509TrustManager() {\r\n" +
+                "                        @Override\r\n" +
+                "                        public void checkClientTrusted(X509Certificate[] chain, String authType)\r\n" +
+                "                                throws CertificateException {\r\n" +
+                "                        }\r\n" +
                 "\r\n" +
-                "@Override\r\n" +
-                "public void checkServerTrusted(X509Certificate[] chain, String authType)\r\n" +
-                "throws CertificateException {\r\n" +
-                "}\r\n" +
+                "                        @Override\r\n" +
+                "                        public void checkServerTrusted(X509Certificate[] chain, String authType)\r\n" +
+                "                                throws CertificateException {\r\n" +
+                "                        }\r\n" +
                 "\r\n" +
-                "@Override\r\n" +
-                "public X509Certificate[] getAcceptedIssuers() {\r\n" +
-                "return new X509Certificate[]{};\r\n" +
-                "}\r\n" +
-                "}\r\n" +
-                "};\r\n" +
+                "                        @Override\r\n" +
+                "                        public X509Certificate[] getAcceptedIssuers() {\r\n" +
+                "                            return new X509Certificate[]{};\r\n" +
+                "                        }\r\n" +
+                "                    }\r\n" +
+                "                };\r\n" +
                 "\r\n" +
-                "final SSLContext sslContext = SSLContext.getInstance(\"TLS\");\r\n" +
-                "sslContext.init(null, trustAllCerts, new SecureRandom());\r\n" +
-                "final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();\r\n" +
-                "builder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0]);\r\n" +
-                "builder.connectTimeout(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
-                "builder.readTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
-                "builder.writeTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
-                "builder.hostnameVerifier(new HostnameVerifier() {\r\n" +
-                "@Override\r\n" +
-                "public boolean verify(String hostname, SSLSession session) {\r\n" +
-                "return true;\r\n" +
-                "}\r\n" +
-                "});\r\n" +
-                "} catch (Exception e) {\r\n" +
-                "}\r\n" +
+                "                final SSLContext sslContext = SSLContext.getInstance(\"TLS\");\r\n" +
+                "                sslContext.init(null, trustAllCerts, new SecureRandom());\r\n" +
+                "                final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();\r\n" +
+                "                builder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustAllCerts[0]);\r\n" +
+                "                builder.connectTimeout(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
+                "                builder.readTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
+                "                builder.writeTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS);\r\n" +
+                "                builder.hostnameVerifier(new HostnameVerifier() {\r\n" +
+                "                    @Override\r\n" +
+                "                    public boolean verify(String hostname, SSLSession session) {\r\n" +
+                "                        return true;\r\n" +
+                "                    }\r\n" +
+                "                });\r\n" +
+                "            } catch (Exception e) {\r\n" +
+                "            }\r\n" +
                 "\r\n" +
-                "client = builder.build();\r\n" +
-                "}\r\n" +
+                "            client = builder.build();\r\n" +
+                "        }\r\n" +
                 "\r\n" +
-                "return client;\r\n" +
-                "}\r\n" +
+                "        return client;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void execute(final RequestNetwork requestNetwork, String method, String url, final String tag, final RequestNetwork.RequestListener requestListener) {\r\n" +
-                "Request.Builder reqBuilder = new Request.Builder();\r\n" +
-                "Headers.Builder headerBuilder = new Headers.Builder();\r\n" +
+                "    public void execute(final RequestNetwork requestNetwork, String method, String url, final String tag, final RequestNetwork.RequestListener requestListener) {\r\n" +
+                "        Request.Builder reqBuilder = new Request.Builder();\r\n" +
+                "        Headers.Builder headerBuilder = new Headers.Builder();\r\n" +
                 "\r\n" +
-                "if (requestNetwork.getHeaders().size() > 0) {\r\n" +
-                "HashMap<String, Object> headers = requestNetwork.getHeaders();\r\n" +
+                "        if (requestNetwork.getHeaders().size() > 0) {\r\n" +
+                "            HashMap<String, Object> headers = requestNetwork.getHeaders();\r\n" +
                 "\r\n" +
-                "for (HashMap.Entry<String, Object> header : headers.entrySet()) {\r\n" +
-                "headerBuilder.add(header.getKey(), String.valueOf(header.getValue()));\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "            for (HashMap.Entry<String, Object> header : headers.entrySet()) {\r\n" +
+                "                headerBuilder.add(header.getKey(), String.valueOf(header.getValue()));\r\n" +
+                "            }\r\n" +
+                "        }\r\n" +
                 "\r\n" +
-                "try {\r\n" +
-                "if (requestNetwork.getRequestType() == REQUEST_PARAM) {\r\n" +
-                "if (method.equals(GET)) {\r\n" +
-                "HttpUrl.Builder httpBuilder;\r\n" +
+                "        try {\r\n" +
+                "            if (requestNetwork.getRequestType() == REQUEST_PARAM) {\r\n" +
+                "                if (method.equals(GET)) {\r\n" +
+                "                    HttpUrl.Builder httpBuilder;\r\n" +
                 "\r\n" +
-                "try {\r\n" +
-                "httpBuilder = HttpUrl.parse(url).newBuilder();\r\n" +
-                "} catch (NullPointerException ne) {\r\n" +
-                "throw new NullPointerException(\"unexpected url: \" + url);\r\n" +
-                "}\r\n" +
+                "                    try {\r\n" +
+                "                        httpBuilder = HttpUrl.parse(url).newBuilder();\r\n" +
+                "                    } catch (NullPointerException ne) {\r\n" +
+                "                        throw new NullPointerException(\"unexpected url: \" + url);\r\n" +
+                "                    }\r\n" +
                 "\r\n" +
-                "if (requestNetwork.getParams().size() > 0) {\r\n" +
-                "HashMap<String, Object> params = requestNetwork.getParams();\r\n" +
+                "                    if (requestNetwork.getParams().size() > 0) {\r\n" +
+                "                        HashMap<String, Object> params = requestNetwork.getParams();\r\n" +
                 "\r\n" +
-                "for (HashMap.Entry<String, Object> param : params.entrySet()) {\r\n" +
-                "httpBuilder.addQueryParameter(param.getKey(), String.valueOf(param.getValue()));\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "                        for (HashMap.Entry<String, Object> param : params.entrySet()) {\r\n" +
+                "                            httpBuilder.addQueryParameter(param.getKey(), String.valueOf(param.getValue()));\r\n" +
+                "                        }\r\n" +
+                "                    }\r\n" +
                 "\r\n" +
-                "reqBuilder.url(httpBuilder.build()).headers(headerBuilder.build()).get();\r\n" +
-                "} else {\r\n" +
-                "FormBody.Builder formBuilder = new FormBody.Builder();\r\n" +
-                "if (requestNetwork.getParams().size() > 0) {\r\n" +
-                "HashMap<String, Object> params = requestNetwork.getParams();\r\n" +
+                "                    reqBuilder.url(httpBuilder.build()).headers(headerBuilder.build()).get();\r\n" +
+                "                } else {\r\n" +
+                "                    FormBody.Builder formBuilder = new FormBody.Builder();\r\n" +
+                "                    if (requestNetwork.getParams().size() > 0) {\r\n" +
+                "                        HashMap<String, Object> params = requestNetwork.getParams();\r\n" +
                 "\r\n" +
-                "for (HashMap.Entry<String, Object> param : params.entrySet()) {\r\n" +
-                "formBuilder.add(param.getKey(), String.valueOf(param.getValue()));\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "                        for (HashMap.Entry<String, Object> param : params.entrySet()) {\r\n" +
+                "                            formBuilder.add(param.getKey(), String.valueOf(param.getValue()));\r\n" +
+                "                        }\r\n" +
+                "                    }\r\n" +
                 "\r\n" +
-                "RequestBody reqBody = formBuilder.build();\r\n" +
+                "                    RequestBody reqBody = formBuilder.build();\r\n" +
                 "\r\n" +
-                "reqBuilder.url(url).headers(headerBuilder.build()).method(method, reqBody);\r\n" +
-                "}\r\n" +
-                "} else {\r\n" +
-                "RequestBody reqBody = RequestBody.create(MediaType.parse(\"application/json\"), new Gson().toJson(requestNetwork.getParams()));\r\n" +
+                "                    reqBuilder.url(url).headers(headerBuilder.build()).method(method, reqBody);\r\n" +
+                "                }\r\n" +
+                "            } else {\r\n" +
+                "                RequestBody reqBody = RequestBody.create(MediaType.parse(\"application/json\"), new Gson().toJson(requestNetwork.getParams()));\r\n" +
                 "\r\n" +
-                "if (method.equals(GET)) {\r\n" +
-                "reqBuilder.url(url).headers(headerBuilder.build()).get();\r\n" +
-                "} else {\r\n" +
-                "reqBuilder.url(url).headers(headerBuilder.build()).method(method, reqBody);\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "                if (method.equals(GET)) {\r\n" +
+                "                    reqBuilder.url(url).headers(headerBuilder.build()).get();\r\n" +
+                "                } else {\r\n" +
+                "                    reqBuilder.url(url).headers(headerBuilder.build()).method(method, reqBody);\r\n" +
+                "                }\r\n" +
+                "            }\r\n" +
                 "\r\n" +
-                "Request req = reqBuilder.build();\r\n" +
+                "            Request req = reqBuilder.build();\r\n" +
                 "\r\n" +
-                "getClient().newCall(req).enqueue(new Callback() {\r\n" +
-                "@Override\r\n" +
-                "public void onFailure(Call call, final IOException e) {\r\n" +
-                "requestNetwork.getActivity().runOnUiThread(new Runnable() {\r\n" +
-                "@Override\r\n" +
-                "public void run() {\r\n" +
-                "requestListener.onErrorResponse(tag, e.getMessage());\r\n" +
-                "}\r\n" +
-                "});\r\n" +
-                "}\r\n" +
+                "            getClient().newCall(req).enqueue(new Callback() {\r\n" +
+                "                @Override\r\n" +
+                "                public void onFailure(Call call, final IOException e) {\r\n" +
+                "                    requestNetwork.getActivity().runOnUiThread(new Runnable() {\r\n" +
+                "                        @Override\r\n" +
+                "                        public void run() {\r\n" +
+                "                            requestListener.onErrorResponse(tag, e.getMessage());\r\n" +
+                "                        }\r\n" +
+                "                    });\r\n" +
+                "                }\r\n" +
                 "\r\n" +
-                "@Override\r\n" +
-                "public void onResponse(Call call, final Response response) throws IOException {\r\n" +
-                "final String responseBody = response.body().string().trim();\r\n" +
-                "requestNetwork.getActivity().runOnUiThread(new Runnable() {\r\n" +
-                "@Override\r\n" +
-                "public void run() {\r\n" +
-                "Headers b = response.headers();\r\n" +
-                "HashMap<String, Object> map = new HashMap<>();\r\n" +
-                "for (String s : b.names()) {\r\n" +
-                "map.put(s, b.get(s) != null ? b.get(s) : \"null\");\r\n" +
-                "}\r\n" +
-                "requestListener.onResponse(tag, responseBody, map);\r\n" +
-                "}\r\n" +
-                "});\r\n" +
-                "}\r\n" +
-                "});\r\n" +
-                "} catch (Exception e) {\r\n" +
-                "requestListener.onErrorResponse(tag, e.getMessage());\r\n" +
-                "}\r\n" +
-                "}\r\n" +
+                "                @Override\r\n" +
+                "                public void onResponse(Call call, final Response response) throws IOException {\r\n" +
+                "                    final String responseBody = response.body().string().trim();\r\n" +
+                "                    requestNetwork.getActivity().runOnUiThread(new Runnable() {\r\n" +
+                "                        @Override\r\n" +
+                "                        public void run() {\r\n" +
+                "                            Headers b = response.headers();\r\n" +
+                "                            HashMap<String, Object> map = new HashMap<>();\r\n" +
+                "                            for (String s : b.names()) {\r\n" +
+                "                                map.put(s, b.get(s) != null ? b.get(s) : \"null\");\r\n" +
+                "                            }\r\n" +
+                "                            requestListener.onResponse(tag, responseBody, map);\r\n" +
+                "                        }\r\n" +
+                "                    });\r\n" +
+                "                }\r\n" +
+                "            });\r\n" +
+                "        } catch (Exception e) {\r\n" +
+                "            requestListener.onErrorResponse(tag, e.getMessage());\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "}\r\n";
     }
 
@@ -2759,52 +2788,53 @@ public class Lx {
                 "import java.util.HashMap;\r\n" +
                 "\r\n" +
                 "public class RequestNetwork {\r\n" +
-                "private HashMap<String, Object> params = new HashMap<>();\r\n" +
-                "private HashMap<String, Object> headers = new HashMap<>();\r\n" +
+                "    private HashMap<String, Object> params = new HashMap<>();\r\n" +
+                "    private HashMap<String, Object> headers = new HashMap<>();\r\n" +
                 "\r\n" +
-                "private Activity activity;\r\n" +
+                "    private Activity activity;\r\n" +
                 "\r\n" +
-                "private int requestType = 0;\r\n" +
+                "    private int requestType = 0;\r\n" +
                 "\r\n" +
-                "public RequestNetwork(Activity activity) {\r\n" +
-                "this.activity = activity;\r\n" +
-                "}\r\n" +
+                "    public RequestNetwork(Activity activity) {\r\n" +
+                "        this.activity = activity;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setHeaders(HashMap<String, Object> headers) {\r\n" +
-                "this.headers = headers;\r\n" +
-                "}\r\n" +
+                "    public void setHeaders(HashMap<String, Object> headers) {\r\n" +
+                "        this.headers = headers;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void setParams(HashMap<String, Object> params, int requestType) {\r\n" +
-                "this.params = params;\r\n" +
-                "this.requestType = requestType;\r\n" +
-                "}\r\n" +
+                "    public void setParams(HashMap<String, Object> params, int requestType) {\r\n" +
+                "        this.params = params;\r\n" +
+                "        this.requestType = requestType;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public HashMap<String, Object> getParams() {\r\n" +
-                "return params;\r\n" +
-                "}\r\n" +
+                "    public HashMap<String, Object> getParams() {\r\n" +
+                "        return params;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public HashMap<String, Object> getHeaders() {\r\n" +
-                "return headers;\r\n" +
-                "}\r\n" +
+                "    public HashMap<String, Object> getHeaders() {\r\n" +
+                "        return headers;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public Activity getActivity() {\r\n" +
-                "return activity;\r\n" +
-                "}\r\n" +
+                "    public Activity getActivity() {\r\n" +
+                "        return activity;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public int getRequestType() {\r\n" +
-                "return requestType;\r\n" +
-                "}\r\n" +
+                "    public int getRequestType() {\r\n" +
+                "        return requestType;\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public void startRequestNetwork(String method, String url, String tag, RequestListener requestListener) {\r\n" +
-                "RequestNetworkController.getInstance().execute(this, method, url, tag, requestListener);\r\n" +
-                "}\r\n" +
+                "    public void startRequestNetwork(String method, String url, String tag, RequestListener requestListener) {\r\n" +
+                "        RequestNetworkController.getInstance().execute(this, method, url, tag, requestListener);\r\n" +
+                "    }\r\n" +
                 "\r\n" +
-                "public interface RequestListener {\r\n" +
-                "public void onResponse(String tag, String response, HashMap<String, Object> responseHeaders);\r\n" +
-                "public void onErrorResponse(String tag, String message);\r\n" +
-                "}\r\n" +
+                "    public interface RequestListener {\r\n" +
+                "        public void onResponse(String tag, String response, HashMap<String, Object> responseHeaders);\r\n" +
+                "        public void onErrorResponse(String tag, String message);\r\n" +
+                "    }\r\n" +
                 "}\r\n";
     }
+
 
     /**
      * @return Content of a <code>SketchwareUtil.java</code> file, with indentation

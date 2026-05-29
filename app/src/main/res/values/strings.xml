@@ -2174,6 +2174,8 @@ Please try again later"</string>
     <string name="component_description_fb_ads_interstitial">Facebook Ads Interstitial is used to display interstitial ads with Facebook ads</string>
     <string name="design_drawer_menu_androidmanifest">AndroidManifest Manager</string>
     <string name="design_drawer_menu_androidmanifest_subtitle">Modify AndroidManifest</string>
+    <string name="design_drawer_menu_gradle">Gradle Manager</string>
+<string name="design_drawer_menu_gradle_subtitle">Modify build scripts and gradle settings</string>
     <string name="design_drawer_menu_proguard">Code Shrinking Manager</string>
     <string name="design_drawer_menu_proguard_subtitle">Minimize/obfuscate your app with R8/ProGuard</string>
     <string name="design_drawer_menu_stringfog">StringFog Manager</string>

@@ -30,7 +30,7 @@ public class ProjectSettings {
     public static final String SETTING_NEW_XML_COMMAND = "xml_command";
     
     public static final String SETTING_FORCE_ANDROIDX = "force_androidx";
-    public static final String SETTING_JAVA_TO_KOTLIN = "java_to_kotlin";
+    public static final String SETTING_ENABLE_CUSTOM_GRADLE = "custom_gradle";
     public static final String SETTING_ENABLE_CUSTOM_JAVA = "custom_java";
     public static final String SETTING_ENABLE_CUSTOM_MANIFEST = "custom_manifest";
 

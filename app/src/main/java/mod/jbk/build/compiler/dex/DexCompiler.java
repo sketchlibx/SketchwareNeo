@@ -30,6 +30,7 @@ public class DexCompiler {
         }
 
         Collection<Path> programFiles = new LinkedList<>();
+        
         if (builder.proguard.isShrinkingEnabled()) {
             programFiles.add(Paths.get(builder.yq.proguardClassesPath));
         } else {
@@ -37,10 +38,11 @@ public class DexCompiler {
             if (compiledClassesDir.exists() && compiledClassesDir.list() != null && compiledClassesDir.list().length > 0) {
                 try {
                     File tempJar = new File(builder.yq.compiledClassesPath + ".jar");
+                    // Generating JAR natively before sending to D8 is much safer
                     JarBuilder.INSTANCE.generateJar(compiledClassesDir);
                     if (tempJar.exists()) {
                         programFiles.add(tempJar.toPath());
-                        LogUtil.d("DexCompiler", "D8 Program File added as JAR to prevent class drop");
+                        LogUtil.d("DexCompiler", "D8 Program File added as JAR to prevent class drop (Java 11/17 safe)");
                     } else {
                         // Fallback
                         for (File file : FileUtil.listFilesRecursively(compiledClassesDir, ".class")) {
@@ -59,7 +61,9 @@ public class DexCompiler {
 
         Collection<Path> libraryFiles = new LinkedList<>();
         for (String jarPath : builder.getClasspath().split(":")) {
-            libraryFiles.add(Paths.get(jarPath));
+            if (!jarPath.trim().isEmpty()) {
+                libraryFiles.add(Paths.get(jarPath));
+            }
         }
 
         // MultiDex generation support

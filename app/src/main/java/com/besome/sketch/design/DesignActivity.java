@@ -103,8 +103,8 @@ import mod.bobur.FloatingProgressWindow;
 import mod.hey.studios.activity.managers.assets.ManageAssetsActivity;
 import mod.hey.studios.activity.managers.java.ManageJavaActivity;
 import mod.hey.studios.code.SrcCodeEditor;
-import mod.hey.studios.compiler.kotlin.KotlinCompilerBridge;
 import mod.hey.studios.project.ProjectSettings;
+import mod.hey.studios.compiler.kotlin.KotlinCompilerBridge;
 import mod.hey.studios.project.custom_blocks.CustomBlocksDialog;
 import mod.hey.studios.project.proguard.ManageProguardActivity;
 import mod.hey.studios.project.proguard.ProguardHandler;
@@ -1081,8 +1081,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 maybeShowNotification();
             });
         }
-
-        private void doInBackground() {
+        
+                private void doInBackground() {
             DesignActivity activity = getActivity();
             if (activity == null) return;
             mod.sketchlibx.project.history.TimeMachineManager.takeSnapshot(DesignActivity.sc_id);
@@ -1136,11 +1136,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 builder.generateViewBinding();
                 if (canceled) return;
                 
-                boolean isKotlinEnabled = new ProjectSettings(sc_id).getValue(ProjectSettings.SETTING_JAVA_TO_KOTLIN, "false").equals("true");
-                if (isKotlinEnabled) {
-                    KotlinCompilerBridge.compileKotlinCodeIfPossible(this, builder);
-                    if (canceled) return;
-                }
+                // Kotlin Compiler Bridge removed for pure Java + Custom Gradle compilation speed & stability
                 
                 onProgress("Java is compiling...", 13);
                 builder.compileJavaCode();
@@ -1207,7 +1203,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 activity.runOnUiThread(this::onPostExecute);
             }
         }
-
+        
         @Override
         public void onProgress(String progress, int step) {
             int totalSteps = 20;

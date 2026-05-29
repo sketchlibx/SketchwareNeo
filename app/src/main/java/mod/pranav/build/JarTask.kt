@@ -1,6 +1,5 @@
 package mod.pranav.build
 
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -11,63 +10,59 @@ import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
 
 object JarBuilder {
-    fun generateJar(classes: File) {
-        // Open archive file
-        val stream = FileOutputStream(File(classes.parent, "classes.jar"))
-        val manifest = buildManifest()
+    
+    @Throws(IOException::class)
+    fun generateJar(classesDir: File) {
+        // Safe check to avoid empty or missing directories
+        if (!classesDir.exists() || !classesDir.isDirectory) {
+            throw IOException("Classes directory does not exist or is not a directory: ${classesDir.absolutePath}")
+        }
 
-        // Create the jar file
-        val out = JarOutputStream(stream, manifest)
+        // Dynamically naming the jar based on the parent folder name
+        val outputFile = File(classesDir.parent, "${classesDir.name}.jar")
+        
+        val manifest = Manifest().apply {
+            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+        }
 
-        // Add the files
-        val files = classes.listFiles()
-        if (files != null) {
-            for (clazz in files) {
-                add(classes.path, clazz, out)
+        JarOutputStream(FileOutputStream(outputFile), manifest).use { out ->
+            classesDir.listFiles()?.forEach { file ->
+                add(classesDir, file, out)
             }
         }
-        out.close()
-        stream.close()
     }
 
-    private fun buildManifest(): Manifest {
-        val manifest = Manifest()
-        manifest.mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
-        return manifest
-    }
+    @Throws(IOException::class)
+    private fun add(rootDir: File, source: File, target: JarOutputStream) {
+        var entryName = source.relativeTo(rootDir).invariantSeparatorsPath
 
-    private fun add(parentPath: String, source: File, target: JarOutputStream) {
-        var name = source.path.substring(parentPath.length + 1)
         if (source.isDirectory) {
-            if (name.isNotEmpty()) {
-                if (!name.endsWith("/")) name += "/"
+            if (entryName.isNotEmpty()) {
+                if (!entryName.endsWith("/")) entryName += "/"
 
-                // Add the Entry
-                val entry = JarEntry(name)
-                entry.time = source.lastModified()
+                val entry = JarEntry(entryName).apply {
+                    time = source.lastModified()
+                }
                 target.putNextEntry(entry)
                 target.closeEntry()
             }
-            for (nestedFile in source.listFiles()!!) {
-                add(parentPath, nestedFile, target)
+            
+            // Safely iterate through child files
+            source.listFiles()?.forEach { nestedFile ->
+                add(rootDir, nestedFile, target)
             }
             return
         }
-        val entry = JarEntry(name)
-        entry.time = source.lastModified()
-        target.putNextEntry(entry)
-        try {
-            BufferedInputStream(FileInputStream(source)).use { `in` ->
-                val buffer = ByteArray(1024)
-                while (true) {
-                    val count = `in`.read(buffer)
-                    if (count == -1) break
-                    target.write(buffer, 0, count)
-                }
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
+
+        val entry = JarEntry(entryName).apply {
+            time = source.lastModified()
         }
+        target.putNextEntry(entry)
+        
+        FileInputStream(source).use { input ->
+            input.copyTo(target)
+        }
+        
         target.closeEntry()
     }
 }

@@ -1,4 +1,6 @@
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -6,120 +8,180 @@
     android:fitsSystemWindows="true"
     tools:ignore="ContentDescription">
 
+    <!-- ── AppBar ──────────────────────────────────────────────────────────── -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fitsSystemWindows="true">
+        android:fitsSystemWindows="true"
+        app:liftOnScroll="true"
+        app:liftOnScrollTargetViewId="@id/filesListRecyclerView">
 
         <com.google.android.material.appbar.MaterialToolbar
-                android:id="@+id/topAppBar"
+            android:id="@+id/topAppBar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:title="Resource Manager"
+            app:menu="@menu/menu_resource_manager" />
+
+        <!-- Search field — toggled visible/gone by search icon click -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/searchLayout"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="8dp"
+            android:hint="Search resources…"
+            android:visibility="gone"
+            app:endIconMode="clear_text"
+            app:startIconDrawable="@drawable/ic_search_24">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchEditText"
                 android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:navigationIcon="?attr/homeAsUpIndicator"
-                app:title="@string/assets_manager_title" />
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:maxLines="1"
+                android:imeOptions="actionSearch" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
     </com.google.android.material.appbar.AppBarLayout>
 
-    <LinearLayout
-        android:id="@+id/contentLayout"
+    <!-- ── File list ──────────────────────────────────────────────────────── -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/filesListRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="100dp"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbars="vertical"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        tools:listitem="@layout/item_resource_tree" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/filesListRecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="120dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior"
-            tools:listitem="@layout/manage_java_item_hs" />
-    </LinearLayout>
-
+    <!-- ── Empty state ───────────────────────────────────────────────────── -->
     <LinearLayout
         android:id="@+id/noContentLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/colorSurface"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingHorizontal="24dp"
-        android:paddingBottom="100dp"
+        android:paddingHorizontal="40dp"
+        android:paddingBottom="80dp"
         android:visibility="gone"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="@string/assets_manager_nofiles_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="20sp" />
+        <!-- Folder illustration -->
+        <FrameLayout
+            android:layout_width="96dp"
+            android:layout_height="96dp">
+
+            <ImageView
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:alpha="0.08"
+                android:src="@drawable/ic_mtrl_folder"
+                app:tint="?attr/colorOnSurface" />
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:alpha="0.35"
+                android:src="@drawable/ic_mtrl_folder"
+                app:tint="?attr/colorPrimary" />
+
+        </FrameLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="20dp"
             android:gravity="center"
-            android:text="@string/assets_manager_nofiles_body"
+            android:text="No resources here"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="Create a new file or import existing resources to get started"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp" />
+            android:textSize="13sp"
+            android:lineSpacingMultiplier="1.3" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCreateEmpty"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Create Resource"
+            app:icon="@drawable/ic_mtrl_add" />
 
     </LinearLayout>
 
+    <!-- ── FAB: "Options" primary button ─────────────────────────────────── -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/showOptionsButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal|bottom"
-        android:layout_marginBottom="30dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="28dp"
         android:text="@string/assets_manager_options"
-        app:icon="@drawable/ic_mtrl_add"
-        tools:translationY="-70dp" />
+        app:icon="@drawable/ic_mtrl_add" />
 
+    <!-- ── FAB row: Create / Close / Import ──────────────────────────────── -->
     <LinearLayout
         android:id="@+id/optionsLayout"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal|bottom"
-        android:layout_marginBottom="10dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="24dp"
         android:alpha="0"
-        android:animateLayoutChanges="true"
-        android:gravity="center"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:translationY="200dp"
-        tools:alpha="1"
-        tools:translationY="0dp">
+        android:translationY="120dp">
 
+        <!-- Create new -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/createNewButton"
+            style="@style/Widget.Material3.ExtendedFloatingActionButton.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="20dp"
-            android:text="@string/assets_manager_add_new" />
+            android:layout_marginEnd="8dp"
+            android:text="@string/assets_manager_add_new"
+            app:icon="@drawable/ic_mtrl_file" />
 
+        <!-- Close -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/closeButton"
+            style="@style/Widget.Material3.FloatingActionButton.Small.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="5dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginHorizontal="8dp"
+            android:contentDescription="Close options"
             android:src="@drawable/close_gray_48dp" />
 
+        <!-- Import -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/importNewButton"
+            style="@style/Widget.Material3.ExtendedFloatingActionButton.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="20dp"
-            android:text="@string/assets_manager_add_file" />
+            android:layout_marginStart="8dp"
+            android:text="@string/assets_manager_add_file"
+            app:icon="@drawable/ic_mtrl_add" />
 
     </LinearLayout>
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
 
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

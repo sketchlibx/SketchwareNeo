@@ -151,7 +151,6 @@ public class yq {
         boolean isForceAndroidXEnabled = projectSettings.getValue(ProjectSettings.SETTING_FORCE_ANDROIDX, "false").equals("true");
         if (!isForceAndroidXEnabled || code == null) return code;
         
-        // Android Support -> AndroidX Migrations
         code = code.replace("android.support.v7.app.AppCompatActivity", "androidx.appcompat.app.AppCompatActivity");
         code = code.replace("android.support.v4.app.Fragment", "androidx.fragment.app.Fragment");
         code = code.replace("android.support.v4.app.FragmentManager", "androidx.fragment.app.FragmentManager");
@@ -214,16 +213,44 @@ public class yq {
     }
 
     public void generateGradleFiles() {
-        fileUtil.b(projectMyscPath + File.separator + "app" + File.separator + "build.gradle",
-                Lx.getBuildGradleString(VAR_DEFAULT_TARGET_SDK_VERSION, VAR_DEFAULT_MIN_SDK_VERSION, projectSettings.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(VAR_DEFAULT_TARGET_SDK_VERSION)), N, projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE)));
-        fileUtil.b(projectMyscPath + File.separator + "settings.gradle", Lx.a());
-        fileUtil.b(projectMyscPath + File.separator + "build.gradle", Lx.c("8.12.0", "4.4.3"));
+        String defaultAppGradle = Lx.getBuildGradleString(VAR_DEFAULT_TARGET_SDK_VERSION, VAR_DEFAULT_MIN_SDK_VERSION, projectSettings.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(VAR_DEFAULT_TARGET_SDK_VERSION)), N, projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE));
+        String defaultProjGradle = Lx.c("8.12.0", "4.4.3");
+        String defaultSettingsGradle = Lx.a();
 
-        fileUtil.b(projectMyscPath + File.separator + "gradle.properties", """
-                android.enableR8.fullMode=false
-                android.enableJetifier=true
-                android.useAndroidX=true
-                """.trim());
+        boolean isCustomGradleEnabled = projectSettings.getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_GRADLE, "false").equals("true");
+        String customGradleDir = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/custom_gradle/";
+
+        String appGradleContent = defaultAppGradle;
+        String projGradleContent = defaultProjGradle;
+        String settingsGradleContent = defaultSettingsGradle;
+
+        if (isCustomGradleEnabled) {
+            FileUtil.makeDir(customGradleDir);
+
+            String pathApp = customGradleDir + "app_build.gradle";
+            String pathProj = customGradleDir + "build.gradle";
+            String pathSettings = customGradleDir + "settings.gradle";
+
+            if (!FileUtil.isExistFile(pathApp) || FileUtil.readFile(pathApp).trim().isEmpty() || FileUtil.readFile(pathApp).contains("// Run the project once")) {
+                FileUtil.writeFile(pathApp, defaultAppGradle);
+            }
+            if (!FileUtil.isExistFile(pathProj) || FileUtil.readFile(pathProj).trim().isEmpty() || FileUtil.readFile(pathProj).contains("// Run the project once")) {
+                FileUtil.writeFile(pathProj, defaultProjGradle);
+            }
+            if (!FileUtil.isExistFile(pathSettings) || FileUtil.readFile(pathSettings).trim().isEmpty() || FileUtil.readFile(pathSettings).contains("// Run the project once")) {
+                FileUtil.writeFile(pathSettings, defaultSettingsGradle);
+            }
+
+            appGradleContent = FileUtil.readFile(pathApp);
+            projGradleContent = FileUtil.readFile(pathProj);
+            settingsGradleContent = FileUtil.readFile(pathSettings);
+        }
+
+        fileUtil.b(projectMyscPath + File.separator + "app" + File.separator + "build.gradle", appGradleContent);
+        fileUtil.b(projectMyscPath + File.separator + "build.gradle", projGradleContent);
+        fileUtil.b(projectMyscPath + File.separator + "settings.gradle", settingsGradleContent);
+
+        fileUtil.b(projectMyscPath + File.separator + "gradle.properties", "android.enableR8.fullMode=false\nandroid.enableJetifier=true\nandroid.useAndroidX=true");
     }
 
     public void a(Context context, String str) {

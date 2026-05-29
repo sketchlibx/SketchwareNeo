@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="16dp">
+
+    <!-- Drag handle -->
+    <View
+        android:layout_width="32dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_bottom_sheet_handle" />
+
+    <!-- File/folder header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:id="@+id/bsFileIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:scaleType="centerInside"
+            android:contentDescription="File icon"
+            app:tint="?attr/colorPrimary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/bsFileName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="middle"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/bsFilePath"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="start"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <com.google.android.material.divider.MaterialDivider
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Action: Edit (file only) -->
+    <LinearLayout
+        android:id="@+id/bsActionEdit"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_code"
+            android:contentDescription="Edit"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Edit"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Edit with... (file only) -->
+    <LinearLayout
+        android:id="@+id/bsActionEditWith"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_open_in_new"
+            android:contentDescription="Edit with..."
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Edit with…"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Create file inside (folder only) -->
+    <LinearLayout
+        android:id="@+id/bsActionCreateFile"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_file"
+            android:contentDescription="New file"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Create file inside"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Create folder inside (folder only) -->
+    <LinearLayout
+        android:id="@+id/bsActionCreateFolder"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_folder"
+            android:contentDescription="New folder"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Create folder inside"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Import here (folder only) -->
+    <LinearLayout
+        android:id="@+id/bsActionImport"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_add"
+            android:contentDescription="Import"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Import here"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Action: Rename (all) -->
+    <LinearLayout
+        android:id="@+id/bsActionRename"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_edit"
+            android:contentDescription="Rename"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Rename"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Divider before destructive action -->
+    <com.google.android.material.divider.MaterialDivider
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="4dp" />
+
+    <!-- Action: Delete (all) — uses error color to signal destructive -->
+    <LinearLayout
+        android:id="@+id/bsActionDelete"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="20dp"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_mtrl_delete"
+            android:contentDescription="Delete"
+            app:tint="?attr/colorError" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Delete"
+            android:textColor="?attr/colorError"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
@@ -18,7 +19,8 @@
         android:layout_marginStart="24dp"
         android:layout_marginBottom="8dp"
         android:text="Global Project Search"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:textAppearance="?attr/textAppearanceTitleLarge"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -28,7 +30,6 @@
 
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/search_input_layout"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -37,7 +38,8 @@
             app:boxCornerRadiusBottomStart="16dp"
             app:boxCornerRadiusTopEnd="16dp"
             app:boxCornerRadiusTopStart="16dp"
-            app:startIconDrawable="@drawable/search_icon_grey">
+            app:endIconMode="clear_text"
+            app:startIconDrawable="@drawable/ic_mtrl_search">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/edit_search"
@@ -46,17 +48,9 @@
                 android:imeOptions="actionSearch"
                 android:importantForAutofill="noExcludeDescendants"
                 android:inputType="text"
+                android:maxLines="1"
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/search_info"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Start typing to instantly scan your entire project's XML layout, logic blocks, and components."
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
 
@@ -66,15 +60,73 @@
         android:layout_marginTop="16dp"
         android:background="?attr/colorOutlineVariant" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_search_results"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:nestedScrollingEnabled="true"
-        android:paddingTop="8dp"
-        android:paddingBottom="24dp"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+        android:layout_weight="1">
 
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_search_results"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:nestedScrollingEnabled="true"
+            android:paddingTop="8dp"
+            android:paddingBottom="24dp"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+        <LinearLayout
+            android:id="@+id/layout_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:alpha="0.6"
+                android:src="@drawable/ic_mtrl_search"
+                app:tint="?attr/colorOnSurface" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="Start typing to instantly scan your entire project's XML layout, logic blocks, and components."
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:alpha="0.6"
+                android:src="@drawable/ic_delete_white_24dp"
+                app:tint="?attr/colorOnSurface" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="No results found."
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                android:textColor="?attr/colorOnSurface" />
+        </LinearLayout>
+
+    </FrameLayout>
 </LinearLayout>

@@ -12,19 +12,15 @@ import pro.sketchware.utility.FileUtil;
 
 public class KotlinCompilerBridge {
 
-    private static boolean isKotlinEnabled(ProjectBuilder builder) {
-        return builder.settings.getValue(ProjectSettings.SETTING_JAVA_TO_KOTLIN, "false").equals("true");
-    }
-
     public static void compileKotlinCodeIfPossible(BuildProgressReceiver receiver, ProjectBuilder builder) throws Throwable {
-        if (isKotlinEnabled(builder) && KotlinCompilerUtil.areAnyKtFilesPresent(builder)) {
+        if (KotlinCompilerUtil.areAnyKtFilesPresent(builder)) {
             receiver.onProgress("Kotlin is compiling...", 12);
             new KotlinCompiler(builder).compile();
         }
     }
 
     public static void maybeAddKotlinBuiltInLibraryDependenciesIfPossible(ProjectBuilder builder, BuiltInLibraryManager builtInLibraryManager) {
-        if (isKotlinEnabled(builder) && KotlinCompilerUtil.areAnyKtFilesPresent(builder)) {
+        if (KotlinCompilerUtil.areAnyKtFilesPresent(builder)) {
             builtInLibraryManager.addLibrary(BuiltInLibraries.JETBRAINS_KOTLIN_STDLIB);
         }
     }

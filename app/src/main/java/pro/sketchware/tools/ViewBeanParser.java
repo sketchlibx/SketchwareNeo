@@ -122,8 +122,6 @@ public class ViewBeanParser {
 
         int type = ViewBean.getViewTypeByTypeName(className);
 
-        // PRO FIX: We do NOT force-convert complex Material types into basic Linear/TextView types
-        // if they are explicitly fully qualified, to prevent CardView from turning into TextView!
         if (!name.contains(".")) {
             if (type == ViewBean.VIEW_TYPE_LAYOUT_LINEAR && !className.equals("LinearLayout")) {
                 if (className.contains("Switch")) type = ViewBean.VIEW_TYPE_WIDGET_SWITCH;
@@ -203,16 +201,27 @@ public class ViewBeanParser {
                     int type = getViewTypeByClassName(name);
 
                     String attrId = parser.getAttributeValue(null, "android:id");
-                    String id =
-                            attrId != null && !ids.contains(parseReferName(attrId, "/"))
+                    String id = "";
+                    
+                    if (className.equals("include")) {
+                        if (attrId != null && !attrId.isEmpty()) {
+                            id = parseReferName(attrId, "/");
+                        } else {
+                            String layout = parser.getAttributeValue(null, "layout");
+                            if (layout != null) {
+                                id = parseReferName(layout, "/");
+                                // We append a random hash to ensure duplicated layout names without explicit IDs don't collide
+                                if (ids.contains(id)) {
+                                    id = generateUniqueId(ids, type, className);
+                                }
+                            } else {
+                                id = generateUniqueId(ids, type, className);
+                            }
+                        }
+                    } else {
+                        id = attrId != null && !ids.contains(parseReferName(attrId, "/"))
                                     ? parseReferName(attrId, "/")
                                     : generateUniqueId(ids, type, className);
-
-                    if (className.equals("include")) {
-                        String layout = parser.getAttributeValue(null, "layout");
-                        if (layout != null) {
-                            id = parseReferName(layout, "/");
-                        }
                     }
 
                     boolean isCustom = false;
@@ -226,21 +235,24 @@ public class ViewBeanParser {
                                 if (type == 0 || type == 14) {
                                     type = oldBean.type;
                                 }
-                                isCustom = oldBean.isCustomWidget;
-                                customView = oldBean.customView;
-                                convert = oldBean.convert;
-                                oldBeanFound = true;
+                                if (oldBean.convert.equals(convert) || className.equals("include")) {
+                                    isCustom = oldBean.isCustomWidget;
+                                    customView = oldBean.customView;
+                                    oldBeanFound = true;
+                                }
                                 break;
                             }
                         }
                     } 
                     
-                    // PRO FIX: If the tag is fully qualified (e.g. com.google.android.material...)
-                    // we strictly mark it as a Custom Widget so the XML generator recreates it exactly as it was!
                     if (!oldBeanFound && name.contains(".")) {
                         if (type == ViewBean.VIEW_TYPE_LAYOUT_CONSTRAINT || className.equals("ConstraintLayout")) {
                             isCustom = false;
                             convert = "androidx.constraintlayout.widget.ConstraintLayout"; 
+                        } else if (name.equals("androidx.coordinatorlayout.widget.CoordinatorLayout")) {
+                            isCustom = true; 
+                            convert = name;
+                            type = ViewBean.VIEW_TYPE_LAYOUT_LINEAR;
                         } else {
                             isCustom = true;
                             convert = name;
@@ -269,6 +281,7 @@ public class ViewBeanParser {
                             attributes.put(parser.getAttributeName(i), parser.getAttributeValue(i));
                         }
                     }
+                    
                     beansAttributes.put(id, attributes);
                     beans.add(bean);
                     ids.add(id);
@@ -291,107 +304,6 @@ public class ViewBeanParser {
             var attr = beansAttributes.getOrDefault(bean.id, null);
             if (attr != null) {
                 new ViewBeanFactory(bean).applyAttributes(attr);
-                
-                if (bean.parentAttributes == null) {
-                    bean.parentAttributes = new HashMap<>();
-                }
-                
-                Map<String, String> injectMap = new LinkedHashMap<>();
-                
-                for (Map.Entry<String, String> entry : attr.entrySet()) {
-                    String key = entry.getKey();
-                    String value = entry.getValue();
-                    
-                    // PRO FIX: Strict bypassing!
-                    // If a custom view has ANY attribute, we put it straight into inject so it doesn't get swallowed.
-                    if (bean.isCustomWidget) {
-                        if (key.startsWith("app:layout_constraint")) {
-                            String parsedValue = value;
-                            if (parsedValue.startsWith("@+id/")) {
-                                parsedValue = "@id/" + parsedValue.substring(5);
-                            } else if (!parsedValue.startsWith("@id/") && !parsedValue.equals("parent") && !parsedValue.equals("true") && !parsedValue.equals("false")) {
-                                try {
-                                    Float.parseFloat(parsedValue); 
-                                } catch (NumberFormatException e) {
-                                   if (!parsedValue.contains(":")) {
-                                       parsedValue = "@id/" + parsedValue;
-                                   }
-                                }
-                            }
-                            bean.parentAttributes.put(key, parsedValue);
-                        } else if (key.startsWith("android:layout_") && !key.equals("android:layout_marginHorizontal") && !key.equals("android:layout_marginVertical")) {
-                            // Standard layout params go to parentAttributes so parent container can measure them
-                            if (!key.equals("android:layout_width") && !key.equals("android:layout_height") && !key.equals("android:layout_weight") && !key.equals("android:layout_gravity")) {
-                                bean.parentAttributes.put(key, parseReferName(value, "/"));
-                            } else {
-                                injectMap.put(key, value);
-                            }
-                        } else {
-                            injectMap.put(key, value);
-                        }
-                        continue;
-                    }
-
-                    boolean isNativeToAll = key.equals("android:id") || key.equals("android:layout_width") || key.equals("android:layout_height") ||
-                                            key.equals("android:layout_margin") || key.equals("android:layout_marginLeft") || key.equals("android:layout_marginTop") || key.equals("android:layout_marginRight") || key.equals("android:layout_marginBottom") ||
-                                            key.equals("android:padding") || key.equals("android:paddingLeft") || key.equals("android:paddingTop") || key.equals("android:paddingRight") || key.equals("android:paddingBottom") ||
-                                            (key.equals("android:background") && !value.equals("@null")) || key.equals("android:layout_weight") ||
-                                            key.equals("android:layout_gravity") || key.equals("android:gravity");
-
-                    boolean isNativeToType = false;
-                    int type = bean.type;
-                    
-                    if (type == ViewBean.VIEW_TYPE_LAYOUT_LINEAR && key.equals("android:orientation")) {
-                        isNativeToType = true;
-                    } else if ((type == ViewBean.VIEW_TYPE_WIDGET_TEXTVIEW || type == ViewBean.VIEW_TYPE_WIDGET_BUTTON || type == ViewBean.VIEW_TYPE_WIDGET_EDITTEXT || type == ViewBean.VIEW_TYPE_WIDGET_CHECKBOX || type == ViewBean.VIEW_TYPE_WIDGET_SWITCH) &&
-                               (key.equals("android:text") || key.equals("android:textSize") || key.equals("android:textColor") || key.equals("android:textStyle") || key.equals("android:hint") || key.equals("android:textColorHint") || key.equals("android:lines") || key.equals("android:singleLine"))) {
-                        isNativeToType = true;
-                    } else if (type == ViewBean.VIEW_TYPE_WIDGET_IMAGEVIEW && (key.equals("android:src") || key.equals("android:scaleType"))) {
-                        isNativeToType = true;
-                    } else if (type == ViewBean.VIEW_TYPE_WIDGET_PROGRESSBAR && (key.equals("android:progress") || key.equals("android:max") || key.equals("android:indeterminate"))) {
-                        isNativeToType = true;
-                        if (key.equals("android:indeterminate")) {
-                            bean.indeterminate = value;
-                        }
-                    } else if (type == ViewBean.VIEW_TYPE_WIDGET_SEEKBAR && (key.equals("android:progress") || key.equals("android:max"))) {
-                        isNativeToType = true;
-                    } else if ((type == ViewBean.VIEW_TYPE_WIDGET_CHECKBOX || type == ViewBean.VIEW_TYPE_WIDGET_SWITCH) && key.equals("android:checked")) {
-                        isNativeToType = true;
-                    } else if (type == ViewBean.VIEW_TYPE_WIDGET_LISTVIEW && (key.equals("android:dividerHeight") || key.equals("android:choiceMode"))) {
-                        isNativeToType = true;
-                    } else if (type == ViewBean.VIEW_TYPE_WIDGET_SPINNER && key.equals("android:spinnerMode")) {
-                        isNativeToType = true;
-                    }
-
-                    if (!isNativeToAll && !isNativeToType) {
-                        if (key.startsWith("android:layout_") && !key.equals("android:layout_marginHorizontal") && !key.equals("android:layout_marginVertical")) {
-                            bean.parentAttributes.put(key, parseReferName(value, "/"));
-                        } else if (key.startsWith("app:layout_constraint")) {
-                            String parsedValue = value;
-                            if (parsedValue.startsWith("@+id/")) {
-                                parsedValue = "@id/" + parsedValue.substring(5);
-                            } else if (!parsedValue.startsWith("@id/") && !parsedValue.equals("parent") && !parsedValue.equals("true") && !parsedValue.equals("false")) {
-                                try {
-                                    Float.parseFloat(parsedValue); 
-                                } catch (NumberFormatException e) {
-                                   if (!parsedValue.contains(":")) {
-                                       parsedValue = "@id/" + parsedValue;
-                                   }
-                                }
-                            }
-                            bean.parentAttributes.put(key, parsedValue);
-                        } else {
-                            injectMap.put(key, value);
-                        }
-                    }
-                }
-                
-                StringBuilder injectBuilder = new StringBuilder();
-                for (Map.Entry<String, String> entry : injectMap.entrySet()) {
-                    if (injectBuilder.length() > 0) injectBuilder.append("\n");
-                    injectBuilder.append(entry.getKey()).append("=\"").append(entry.getValue()).append("\"");
-                }
-                bean.inject = injectBuilder.toString();
             }
         }
         return beans;

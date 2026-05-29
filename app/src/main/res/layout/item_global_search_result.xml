@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?attr/selectableItemBackground"
@@ -13,31 +14,38 @@
 
     <ImageView
         android:id="@+id/img_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:src="@drawable/ic_mtrl_file"
-        app:tint="?attr/colorPrimary" />
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginEnd="16dp"
+        app:tint="?attr/colorOnSurfaceVariant"
+        tools:src="@drawable/ic_mtrl_file" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <com.google.android.material.textview.MaterialTextView
+        <TextView
             android:id="@+id/tv_title"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:textAppearance="?attr/textAppearanceBodyLarge"
-            android:textColor="?attr/colorOnSurface" />
+            android:textColor="?attr/colorOnSurface"
+            android:textStyle="bold"
+            tools:text="[View] LinearLayout1" />
 
-        <com.google.android.material.textview.MaterialTextView
+        <TextView
             android:id="@+id/tv_subtitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="main.xml • Background color changed" />
     </LinearLayout>
 </LinearLayout>

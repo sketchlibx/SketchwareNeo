@@ -184,6 +184,10 @@ public class ProjectBuilder {
     }
 
     public boolean isD8Enabled() {
+        String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
+        if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_11) || javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
+            return true;
+        }
         return build_settings.getValue(
                 BuildSettings.SETTING_DEXER,
                 BuildSettings.SETTING_DEXER_DX
@@ -258,9 +262,8 @@ public class ProjectBuilder {
             classpath.append(":").append(BuiltInLibraries.getLibraryClassesJarPathString(BuiltInLibraries.ANDROIDX_MULTIDEX));
         }
 
-        if (!build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION,
-                        BuildSettings.SETTING_JAVA_VERSION_1_7)
-                .equals(BuildSettings.SETTING_JAVA_VERSION_1_7)) {
+        String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
+        if (!javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_1_7) && !javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_11) && !javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
             classpath.append(":").append(new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "core-lambda-stubs.jar").getAbsolutePath());
         }
 
@@ -312,7 +315,7 @@ public class ProjectBuilder {
             }
         }
 
-        classpath.deleteCharAt(classpath.length() - 1);
+        if (classpath.length() > 0) classpath.deleteCharAt(classpath.length() - 1);
         return classpath.toString();
     }
 
@@ -327,6 +330,8 @@ public class ProjectBuilder {
         List<MethodId> mergedDexMethods;
         List<ProtoId> mergedDexProtos;
         List<Integer> mergedDexTypes;
+
+        if (!toMergeIterator.hasNext()) return resultDexFiles;
 
         {
             Dex firstDex = new Dex(new FileInputStream(toMergeIterator.next()));
@@ -395,7 +400,7 @@ public class ProjectBuilder {
 
                 for (Integer typeId : dex.typeIds()) {
                     if (!newDexTypeIds.contains(typeId)) {
-                        if (mergedDexTypes.size() + newDexProtoIds.size() + 1 > 0xffff) {
+                        if (mergedDexTypes.size() + newDexTypeIds.size() + 1 > 0xffff) {
                             LogUtil.d(TAG, "Can't merge DEX file to " + nextMergedDexFilename +
                                     " because it has too many new type IDs. "
                                     + nextMergedDexFilename + " will have " + mergedDexTypes.size() + " type IDs");
