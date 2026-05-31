@@ -1,7 +1,7 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/build.gradle",
       "selection": {
         "end": {
           "column": 0,
@@ -14,7 +14,52 @@
           "line": 0
         }
       }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/src/main/AndroidManifest.xml",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 0,
+          "line": 0
+        },
+        "start": {
+          "column": 0,
+          "index": 0,
+          "line": 0
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/build.gradle",
+      "selection": {
+        "end": {
+          "column": 9,
+          "index": 5097,
+          "line": 168
+        },
+        "start": {
+          "column": 9,
+          "index": 5097,
+          "line": 168
+        }
+      }
+    },
+    {
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/src/debug/google-services.json",
+      "selection": {
+        "end": {
+          "column": 6,
+          "index": 8,
+          "line": 1
+        },
+        "start": {
+          "column": 6,
+          "index": 8,
+          "line": 1
+        }
+      }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/build.gradle"
 }
