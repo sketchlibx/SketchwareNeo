@@ -34,10 +34,10 @@ import a.a.a.yB;
 import mod.hey.studios.project.ProjectSettingsDialog;
 import mod.hey.studios.project.backup.BackupRestoreManager;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.activities.main.fragments.projects.ProjectsFragment;
-import pro.sketchware.databinding.BottomSheetProjectOptionsBinding;
-import pro.sketchware.databinding.MyprojectsItemBinding;
+import neo.sketchware.R;
+import neo.sketchware.activities.main.fragments.projects.ProjectsFragment;
+import neo.sketchware.databinding.BottomSheetProjectOptionsBinding;
+import neo.sketchware.databinding.MyprojectsItemBinding;
 
 public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.ProjectViewHolder> {
     private final ProjectsFragment projectsFragment;

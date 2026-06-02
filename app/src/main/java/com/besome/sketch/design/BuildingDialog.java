@@ -9,7 +9,7 @@ import android.widget.TextView;
 import com.besome.sketch.tools.QuizBoard;
 
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
+import neo.sketchware.R;
 
 public class BuildingDialog extends Dialog {
 

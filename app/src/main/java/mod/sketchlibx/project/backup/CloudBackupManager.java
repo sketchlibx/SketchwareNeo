@@ -65,7 +65,7 @@ public class CloudBackupManager {
                     GoogleNetHttpTransport.newTrustedTransport(),
                     GsonFactory.getDefaultInstance(),
                     credential)
-                    .setApplicationName("Sketchware Pro Backup")
+                    .setApplicationName("Sketchware Neo Backup")
                     .build();
 
             Log.i(TAG, "Drive service initialised successfully.");

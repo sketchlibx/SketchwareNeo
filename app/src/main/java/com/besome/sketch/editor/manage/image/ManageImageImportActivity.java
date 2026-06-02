@@ -33,9 +33,9 @@ import a.a.a.bB;
 import a.a.a.mB;
 import a.a.a.uq;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
 
 public class ManageImageImportActivity extends BaseAppCompatActivity implements View.OnClickListener {
     private ImageView img;

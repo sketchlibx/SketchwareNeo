@@ -97,7 +97,7 @@ public class jq {
 
     /**
      * Application's name of project,
-     * e.g. Sketchware Pro Remod Remod Demo.
+     * e.g. Sketchware Neo Remod Remod Demo.
      */
     public String projectName;
 

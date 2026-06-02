@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="TextAppearance.SketchwarePro.DisplayLarge" parent="TextAppearance.Material3.DisplayLarge" />
+    <style name="TextAppearance.SketchwareNeo.DisplayLarge" parent="TextAppearance.Material3.DisplayLarge" />
 
-    <style name="TextAppearance.SketchwarePro.DisplayMedium" parent="TextAppearance.Material3.DisplayMedium" />
+    <style name="TextAppearance.SketchwareNeo.DisplayMedium" parent="TextAppearance.Material3.DisplayMedium" />
 
-    <style name="TextAppearance.SketchwarePro.DisplaySmall" parent="TextAppearance.Material3.DisplaySmall" />
+    <style name="TextAppearance.SketchwareNeo.DisplaySmall" parent="TextAppearance.Material3.DisplaySmall" />
 
-    <style name="TextAppearance.SketchwarePro.HeadlineLarge" parent="TextAppearance.Material3.HeadlineLarge" />
+    <style name="TextAppearance.SketchwareNeo.HeadlineLarge" parent="TextAppearance.Material3.HeadlineLarge" />
 
-    <style name="TextAppearance.SketchwarePro.HeadlineMedium" parent="TextAppearance.Material3.HeadlineMedium" />
+    <style name="TextAppearance.SketchwareNeo.HeadlineMedium" parent="TextAppearance.Material3.HeadlineMedium" />
 
-    <style name="TextAppearance.SketchwarePro.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall" />
+    <style name="TextAppearance.SketchwareNeo.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall" />
 
-    <style name="TextAppearance.SketchwarePro.TitleLarge" parent="TextAppearance.Material3.TitleLarge" />
+    <style name="TextAppearance.SketchwareNeo.TitleLarge" parent="TextAppearance.Material3.TitleLarge" />
 
-    <style name="TextAppearance.SketchwarePro.TitleMedium" parent="TextAppearance.Material3.TitleMedium" />
+    <style name="TextAppearance.SketchwareNeo.TitleMedium" parent="TextAppearance.Material3.TitleMedium" />
 
-    <style name="TextAppearance.SketchwarePro.TitleSmall" parent="TextAppearance.Material3.TitleSmall" />
+    <style name="TextAppearance.SketchwareNeo.TitleSmall" parent="TextAppearance.Material3.TitleSmall" />
 
-    <style name="TextAppearance.SketchwarePro.BodyLarge" parent="TextAppearance.Material3.BodyLarge" />
+    <style name="TextAppearance.SketchwareNeo.BodyLarge" parent="TextAppearance.Material3.BodyLarge" />
 
-    <style name="TextAppearance.SketchwarePro.BodyMedium" parent="TextAppearance.Material3.BodyMedium" />
+    <style name="TextAppearance.SketchwareNeo.BodyMedium" parent="TextAppearance.Material3.BodyMedium" />
 
-    <style name="TextAppearance.SketchwarePro.BodySmall" parent="TextAppearance.Material3.BodySmall" />
+    <style name="TextAppearance.SketchwareNeo.BodySmall" parent="TextAppearance.Material3.BodySmall" />
 
-    <style name="TextAppearance.SketchwarePro.LabelLarge" parent="TextAppearance.Material3.LabelLarge" />
+    <style name="TextAppearance.SketchwareNeo.LabelLarge" parent="TextAppearance.Material3.LabelLarge" />
 
-    <style name="TextAppearance.SketchwarePro.LabelMedium" parent="TextAppearance.Material3.LabelMedium" />
+    <style name="TextAppearance.SketchwareNeo.LabelMedium" parent="TextAppearance.Material3.LabelMedium" />
 
-    <style name="TextAppearance.SketchwarePro.LabelSmall" parent="TextAppearance.Material3.LabelSmall" />
+    <style name="TextAppearance.SketchwareNeo.LabelSmall" parent="TextAppearance.Material3.LabelSmall" />
 </resources>

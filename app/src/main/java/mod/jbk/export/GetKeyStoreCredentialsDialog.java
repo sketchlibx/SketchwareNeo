@@ -13,9 +13,9 @@ import java.util.LinkedList;
 
 import a.a.a.wq;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.databinding.DialogKeystoreCredentialsBinding;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DialogKeystoreCredentialsBinding;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class GetKeyStoreCredentialsDialog {
 

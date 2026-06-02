@@ -47,7 +47,7 @@ import a.a.a.wB;
 import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import pro.sketchware.R;
+import neo.sketchware.R;
 
 public class ViewProperty extends LinearLayout implements Kw {
 

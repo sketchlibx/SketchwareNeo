@@ -35,8 +35,8 @@ import a.a.a.oB;
 import a.a.a.uq;
 import a.a.a.yy;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class AddImageActivity extends BaseDialogActivity implements View.OnClickListener {
     private ArrayList<ProjectResourceBean> existingImages;

@@ -71,11 +71,11 @@ import mod.jbk.util.LogUtil;
 import mod.jbk.util.TestkeySignBridge;
 import mod.pranav.build.JarBuilder;
 import mod.pranav.viewbinding.ViewBindingBuilder;
-import pro.sketchware.SketchApplication;
-import pro.sketchware.util.library.BuiltInLibraryManager;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.SketchApplication;
+import neo.sketchware.util.library.BuiltInLibraryManager;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 import proguard.Configuration;
 import proguard.ConfigurationParser;
 import proguard.ParseException;
@@ -112,7 +112,7 @@ public class ProjectBuilder {
 
         try {
             PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-            LogUtil.d(TAG, "Running Sketchware Pro " + info.versionName + " (" + info.versionCode + ")");
+            LogUtil.d(TAG, "Running Sketchware Neo " + info.versionName + " (" + info.versionCode + ")");
             ApplicationInfo applicationInfo = context.getPackageManager().getApplicationInfo(context.getPackageName(), 0);
             long fileSizeInBytes = new File(applicationInfo.sourceDir).length();
             LogUtil.d(TAG, "base.apk's size is " + Formatter.formatFileSize(context, fileSizeInBytes) + " (" + fileSizeInBytes + " B)");

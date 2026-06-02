@@ -25,11 +25,11 @@ import com.google.android.material.shape.MaterialShapeUtils;
 import com.google.android.material.shape.ShapeAppearanceModel;
 
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.databinding.DesignDrawerItemBinding;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
-import pro.sketchware.utility.UI;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DesignDrawerItemBinding;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
+import neo.sketchware.utility.UI;
 
 public class DesignDrawer extends LinearLayout {
     @SuppressLint("NonConstantResourceId")
@@ -63,7 +63,7 @@ public class DesignDrawer extends LinearLayout {
         } else if (id == R.id.item_manifest_manager) {
             designActivity.toAndroidManifestManager();
         } else if (id == R.id.item_gradle_manager) {
-            Intent intent = new Intent(designActivity, pro.sketchware.activities.editor.gradle.ManageGradleActivity.class);
+            Intent intent = new Intent(designActivity, neo.sketchware.activities.editor.gradle.ManageGradleActivity.class);
             intent.putExtra("sc_id", DesignActivity.sc_id);
             designActivity.startActivity(intent);
         } else if (id == R.id.item_used_custom_blocks) {

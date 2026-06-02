@@ -27,9 +27,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import pro.sketchware.R;
-import pro.sketchware.databinding.DialogGlobalSearchBinding;
-import pro.sketchware.databinding.ItemGlobalSearchResultBinding;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DialogGlobalSearchBinding;
+import neo.sketchware.databinding.ItemGlobalSearchResultBinding;
 
 public class GlobalSearchDialog extends BottomSheetDialogFragment {
 

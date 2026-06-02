@@ -19,13 +19,13 @@ import java.util.Comparator;
 import java.util.Objects;
 
 import dev.chrisbanes.insetter.Insetter;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ManagePermissionBinding;
-import pro.sketchware.databinding.ViewItemPermissionBinding;
-import pro.sketchware.lib.base.BaseTextWatcher;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileResConfig;
-import pro.sketchware.utility.FileUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ManagePermissionBinding;
+import neo.sketchware.databinding.ViewItemPermissionBinding;
+import neo.sketchware.lib.base.BaseTextWatcher;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileResConfig;
+import neo.sketchware.utility.FileUtil;
 
 public class ManagePermissionActivity extends BaseAppCompatActivity {
     private PermissionsAdapter adapter;

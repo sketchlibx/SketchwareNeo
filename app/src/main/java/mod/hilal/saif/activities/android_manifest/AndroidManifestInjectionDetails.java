@@ -1,7 +1,7 @@
 package mod.hilal.saif.activities.android_manifest;
 
-import static pro.sketchware.utility.GsonUtils.getGson;
-import static pro.sketchware.utility.SketchwareUtil.getDip;
+import static neo.sketchware.utility.GsonUtils.getGson;
+import static neo.sketchware.utility.SketchwareUtil.getDip;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -27,12 +27,12 @@ import a.a.a.yq;
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.util.Helper;
 import mod.remaker.view.CustomAttributeView;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ActivityManageCustomAttributeBinding;
-import pro.sketchware.databinding.CustomDialogAttributeBinding;
-import pro.sketchware.databinding.DialogCreateNewFileLayoutBinding;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ActivityManageCustomAttributeBinding;
+import neo.sketchware.databinding.CustomDialogAttributeBinding;
+import neo.sketchware.databinding.DialogCreateNewFileLayoutBinding;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.ThemeUtils;
 
 public class AndroidManifestInjectionDetails extends BaseAppCompatActivity {
 

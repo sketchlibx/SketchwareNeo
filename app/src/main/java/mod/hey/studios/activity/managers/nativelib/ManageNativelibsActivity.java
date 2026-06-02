@@ -34,15 +34,15 @@ import dev.pranav.filepicker.FilePickerDialogFragment;
 import dev.pranav.filepicker.FilePickerOptions;
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.AddMarginOnApplyWindowInsetsListener;
-import pro.sketchware.R;
-import pro.sketchware.databinding.DialogCreateNewFileLayoutBinding;
-import pro.sketchware.databinding.DialogInputLayoutBinding;
-import pro.sketchware.databinding.ManageFileBinding;
-import pro.sketchware.databinding.ManageJavaItemHsBinding;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileResConfig;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DialogCreateNewFileLayoutBinding;
+import neo.sketchware.databinding.DialogInputLayoutBinding;
+import neo.sketchware.databinding.ManageFileBinding;
+import neo.sketchware.databinding.ManageJavaItemHsBinding;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileResConfig;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class ManageNativelibsActivity extends BaseAppCompatActivity implements View.OnClickListener {
     private FilePickerDialogFragment filePicker;

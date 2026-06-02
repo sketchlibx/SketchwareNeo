@@ -121,17 +121,17 @@ import mod.jbk.diagnostic.MissingFileException;
 import mod.jbk.util.LogUtil;
 import mod.khaled.logcat.LogReaderActivity;
 import mod.sketchlibx.search.GlobalSearchDialog;
-import pro.sketchware.R;
-import pro.sketchware.activities.appcompat.ManageAppCompatActivity;
-import pro.sketchware.activities.editor.command.ManageXMLCommandActivity;
-import pro.sketchware.activities.editor.view.CodeViewerActivity;
-import pro.sketchware.activities.editor.view.ViewCodeEditorActivity;
-import pro.sketchware.activities.resourceseditor.ResourcesEditorActivity;
-import pro.sketchware.dialogs.BuildSettingsBottomSheet;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
-import pro.sketchware.utility.apk.ApkSignatures;
+import neo.sketchware.R;
+import neo.sketchware.activities.appcompat.ManageAppCompatActivity;
+import neo.sketchware.activities.editor.command.ManageXMLCommandActivity;
+import neo.sketchware.activities.editor.view.CodeViewerActivity;
+import neo.sketchware.activities.editor.view.ViewCodeEditorActivity;
+import neo.sketchware.activities.resourceseditor.ResourcesEditorActivity;
+import neo.sketchware.dialogs.BuildSettingsBottomSheet;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
+import neo.sketchware.utility.apk.ApkSignatures;
 
 public class DesignActivity extends BaseAppCompatActivity implements View.OnClickListener {
     public static String sc_id;
@@ -1175,7 +1175,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (isMissingDirectory) {
                         dialog.setTitle("Missing directory detected");
                         dialog.setMessage("A directory important for building is missing. " +
-                                "Sketchware Pro can try creating " + e.getMissingFile().getAbsolutePath() +
+                                "Sketchware Neo can try creating " + e.getMissingFile().getAbsolutePath() +
                                 " if you'd like to.");
                         dialog.setNeutralButton("Create", (v, which) -> {
                             v.dismiss();
@@ -1566,7 +1566,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                         intent.putExtra("event_text", result.eventName);
                         startActivity(intent);
                     } else if (result.category.equals("Component") || result.category.equals("Variable") || result.category.equals("List")) {
-                        pro.sketchware.utility.SketchwareUtil.toast("Switched to " + result.category + " tab");
+                        neo.sketchware.utility.SketchwareUtil.toast("Switched to " + result.category + " tab");
                     }
                 } catch (Exception e) {
                     Log.e("DeepLink", "Failed to resolve deep link", e);
@@ -1574,7 +1574,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             }, 300);
 
         } else {
-            pro.sketchware.utility.SketchwareUtil.toastError("Could not find file: " + result.fileName);
+            neo.sketchware.utility.SketchwareUtil.toastError("Could not find file: " + result.fileName);
         }
     }
     

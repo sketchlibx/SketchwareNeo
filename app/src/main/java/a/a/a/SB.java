@@ -4,7 +4,7 @@ import android.content.Context;
 
 import com.google.android.material.textfield.TextInputLayout;
 
-import pro.sketchware.R;
+import neo.sketchware.R;
 
 public class SB extends MB {
 

@@ -13,8 +13,8 @@ android {
 
     defaultConfig {
         applicationId = "neo.sketchware"
-        namespace = "pro.sketchware"
-        //noinspection ExpiredTargetSdkVersion since we don't target getting Sketchware Pro on Google Play.
+        namespace = "neo.sketchware"
+        //noinspection ExpiredTargetSdkVersion since we don't target getting Sketchware Neo on Google Play.
         targetSdk = 28
         minSdk = 26
         versionCode = 158

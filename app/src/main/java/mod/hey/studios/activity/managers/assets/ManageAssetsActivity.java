@@ -49,15 +49,15 @@ import dev.pranav.filepicker.SelectionMode;
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import pro.sketchware.R;
-import pro.sketchware.databinding.DialogCreateNewFileLayoutBinding;
-import pro.sketchware.databinding.DialogInputLayoutBinding;
-import pro.sketchware.databinding.ManageFileBinding;
-import pro.sketchware.databinding.ManageJavaItemHsBinding;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DialogCreateNewFileLayoutBinding;
+import neo.sketchware.databinding.DialogInputLayoutBinding;
+import neo.sketchware.databinding.ManageFileBinding;
+import neo.sketchware.databinding.ManageJavaItemHsBinding;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
 
 @SuppressLint("SetTextI18n")
 public class ManageAssetsActivity extends BaseAppCompatActivity {

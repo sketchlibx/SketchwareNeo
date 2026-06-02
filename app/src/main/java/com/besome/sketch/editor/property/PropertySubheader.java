@@ -7,7 +7,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import a.a.a.wB;
-import pro.sketchware.R;
+import neo.sketchware.R;
 
 public class PropertySubheader extends RelativeLayout {
 

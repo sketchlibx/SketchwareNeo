@@ -5,8 +5,8 @@ import android.content.Intent;
 
 import com.besome.sketch.tools.CompileLogActivity;
 
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileUtil;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileUtil;
 
 public class CompileErrorSaver {
 
@@ -18,7 +18,7 @@ public class CompileErrorSaver {
     /**
      * Create this helper class for saving compile errors.
      *
-     * @param sc_id The Sketchware project ID for the project to operate on, like 605
+     * @param sc_id The Sketchware Neoject ID for the project to operate on, like 605
      */
     public CompileErrorSaver(String sc_id) {
         this.sc_id = sc_id;

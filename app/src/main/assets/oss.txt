@@ -66,7 +66,7 @@ We are deeply grateful to these developers for their work and contributions.
 	by mr jorge cruz from cary
 
 
-Libraries added with Sketchware Pro
+Libraries added with Sketchware Neo
 
 * R8
 

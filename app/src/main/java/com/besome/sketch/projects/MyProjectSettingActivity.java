@@ -47,14 +47,14 @@ import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.Helper;
 import mod.hey.studios.util.ProjectFile;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import pro.sketchware.R;
-import pro.sketchware.activities.iconcreator.IconCreatorActivity;
-import pro.sketchware.control.VersionDialog;
-import pro.sketchware.databinding.MyprojectSettingBinding;
-import pro.sketchware.lib.validator.AppNameValidator;
-import pro.sketchware.lib.validator.PackageNameValidator;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.activities.iconcreator.IconCreatorActivity;
+import neo.sketchware.control.VersionDialog;
+import neo.sketchware.databinding.MyprojectSettingBinding;
+import neo.sketchware.lib.validator.AppNameValidator;
+import neo.sketchware.lib.validator.PackageNameValidator;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class MyProjectSettingActivity extends BaseAppCompatActivity implements View.OnClickListener {
 

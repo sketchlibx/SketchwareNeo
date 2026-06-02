@@ -18,10 +18,10 @@ import java.util.ArrayList;
 
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.BlockUtil;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ManageCollectionPopupImportMoreBlockListItemBinding;
-import pro.sketchware.databinding.SearchWithRecyclerViewBinding;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ManageCollectionPopupImportMoreBlockListItemBinding;
+import neo.sketchware.databinding.SearchWithRecyclerViewBinding;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class MoreblockImporterDialog extends MaterialAlertDialogBuilder {
 

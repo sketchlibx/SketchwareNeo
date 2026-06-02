@@ -29,10 +29,10 @@ import a.a.a.Ts;
 import a.a.a.bB;
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.BlockUtil;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ManageCollectionShowBlockBinding;
-import pro.sketchware.tools.ImageFactory;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ManageCollectionShowBlockBinding;
+import neo.sketchware.tools.ImageFactory;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class ShowMoreBlockCollectionActivity extends BaseAppCompatActivity implements View.OnClickListener {
 

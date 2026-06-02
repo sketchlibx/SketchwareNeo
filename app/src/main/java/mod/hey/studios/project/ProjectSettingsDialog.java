@@ -12,7 +12,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.checkbox.MaterialCheckBox;
 
-import pro.sketchware.databinding.DialogProjectSettingsBinding;
+import neo.sketchware.databinding.DialogProjectSettingsBinding;
 
 public class ProjectSettingsDialog {
 
@@ -43,8 +43,8 @@ public class ProjectSettingsDialog {
         binding.etTargetSdkVersion.setText(settings.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(VAR_DEFAULT_TARGET_SDK_VERSION)));
         binding.etApplicationClassName.setText(settings.getValue(ProjectSettings.SETTING_APPLICATION_CLASS, ".SketchApplication"));
 
-        MaterialCheckBox cbVersionHistory = binding.getRoot().findViewById(pro.sketchware.R.id.cb_enable_version_history);
-        LinearLayout layoutVersionHistory = binding.getRoot().findViewById(pro.sketchware.R.id.enable_version_history);
+        MaterialCheckBox cbVersionHistory = binding.getRoot().findViewById(neo.sketchware.R.id.cb_enable_version_history);
+        LinearLayout layoutVersionHistory = binding.getRoot().findViewById(neo.sketchware.R.id.enable_version_history);
         
         cbVersionHistory.setChecked(settings.getValue(SETTING_ENABLE_VERSION_HISTORY, "false").equals("true"));
         binding.cbEnableViewbinding.setChecked(settings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, "false").equals("true"));

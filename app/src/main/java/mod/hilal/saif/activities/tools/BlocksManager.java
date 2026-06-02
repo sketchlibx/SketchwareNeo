@@ -1,6 +1,6 @@
 package mod.hilal.saif.activities.tools;
 
-import static pro.sketchware.utility.GsonUtils.getGson;
+import static neo.sketchware.utility.GsonUtils.getGson;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -48,14 +48,14 @@ import java.util.Objects;
 
 import mod.hey.studios.editor.manage.block.v2.BlockLoader;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ActivityBlocksManagerBinding;
-import pro.sketchware.databinding.DialogBlockConfigurationBinding;
-import pro.sketchware.databinding.DialogPaletteBinding;
-import pro.sketchware.databinding.PalletCustomviewBinding;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.PropertiesUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ActivityBlocksManagerBinding;
+import neo.sketchware.databinding.DialogBlockConfigurationBinding;
+import neo.sketchware.databinding.DialogPaletteBinding;
+import neo.sketchware.databinding.PalletCustomviewBinding;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.PropertiesUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class BlocksManager extends BaseAppCompatActivity {
 

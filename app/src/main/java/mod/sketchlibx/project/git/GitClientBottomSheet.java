@@ -73,11 +73,11 @@ import a.a.a.yB;
 import a.a.a.yq;
 import mod.hilal.saif.activities.tools.ConfigActivity;
 import mod.jbk.build.BuildProgressReceiver;
-import pro.sketchware.R;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
 
 public class GitClientBottomSheet extends BottomSheetDialogFragment {
 

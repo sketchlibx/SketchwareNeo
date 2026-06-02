@@ -55,7 +55,7 @@
                     app:layout_constraintStart_toEndOf="@+id/icon"
                     app:layout_constraintTop_toTopOf="@+id/icon"
                     app:lineHeight="33dp"
-                    tools:text="Sketchware Pro - a new place to create android apps!" />
+                    tools:text="Sketchware Neo - a new place to create android apps!" />
 
                 <TextView
                     android:id="@+id/author"
@@ -89,7 +89,7 @@
                     android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textIsSelectable="true"
-                    tools:text="Meet Sketchware Pro v7.0.0!\nFinally, the long-awaited version has been released!" />
+                    tools:text="Meet Sketchware Neo v7.0.0!\nFinally, the long-awaited version has been released!" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
@@ -128,7 +128,7 @@
                     android:clipToPadding="false"
                     android:orientation="horizontal"
                     android:paddingHorizontal="24dp"
-                    android:theme="@style/ThemeOverlay.SketchwarePro.Chip.ProjectPreview" />
+                    android:theme="@style/ThemeOverlay.SketchwareNeo.Chip.ProjectPreview" />
 
             </HorizontalScrollView>
 
@@ -275,7 +275,7 @@
                 android:singleLine="true"
                 android:textAppearance="?attr/textAppearanceBodyLargeEmphasized"
                 android:textSize="18sp"
-                tools:text="Sketchware Pro - a new place to create android apps!" />
+                tools:text="Sketchware Neo - a new place to create android apps!" />
 
             <TextView
                 android:id="@+id/toolbar_subtitle"

@@ -29,12 +29,12 @@ import mod.hey.studios.editor.manage.block.ExtraBlockInfo;
 import mod.hey.studios.editor.manage.block.v2.BlockLoader;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import pro.sketchware.R;
-import pro.sketchware.databinding.DialogPaletteBinding;
-import pro.sketchware.databinding.ItemCustomBlockBinding;
-import pro.sketchware.databinding.ViewUsedCustomBlocksBinding;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.DialogPaletteBinding;
+import neo.sketchware.databinding.ItemCustomBlockBinding;
+import neo.sketchware.databinding.ViewUsedCustomBlocksBinding;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class CustomBlocksDialog {
 

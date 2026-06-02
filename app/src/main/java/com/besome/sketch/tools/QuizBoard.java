@@ -17,8 +17,8 @@ import java.util.Random;
 
 import a.a.a.mB;
 import a.a.a.tq;
-import pro.sketchware.R;
-import pro.sketchware.databinding.QuizBoardBinding;
+import neo.sketchware.R;
+import neo.sketchware.databinding.QuizBoardBinding;
 
 public class QuizBoard extends LinearLayout implements View.OnClickListener {
 

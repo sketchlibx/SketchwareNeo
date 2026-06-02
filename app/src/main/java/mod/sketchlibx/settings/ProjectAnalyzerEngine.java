@@ -15,7 +15,7 @@ import java.util.Set;
 
 import a.a.a.jC;
 import a.a.a.yq;
-import pro.sketchware.utility.FileUtil;
+import neo.sketchware.utility.FileUtil;
 
 public class ProjectAnalyzerEngine {
 
@@ -45,7 +45,7 @@ public class ProjectAnalyzerEngine {
         Set<String> usedResources = new HashSet<>();
         Set<String> usedCustomViews = new HashSet<>();
 
-        yq javaCodeGenerator = new yq(pro.sketchware.SketchApplication.getContext(), sc_id);
+        yq javaCodeGenerator = new yq(neo.sketchware.SketchApplication.getContext(), sc_id);
         StringBuilder deepScanTextBuilder = new StringBuilder();
 
         // 1. Blocks and ViewBeans (Direct Sketchware Links)

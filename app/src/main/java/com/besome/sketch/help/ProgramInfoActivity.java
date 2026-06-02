@@ -17,8 +17,8 @@ import a.a.a.bB;
 import a.a.a.mB;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ProgramInfoBinding;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ProgramInfoBinding;
 
 public class ProgramInfoActivity extends BaseAppCompatActivity {
 

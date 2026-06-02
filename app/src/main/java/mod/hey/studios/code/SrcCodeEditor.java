@@ -1,6 +1,6 @@
 package mod.hey.studios.code;
 
-import static pro.sketchware.utility.GsonUtils.getGson;
+import static neo.sketchware.utility.GsonUtils.getGson;
 
 import android.app.Activity;
 import android.content.Context;
@@ -65,14 +65,14 @@ import io.github.rosemoe.sora.widget.schemes.SchemeVS2019;
 import mod.hey.studios.util.Helper;
 import mod.jbk.code.CodeEditorColorSchemes;
 import mod.jbk.code.CodeEditorLanguages;
-import pro.sketchware.R;
-import pro.sketchware.activities.preview.LayoutPreviewActivity;
-import pro.sketchware.databinding.CodeEditorHsBinding;
-import pro.sketchware.utility.EditorUtils;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
-import pro.sketchware.utility.UI;
+import neo.sketchware.R;
+import neo.sketchware.activities.preview.LayoutPreviewActivity;
+import neo.sketchware.databinding.CodeEditorHsBinding;
+import neo.sketchware.utility.EditorUtils;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
+import neo.sketchware.utility.UI;
 
 public class SrcCodeEditor extends BaseAppCompatActivity {
     public static final String FLAG_FROM_ANDROID_MANIFEST = "from_android_manifest";

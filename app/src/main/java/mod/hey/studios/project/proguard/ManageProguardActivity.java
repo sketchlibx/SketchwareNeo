@@ -12,9 +12,9 @@ import java.util.HashMap;
 
 import mod.agus.jcoderz.editor.manage.library.locallibrary.ManageLocalLibrary;
 import mod.hey.studios.code.SrcCodeEditor;
-import pro.sketchware.R;
-import pro.sketchware.databinding.ManageProguardBinding;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.databinding.ManageProguardBinding;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class ManageProguardActivity extends BaseAppCompatActivity {
 

@@ -1,17 +1,32 @@
 {
   "allFiles": [
     {
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/src/main/AndroidManifest.xml",
+      "selection": {
+        "end": {
+          "column": 0,
+          "index": 0,
+          "line": 0
+        },
+        "start": {
+          "column": 0,
+          "index": 0,
+          "line": 0
+        }
+      }
+    },
+    {
       "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/app/build.gradle",
       "selection": {
         "end": {
-          "column": 61,
-          "index": 4369,
-          "line": 146
+          "column": 24,
+          "index": 481,
+          "line": 15
         },
         "start": {
-          "column": 61,
-          "index": 4369,
-          "line": 146
+          "column": 24,
+          "index": 481,
+          "line": 15
         }
       }
     }

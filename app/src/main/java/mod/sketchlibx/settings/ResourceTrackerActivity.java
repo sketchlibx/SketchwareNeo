@@ -34,9 +34,9 @@ import java.util.List;
 import a.a.a.By;
 import a.a.a.MA;
 import a.a.a.jC;
-import pro.sketchware.R;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.utility.ThemeUtils;
 
 public class ResourceTrackerActivity extends BaseAppCompatActivity {
 

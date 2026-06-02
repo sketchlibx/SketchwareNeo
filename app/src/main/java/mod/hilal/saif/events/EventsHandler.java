@@ -12,9 +12,9 @@ import a.a.a.oq;
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.LogUtil;
 import mod.jbk.util.OldResourceIdMapper;
-import pro.sketchware.R;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class EventsHandler {
 

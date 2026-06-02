@@ -3,8 +3,8 @@ package dev.aldi.sayuti.editor.injection;
 import java.util.ArrayList;
 
 import a.a.a.jq;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.xml.XmlBuilder;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.xml.XmlBuilder;
 
 public class ManifestInjection {
 

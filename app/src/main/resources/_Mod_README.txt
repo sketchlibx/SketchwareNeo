@@ -1,5 +1,5 @@
 ★★★★★★★★★★★★★★★★★★★★★★★
-★★★  Sketchware Pro v6.3.0 ★★★
+★★★  Sketchware Neo v6.3.0 ★★★
 ★★★★★★★★★★★★★★★★★★★★★★★
 
 This is an advanced Sketchware Mod that was re-modded from the Sketchware Revolution by Agus Jcoderz.
@@ -18,7 +18,7 @@ Contributors & Special Thanks:
 - Auwal Emptyset        (for library downloading source)
 - Ani1nonly
 - Dava
-- Ilyasse Salama        (for the new About Sketchware Pro activity)
+- Ilyasse Salama        (for the new About Sketchware Neo activity)
 - Zarzo
 - AlucardTN             (for some miscellaneous stuff)
 - tyron                 (for .swb file Intent filter)
@@ -37,7 +37,7 @@ We love Sketchware very much, and we are grateful to Sketchware's developers for
 but unfortunately, we haven't received updates for a long time.
 That's why we decided to keep Sketchware alive by making this mod, plus we don't demand any money - It's completely free :)
 Also, starting with version 6.4.0 of the Mod, we've made some source code open source! You can check it out at https://github.com/Sketchware-Pro/Sketchware-Pro/,
-and if you want to contribute, go fork it and open a pull request! We'd love to see new amazing features getting added to Sketchware Pro :D
+and if you want to contribute, go fork it and open a pull request! We'd love to see new amazing features getting added to Sketchware Neo :D
 
 ★ The change log can be found in the mod's Main Drawer.
 

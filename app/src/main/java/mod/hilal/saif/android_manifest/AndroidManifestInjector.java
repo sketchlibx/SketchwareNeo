@@ -1,6 +1,6 @@
 package mod.hilal.saif.android_manifest;
 
-import static pro.sketchware.utility.GsonUtils.getGson;
+import static neo.sketchware.utility.GsonUtils.getGson;
 
 import android.os.Environment;
 
@@ -12,9 +12,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 import mod.hey.studios.util.Helper;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
-import pro.sketchware.xml.XmlBuilder;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
+import neo.sketchware.xml.XmlBuilder;
 
 public class AndroidManifestInjector {
 

@@ -68,13 +68,13 @@ import mod.sketchlibx.project.backup.CloudBackupManager;
 import mod.sketchlibx.project.backup.CloudBackupFactory;
 import mod.hey.studios.util.Helper;
 import mod.khaled.logcat.LogReaderActivity;
-import pro.sketchware.R;
-import pro.sketchware.activities.editor.component.ManageCustomComponentActivity;
-import pro.sketchware.activities.settings.SettingsActivity;
-import pro.sketchware.databinding.ActivityAppSettingsBinding;
-import pro.sketchware.databinding.DialogSelectApkToSignBinding;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.SketchwareUtil;
+import neo.sketchware.R;
+import neo.sketchware.activities.editor.component.ManageCustomComponentActivity;
+import neo.sketchware.activities.settings.SettingsActivity;
+import neo.sketchware.databinding.ActivityAppSettingsBinding;
+import neo.sketchware.databinding.DialogSelectApkToSignBinding;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.SketchwareUtil;
 
 public class AppSettings extends BaseAppCompatActivity {
 
@@ -157,7 +157,7 @@ public class AppSettings extends BaseAppCompatActivity {
 
         generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_settings_applications, "App settings", "Change general app settings", new ActivityLauncher(new Intent(getApplicationContext(), ConfigActivity.class))), true);
         generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_palette, Helper.getResString(R.string.settings_appearance), Helper.getResString(R.string.settings_appearance_description), openSettingsActivity(SettingsActivity.SETTINGS_APPEARANCE_FRAGMENT)), true);
-        generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_folder, "Open working directory", "Open Sketchware Pro's directory and edit files in it", v -> openWorkingDirectory()), true);
+        generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_folder, "Open working directory", "Open Sketchware Neo's directory and edit files in it", v -> openWorkingDirectory()), true);
         generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_apk_document, "Sign an APK file with testkey", "Sign an already existing APK file with testkey and signature schemes up to V4", v -> signApkFileDialog()), true);
         generalCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_settings, Helper.getResString(R.string.main_drawer_title_system_settings), "Auto-save and vibrations", new ActivityLauncher(new Intent(getApplicationContext(), SystemSettingActivity.class))), false);
 
@@ -187,10 +187,10 @@ public class AppSettings extends BaseAppCompatActivity {
 
         TextView message = new TextView(this);
         message.setText("Welcome to Cloud Backup System!\n\n" +
-                "This feature allows you to securely backup and sync your Sketchware Pro projects directly to your personal Google Drive.\n\n" +
+                "This feature allows you to securely backup and sync your Sketchware Neo projects directly to your personal Google Drive.\n\n" +
                 "⚠️ IMPORTANT DISCLAIMER:\n" +
                 "• BYOK Structure: We do NOT host your backups on our servers. Your data is synced directly to your own Google Drive's hidden AppData folder.\n" +
-                "• No Data Collection: Sketchware Pro contributors do not collect, view, or have access to your personal files, Google account, or backups.\n" +
+                "• No Data Collection: Sketchware Neo contributors do not collect, view, or have access to your personal files, Google account, or backups.\n" +
                 "• Liability: This tool is provided 'AS-IS'. The developers are not responsible for any data loss, corruption, or legal issues regarding the content you backup.\n\n" +
                 "Please read carefully before proceeding.");
         message.setTextSize(15f);

@@ -15,7 +15,7 @@ import com.google.android.material.color.MaterialColors;
 import java.util.List;
 
 import mod.hey.studios.util.Helper;
-import pro.sketchware.R;
+import neo.sketchware.R;
 
 public class CollapsibleComponentLayout extends CollapsibleLayout<CollapsibleButton> {
     private CollapsibleButton delete;

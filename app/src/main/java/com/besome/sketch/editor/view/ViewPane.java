@@ -104,18 +104,18 @@ import mod.agus.jcoderz.editor.view.item.ItemTimePicker;
 import mod.agus.jcoderz.editor.view.item.ItemVideoView;
 import mod.bobur.VectorDrawableLoader;
 import mod.hey.studios.util.ProjectFile;
-import pro.sketchware.R;
-import pro.sketchware.activities.resourceseditor.components.utils.ColorsEditorManager;
-import pro.sketchware.activities.resourceseditor.components.utils.StringsEditorManager;
-import pro.sketchware.managers.inject.InjectRootLayoutManager;
-import pro.sketchware.utility.FilePathUtil;
-import pro.sketchware.utility.FileUtil;
-import pro.sketchware.utility.InjectAttributeHandler;
-import pro.sketchware.utility.InvokeUtil;
-import pro.sketchware.utility.PropertiesUtil;
-import pro.sketchware.utility.ResourceUtil;
-import pro.sketchware.utility.SvgUtils;
-import pro.sketchware.utility.ThemeUtils;
+import neo.sketchware.R;
+import neo.sketchware.activities.resourceseditor.components.utils.ColorsEditorManager;
+import neo.sketchware.activities.resourceseditor.components.utils.StringsEditorManager;
+import neo.sketchware.managers.inject.InjectRootLayoutManager;
+import neo.sketchware.utility.FilePathUtil;
+import neo.sketchware.utility.FileUtil;
+import neo.sketchware.utility.InjectAttributeHandler;
+import neo.sketchware.utility.InvokeUtil;
+import neo.sketchware.utility.PropertiesUtil;
+import neo.sketchware.utility.ResourceUtil;
+import neo.sketchware.utility.SvgUtils;
+import neo.sketchware.utility.ThemeUtils;
 
 public class ViewPane extends RelativeLayout {
     private final String stringsStart = "@string/";
@@ -262,7 +262,7 @@ public class ViewPane extends RelativeLayout {
         context = new ContextThemeWrapper(getContext(), viewEditorThemeOverlay);
         svgUtils = new SvgUtils(context);
         svgUtils.initImageLoader();
-        if (viewEditorThemeOverlay == R.style.ThemeOverlay_SketchwarePro_ViewEditor) {
+        if (viewEditorThemeOverlay == R.style.ThemeOverlay_SketchwareNeo_ViewEditor) {
             setBackgroundColor(Color.WHITE);
         } else if (isPreviewMode) {
             setBackgroundColor(ThemeUtils.getColor(context, R.attr.colorSurface));
