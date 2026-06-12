@@ -10,22 +10,23 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Environment;
 import android.util.Pair;
+import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.work.ExistingPeriodicWorkPolicy;
@@ -43,6 +44,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.common.api.Scope;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.api.services.drive.DriveScopes;
 
@@ -68,13 +70,13 @@ import mod.sketchlibx.project.backup.CloudBackupManager;
 import mod.sketchlibx.project.backup.CloudBackupFactory;
 import mod.hey.studios.util.Helper;
 import mod.khaled.logcat.LogReaderActivity;
-import neo.sketchware.R;
-import neo.sketchware.activities.editor.component.ManageCustomComponentActivity;
-import neo.sketchware.activities.settings.SettingsActivity;
-import neo.sketchware.databinding.ActivityAppSettingsBinding;
-import neo.sketchware.databinding.DialogSelectApkToSignBinding;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.activities.editor.component.ManageCustomComponentActivity;
+import pro.sketchware.activities.settings.SettingsActivity;
+import pro.sketchware.databinding.ActivityAppSettingsBinding;
+import pro.sketchware.databinding.DialogSelectApkToSignBinding;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class AppSettings extends BaseAppCompatActivity {
 
@@ -88,31 +90,12 @@ public class AppSettings extends BaseAppCompatActivity {
         var binding = ActivityAppSettingsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        {
-            View view = binding.appBarLayout;
-            int left = view.getPaddingLeft();
-            int top = view.getPaddingTop();
-            int right = view.getPaddingRight();
-            int bottom = view.getPaddingBottom();
-            ViewCompat.setOnApplyWindowInsetsListener(view, (v, i) -> {
-                Insets insets = i.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-                v.setPadding(left + insets.left, top + insets.top, right + insets.right, bottom + insets.bottom);
-                return i;
-            });
-        }
-
-        {
-            View view = binding.contentScroll;
-            int left = view.getPaddingLeft();
-            int top = view.getPaddingTop();
-            int right = view.getPaddingRight();
-            int bottom = view.getPaddingBottom();
-            ViewCompat.setOnApplyWindowInsetsListener(view, (v, i) -> {
-                Insets insets = i.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(left, top, right, bottom + insets.bottom);
-                return i;
-            });
-        }
+        // Fix padding for edge-to-edge
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
+            androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         binding.topAppBar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
 
@@ -122,7 +105,7 @@ public class AppSettings extends BaseAppCompatActivity {
                 try {
                     GoogleSignInAccount account = task.getResult(ApiException.class);
                     SketchwareUtil.toast("Signed in as " + account.getEmail());
-                    processCloudBackupEntry();
+                    showCloudDashboard(account);
                 } catch (ApiException e) {
                     showErrorDialog("Sign-In Error", "Google Sign-In failed with code: " + e.getStatusCode() + "\n" + e.getMessage());
                 }
@@ -149,7 +132,7 @@ public class AppSettings extends BaseAppCompatActivity {
         LibraryCategoryView cloudCategory = new LibraryCategoryView(this);
         cloudCategory.setTitle("Cloud & Sync");
         preferences.add(cloudCategory);
-        cloudCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_sync, "Cloud Backup", "Backup and restore projects securely to Google Drive", v -> checkDisclaimerAndOpenCloud()), false);
+        cloudCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_sync, "Cloud Backup Dashboard", "Backup and restore projects securely to Google Drive", v -> checkDisclaimerAndOpenCloud()), false);
 
         LibraryCategoryView generalCategory = new LibraryCategoryView(this);
         generalCategory.setTitle("General");
@@ -178,74 +161,63 @@ public class AppSettings extends BaseAppCompatActivity {
         }
     }
 
-    // 🔥 PRO FIX: M3 Custom Disclaimer Dialog with 10-Second Countdown
+    // Modern BottomSheet Design for Cloud Disclaimer
     private void showCloudDisclaimerDialog(Runnable onAccepted) {
+        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        int padding = (int) (24 * getResources().getDisplayMetrics().density);
-        container.setPadding(padding, padding, padding, 0);
+        int padding = SketchwareUtil.dpToPx(24);
+        container.setPadding(padding, padding, padding, padding);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.ic_mtrl_sync);
+        icon.setColorFilter(getResources().getColor(R.color.color_primary, getTheme()));
+        container.addView(icon, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(48), SketchwareUtil.dpToPx(48)));
+
+        TextView title = new TextView(this);
+        title.setText("Cloud Backup Policy");
+        title.setTextSize(20f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(0, SketchwareUtil.dpToPx(16), 0, SketchwareUtil.dpToPx(8));
+        container.addView(title);
 
         TextView message = new TextView(this);
-        message.setText("Welcome to Cloud Backup System!\n\n" +
-                "This feature allows you to securely backup and sync your Sketchware Neo projects directly to your personal Google Drive.\n\n" +
-                "⚠️ IMPORTANT DISCLAIMER:\n" +
+        message.setText("Securely backup and sync your Sketchware Neo projects directly to your personal Google Drive.\n\n" +
                 "• BYOK Structure: We do NOT host your backups on our servers. Your data is synced directly to your own Google Drive's hidden AppData folder.\n" +
                 "• No Data Collection: Sketchware Neo contributors do not collect, view, or have access to your personal files, Google account, or backups.\n" +
-                "• Liability: This tool is provided 'AS-IS'. The developers are not responsible for any data loss, corruption, or legal issues regarding the content you backup.\n\n" +
-                "Please read carefully before proceeding.");
-        message.setTextSize(15f);
+                "• Liability: This tool is provided 'AS-IS'. The developers are not responsible for any data loss, corruption, or legal issues regarding the content you backup.");
+        message.setTextSize(14f);
         message.setLineSpacing(0, 1.2f);
         container.addView(message);
 
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-                .setTitle("Cloud Backup Policy")
-                .setIcon(R.drawable.ic_mtrl_sync)
-                .setView(container)
-                .setPositiveButton("Accept (10s)", null)
-                .setNegativeButton(R.string.common_word_cancel, null)
-                .setCancelable(false)
-                .create();
+        Button acceptBtn = new Button(this);
+        acceptBtn.setText("Accept (10s)");
+        acceptBtn.setEnabled(false);
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnParams.setMargins(0, SketchwareUtil.dpToPx(24), 0, 0);
+        container.addView(acceptBtn, btnParams);
 
-        dialog.setOnShowListener(d -> {
-            Button positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positiveBtn.setEnabled(false);
+        bottomSheet.setContentView(container);
+        bottomSheet.setCancelable(false);
 
-            new CountDownTimer(10000, 1000) {
-                @Override
-                public void onTick(long millisUntilFinished) {
-                    positiveBtn.setText("Accept (" + (millisUntilFinished / 1000) + "s)");
-                }
+        new CountDownTimer(10000, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                acceptBtn.setText("Accept (" + (millisUntilFinished / 1000) + "s)");
+            }
 
-                @Override
-                public void onFinish() {
-                    positiveBtn.setText("Accept & Continue");
-                    positiveBtn.setEnabled(true);
-                    positiveBtn.setOnClickListener(v -> {
-                        dialog.dismiss();
-                        onAccepted.run();
-                    });
-                }
-            }.start();
-        });
+            @Override
+            public void onFinish() {
+                acceptBtn.setText("Accept & Continue");
+                acceptBtn.setEnabled(true);
+                acceptBtn.setOnClickListener(v -> {
+                    bottomSheet.dismiss();
+                    onAccepted.run();
+                });
+            }
+        }.start();
 
-        dialog.show();
-    }
-
-    // 🔥 PRO FIX: Helper to create Properly Padded Progress Dialogs
-    private AlertDialog createPaddedProgressDialog(String title) {
-        LinearLayout container = new LinearLayout(this);
-        container.setGravity(Gravity.CENTER);
-        int padding = (int) (24 * getResources().getDisplayMetrics().density);
-        container.setPadding(padding, padding, padding, padding);
-
-        ProgressBar progressBar = new ProgressBar(this);
-        container.addView(progressBar);
-
-        return new MaterialAlertDialogBuilder(this)
-                .setTitle(title)
-                .setView(container)
-                .setCancelable(false)
-                .create();
+        bottomSheet.show();
     }
 
     private void processCloudBackupEntry() {
@@ -259,7 +231,7 @@ public class AppSettings extends BaseAppCompatActivity {
 
         if (account == null) {
             new MaterialAlertDialogBuilder(this)
-                .setTitle("Cloud Sync")
+                .setTitle("Sign In Required")
                 .setMessage("Please sign in with your Google Account to link your personal Google Drive for cloud backups.")
                 .setPositiveButton("Sign In", (dialog, which) -> {
                     googleSignInLauncher.launch(mGoogleSignInClient.getSignInIntent());
@@ -267,33 +239,119 @@ public class AppSettings extends BaseAppCompatActivity {
                 .setNegativeButton(R.string.common_word_cancel, null)
                 .show();
         } else {
-            String[] options = {
-                    "Manual Backup (Select Projects)", 
-                    "Restore Projects from Cloud", 
-                    "Configure Auto-Backup", 
-                    "Disconnect Account (" + account.getEmail() + ")"
-            };
-            
-            new MaterialAlertDialogBuilder(this)
-                .setTitle("Cloud Backup Settings")
-                .setItems(options, (dialog, which) -> {
-                    switch (which) {
-                        case 0 -> triggerSelectiveCloudBackup(account);
-                        case 1 -> triggerSelectiveCloudRestore(account);
-                        case 2 -> configureAutoBackupProjects();
-                        case 3 -> {
-                            mGoogleSignInClient.revokeAccess().addOnCompleteListener(task -> {
-                                SketchwareUtil.toast("Google Drive access revoked & Signed out.");
-                                getSharedPreferences("cloud_backup_prefs", MODE_PRIVATE).edit().putInt("auto_backup_interval", 0).apply();
-                                WorkManager.getInstance(this).cancelUniqueWork("CloudAutoBackup_Recurring");
-                            });
-                        }
-                    }
-                })
-                .show();
+            showCloudDashboard(account);
         }
     }
 
+    // Modern BottomSheet Dashboard for Cloud Actions
+    private void showCloudDashboard(GoogleSignInAccount account) {
+        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        int padding = SketchwareUtil.dpToPx(16);
+        container.setPadding(padding, padding, padding, padding);
+
+        TextView title = new TextView(this);
+        title.setText("Cloud Sync Dashboard");
+        title.setTextSize(18f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(padding, padding, padding, padding);
+        container.addView(title);
+
+        TextView emailDesc = new TextView(this);
+        emailDesc.setText("Signed in as: " + account.getEmail());
+        emailDesc.setTextSize(14f);
+        emailDesc.setPadding(padding, 0, padding, SketchwareUtil.dpToPx(16));
+        container.addView(emailDesc);
+
+        container.addView(createDashboardAction(R.drawable.ic_mtrl_upload, "Manual Backup", "Upload selected projects to Cloud", v -> {
+            bottomSheet.dismiss();
+            triggerSelectiveCloudBackup(account);
+        }));
+        
+        container.addView(createDashboardAction(R.drawable.ic_mtrl_download, "Restore Projects", "Download projects from Cloud", v -> {
+            bottomSheet.dismiss();
+            triggerSelectiveCloudRestore(account);
+        }));
+
+        container.addView(createDashboardAction(R.drawable.ic_mtrl_settings, "Auto-Backup Schedule", "Set daily, weekly or monthly backups", v -> {
+            bottomSheet.dismiss();
+            configureAutoBackupProjects();
+        }));
+
+        container.addView(createDashboardAction(R.drawable.ic_mtrl_exit, "Disconnect Account", "Revoke Google Drive access", v -> {
+            bottomSheet.dismiss();
+            mGoogleSignInClient.revokeAccess().addOnCompleteListener(task -> {
+                SketchwareUtil.toast("Google Drive access revoked.");
+                getSharedPreferences("cloud_backup_prefs", MODE_PRIVATE).edit().putInt("auto_backup_interval", 0).apply();
+                WorkManager.getInstance(this).cancelUniqueWork("CloudAutoBackup_Recurring");
+            });
+        }));
+
+        bottomSheet.setContentView(container);
+        bottomSheet.show();
+    }
+
+    private View createDashboardAction(int iconRes, String title, String subtitle, View.OnClickListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setClickable(true);
+        row.setFocusable(true);
+        
+        // Android Standard Ripple Effect
+        TypedValue outValue = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        row.setBackgroundResource(outValue.resourceId);
+        
+        int pad = SketchwareUtil.dpToPx(16);
+        row.setPadding(pad, pad, pad, pad);
+        row.setOnClickListener(listener);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(getResources().getColor(R.color.color_text_onSurfaceVariant, getTheme()));
+        row.addView(icon, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(24), SketchwareUtil.dpToPx(24)));
+
+        LinearLayout textContainer = new LinearLayout(this);
+        textContainer.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        textParams.setMargins(SketchwareUtil.dpToPx(16), 0, 0, 0);
+        row.addView(textContainer, textParams);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextSize(16f);
+        tvTitle.setTextColor(getResources().getColor(R.color.color_text_onSurface, getTheme()));
+        textContainer.addView(tvTitle);
+
+        TextView tvSubtitle = new TextView(this);
+        tvSubtitle.setText(subtitle);
+        tvSubtitle.setTextSize(13f);
+        tvSubtitle.setTextColor(getResources().getColor(R.color.color_text_onSurfaceVariant, getTheme()));
+        textContainer.addView(tvSubtitle);
+
+        return row;
+    }
+
+    private AlertDialog createPaddedProgressDialog(String title) {
+        LinearLayout container = new LinearLayout(this);
+        container.setGravity(Gravity.CENTER);
+        int padding = SketchwareUtil.dpToPx(24);
+        container.setPadding(padding, padding, padding, padding);
+
+        ProgressBar progressBar = new ProgressBar(this);
+        container.addView(progressBar);
+
+        return new MaterialAlertDialogBuilder(this)
+                .setTitle(title)
+                .setView(container)
+                .setCancelable(false)
+                .create();
+    }
+
+    // --- Rest of your original methods below, unchanged but perfectly integrated ---
+    
     private void showErrorDialog(String title, String errorMessage) {
         new MaterialAlertDialogBuilder(this)
             .setTitle(title)

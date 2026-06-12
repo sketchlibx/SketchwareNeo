@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -17,7 +18,8 @@
         android:layout_marginStart="24dp"
         android:layout_marginBottom="16dp"
         android:text="Build Settings"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textStyle="bold" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/preference_scroller"
@@ -35,15 +37,30 @@
             android:paddingHorizontal="24dp"
             android:paddingBottom="24dp">
 
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Environment Paths"
+                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textColor="?attr/colorPrimary" />
+
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_android_jar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxBackgroundColor="?attr/colorSurfaceContainerHighest"
+                app:boxStrokeWidth="0dp"
                 android:hint="Custom android.jar">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingVertical="14dp"
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -52,11 +69,18 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                app:boxCornerRadiusTopStart="16dp"
+                app:boxCornerRadiusTopEnd="16dp"
+                app:boxCornerRadiusBottomStart="16dp"
+                app:boxCornerRadiusBottomEnd="16dp"
+                app:boxBackgroundColor="?attr/colorSurfaceContainerHighest"
+                app:boxStrokeWidth="0dp"
                 android:hint="Classpath 'separated by :'">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:paddingVertical="14dp"
                     android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -65,44 +89,84 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="Dexer"
-                android:textAppearance="?attr/textAppearanceBodyLargeEmphasized" />
-
-            <RadioGroup
-                android:id="@+id/rg_dexer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/title_java_version"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"
-                android:text="Java version"
-                android:textAppearance="?attr/textAppearanceBodyLargeEmphasized" />
-
-            <RadioGroup
-                android:id="@+id/rg_java_version"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="8dp"
-                android:text="Advanced Options"
+                android:text="Compiler Engine"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:orientation="vertical">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="Dexer"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        android:textStyle="bold"/>
+
+                    <RadioGroup
+                        android:id="@+id/rg_dexer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginVertical="12dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/title_java_version"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="Java version"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        android:textStyle="bold"/>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none"
+                        android:overScrollMode="never">
+
+                        <RadioGroup
+                            android:id="@+id/rg_java_version"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+                    
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:text="Build Flags"
+                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textColor="?attr/colorPrimary" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -119,17 +183,18 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <com.google.android.material.textview.MaterialTextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="Hide warnings in error log"
+                            android:textColor="?attr/colorOnSurface"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-                        <com.google.android.material.checkbox.MaterialCheckBox
+                        <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/cb_no_warnings"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -138,11 +203,11 @@
                             android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/no_http_legacy"
@@ -153,17 +218,18 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <com.google.android.material.textview.MaterialTextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="Don't include http-legacy-28.dex"
+                            android:textColor="?attr/colorOnSurface"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-                        <com.google.android.material.checkbox.MaterialCheckBox
+                        <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/cb_no_http_legacy"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -172,11 +238,11 @@
                             android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/enable_logcat"
@@ -187,17 +253,32 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
-                        <com.google.android.material.textview.MaterialTextView
+                        <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Enable debug logcat logs viewable in Logcat Reader. Not enabled in exported AABs/APKs."
-                            android:textAppearance="?attr/textAppearanceBodyMedium" />
+                            android:orientation="vertical">
 
-                        <com.google.android.material.checkbox.MaterialCheckBox
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Enable Logcat Debugging"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Logs viewable in Logcat Reader. Not enabled in exported AABs/APKs."
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textAppearance="?attr/textAppearanceBodyMedium" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/cb_enable_logcat"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -212,23 +293,24 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="32dp"
                 android:orientation="horizontal">
 
                 <Button
                     android:id="@+id/btn_cancel"
-                    style="@style/Widget.Material3Expressive.Button.TonalButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="12dp"
                     android:layout_weight="1"
                     android:text="@android:string/cancel" />
 
                 <Button
                     android:id="@+id/btn_save"
-                    style="@style/Widget.Material3Expressive.Button"
+                    style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="12dp"
                     android:layout_weight="1"
                     android:text="@string/common_word_save" />
             </LinearLayout>

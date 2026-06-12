@@ -28,10 +28,10 @@ import java.util.Locale;
 
 import mod.jbk.util.AudioMetadata;
 import mod.jbk.util.SoundPlayingAdapter;
-import neo.sketchware.R;
-import neo.sketchware.databinding.FrManageSoundListBinding;
-import neo.sketchware.databinding.ManageSoundBinding;
-import neo.sketchware.databinding.ManageSoundListItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.FrManageSoundListBinding;
+import pro.sketchware.databinding.ManageSoundBinding;
+import pro.sketchware.databinding.ManageSoundListItemBinding;
 
 public class Yv extends qA {
     private String sc_id;

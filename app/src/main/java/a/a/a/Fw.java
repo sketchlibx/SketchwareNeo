@@ -22,8 +22,8 @@ import com.besome.sketch.editor.manage.view.PresetSettingActivity;
 
 import java.util.ArrayList;
 
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageViewListItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageViewListItemBinding;
 
 public class Fw extends qA {
 

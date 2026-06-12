@@ -1,6 +1,6 @@
 package mod.hey.studios.util;
 
-import static neo.sketchware.SketchApplication.getContext;
+import static pro.sketchware.SketchApplication.getContext;
 
 import android.app.Dialog;
 import android.content.Context;
@@ -31,8 +31,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
-import neo.sketchware.lib.base.BaseTextWatcher;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.lib.base.BaseTextWatcher;
+import pro.sketchware.utility.FileUtil;
 
 public class Helper {
     public static final TypeToken<HashMap<String, Object>> TYPE_MAP = new TypeToken<>() {

@@ -34,35 +34,39 @@ import a.a.a.yB;
 import mod.hey.studios.project.ProjectSettingsDialog;
 import mod.hey.studios.project.backup.BackupRestoreManager;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.activities.main.fragments.projects.ProjectsFragment;
-import neo.sketchware.databinding.BottomSheetProjectOptionsBinding;
-import neo.sketchware.databinding.MyprojectsItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.activities.main.fragments.projects.ProjectsFragment;
+import pro.sketchware.databinding.BottomSheetProjectOptionsBinding;
+import pro.sketchware.databinding.MyprojectsItemBinding;
 
 public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.ProjectViewHolder> {
     private final ProjectsFragment projectsFragment;
     private final Activity activity;
     private final DB preference;
     private List<HashMap<String, Object>> shownProjects = new ArrayList<>();
-    private List<HashMap<String, Object>> allProjects;
+    private List<HashMap<String, Object>> allProjects = new ArrayList<>();
+    private String currentQuery = "";
 
     public ProjectsAdapter(ProjectsFragment projectsFragment, List<HashMap<String, Object>> allProjects) {
         this.projectsFragment = projectsFragment;
         activity = projectsFragment.requireActivity();
-        this.allProjects = allProjects;
         preference = new DB(activity, "project");
-
+        updateData(allProjects);
     }
 
-    public void setAllProjects(List<HashMap<String, Object>> projects) {
-        allProjects = projects;
+    // NEW: Safely update data and maintain search filter state
+    public void updateData(List<HashMap<String, Object>> newProjects) {
+        this.allProjects = new ArrayList<>(newProjects);
+        filterData(currentQuery);
     }
 
     public void filterData(String query) {
-        List<HashMap<String, Object>> newProjects = query.isEmpty() ? allProjects : new ArrayList<>();
-        if (!query.isEmpty()) {
+        this.currentQuery = query == null ? "" : query;
+        List<HashMap<String, Object>> newProjects = currentQuery.isEmpty() ? allProjects : new ArrayList<>();
+        
+        if (!currentQuery.isEmpty()) {
             for (HashMap<String, Object> project : allProjects) {
-                if (matchesQuery(project, query)) {
+                if (matchesQuery(project, currentQuery)) {
                     newProjects.add(project);
                 }
             }
@@ -70,14 +74,10 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
         DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             @Override
-            public int getOldListSize() {
-                return shownProjects.size();
-            }
+            public int getOldListSize() { return shownProjects.size(); }
 
             @Override
-            public int getNewListSize() {
-                return newProjects.size();
-            }
+            public int getNewListSize() { return newProjects.size(); }
 
             @Override
             public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
@@ -91,18 +91,16 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
                 HashMap<String, Object> oldMap = shownProjects.get(oldItemPosition);
                 HashMap<String, Object> newMap = newProjects.get(newItemPosition);
                 for (String key : Arrays.asList("my_app_name", "my_ws_name", "sc_ver_name", "sc_ver_code", "my_sc_pkg_name")) {
-                    if (!yB.c(oldMap, key).equals(yB.c(newMap, key))) {
-                        return false;
-                    }
+                    if (!yB.c(oldMap, key).equals(yB.c(newMap, key))) return false;
                 }
                 boolean oldCustomIcon = yB.a(oldMap, "custom_icon");
                 boolean newCustomIcon = yB.a(newMap, "custom_icon");
                 return oldCustomIcon == newCustomIcon;
             }
         }, true);
+        
         shownProjects = newProjects;
         result.dispatchUpdatesTo(this);
-        notifyDataSetChanged();
     }
 
     @Override
@@ -122,15 +120,10 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
     @DrawableRes
     public static <T> int getShapedBackgroundForList(List<T> list, int position) {
-        if (list.size() == 1) {
-            return R.drawable.project_item_shape_alone;
-        } else if (position == 0) {
-            return R.drawable.project_item_shape_top;
-        } else if (position == list.size() - 1) {
-            return R.drawable.project_item_shape_bottom;
-        } else {
-            return R.drawable.project_item_shape_middle;
-        }
+        if (list.size() == 1) return R.drawable.project_item_shape_alone;
+        else if (position == 0) return R.drawable.project_item_shape_top;
+        else if (position == list.size() - 1) return R.drawable.project_item_shape_bottom;
+        else return R.drawable.project_item_shape_middle;
     }
 
     @Override
@@ -156,21 +149,14 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
             String iconFolder = wq.e() + File.separator + scId;
             File iconFile = new File(iconFolder, "icon.png");
             if (iconFile.exists()) {
-                Uri uri;
-                String providerPath = activity.getPackageName() + ".provider";
-                uri = FileProvider.getUriForFile(activity, providerPath, iconFile);
+                Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".provider", iconFile);
                 holder.binding.imgIcon.setImageURI(uri);
             } else {
                 holder.binding.imgIcon.setImageResource(R.drawable.default_icon);
             }
         }
 
-        if (isPinned(projectMap)) {
-            holder.binding.imgPin.setVisibility(View.VISIBLE);
-        } else {
-            holder.binding.imgPin.setVisibility(View.INVISIBLE);
-
-        }
+        holder.binding.imgPin.setVisibility(isPinned(projectMap) ? View.VISIBLE : View.GONE);
 
         String version = " - " + yB.c(projectMap, "sc_ver_name") + " (" + yB.c(projectMap, "sc_ver_code") + ")";
         holder.binding.appName.setText(yB.c(projectMap, "my_ws_name") + version);
@@ -181,9 +167,7 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         holder.itemView.setTag("custom");
 
         holder.binding.getRoot().setOnClickListener(v -> {
-            if (!mB.a()) {
-                projectsFragment.toDesignActivity(scId);
-            }
+            if (!mB.a()) projectsFragment.toDesignActivity(scId);
         });
 
         View.OnClickListener showProjectSettingsDialog = v -> {
@@ -212,15 +196,13 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
     private void deleteProject(HashMap<String, Object> projectMap, int position) {
         LoadingDialog progressDialog = new LoadingDialog(activity);
         progressDialog.show();
-
         String scId = yB.c(projectMap, "sc_id");
         new Thread(() -> {
             lC.a(activity, scId);
             activity.runOnUiThread(() -> {
                 progressDialog.dismiss();
-                shownProjects.remove(position);
-                notifyDataSetChanged();
                 allProjects.remove(projectMap);
+                updateData(allProjects);
             });
         }).start();
     }
@@ -324,7 +306,6 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
     public static class ProjectViewHolder extends RecyclerView.ViewHolder {
         final MyprojectsItemBinding binding;
-
         ProjectViewHolder(MyprojectsItemBinding binding) {
             super(binding.getRoot());
             this.binding = binding;

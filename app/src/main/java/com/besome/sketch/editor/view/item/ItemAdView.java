@@ -12,7 +12,7 @@ import com.besome.sketch.beans.ViewBean;
 import com.besome.sketch.editor.view.ItemView;
 
 import a.a.a.wB;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class ItemAdView extends LinearLayout implements ItemView {
 

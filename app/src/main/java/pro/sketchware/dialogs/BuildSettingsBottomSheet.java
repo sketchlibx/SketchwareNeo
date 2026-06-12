@@ -18,15 +18,14 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckBox;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
 import androidx.annotation.NonNull;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import mod.hey.studios.build.BuildSettings;
 import pro.sketchware.databinding.ProjectConfigLayoutBinding;
@@ -122,9 +121,9 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
         setRadioGroupOptions(binding.rgDexer, new String[]{"Dx", "D8"}, SETTING_DEXER, "D8");
         setRadioGroupOptions(binding.rgJavaVersion, getAvailableJavaVersions(), SETTING_JAVA_VERSION, "1.8");
 
-        setCheckboxValue(binding.cbNoWarnings, SETTING_NO_WARNINGS, true);
-        setCheckboxValue(binding.cbNoHttpLegacy, SETTING_NO_HTTP_LEGACY, false);
-        setCheckboxValue(binding.cbEnableLogcat, SETTING_ENABLE_LOGCAT, true);
+        setSwitchValue(binding.cbNoWarnings, SETTING_NO_WARNINGS, true);
+        setSwitchValue(binding.cbNoHttpLegacy, SETTING_NO_HTTP_LEGACY, false);
+        setSwitchValue(binding.cbEnableLogcat, SETTING_ENABLE_LOGCAT, true);
 
         binding.btnCancel.setOnClickListener(v -> dismiss());
         binding.btnSave.setOnClickListener(v -> {
@@ -164,6 +163,7 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
             RadioButton radioButton = new RadioButton(radioGroup.getContext());
             radioButton.setText(option);
             radioButton.setId(View.generateViewId());
+            radioButton.setPadding(SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8));
             radioButton.setLayoutParams(new RadioGroup.LayoutParams(0, -2, 1f));
             if (value.equals(option)) {
                 radioButton.setChecked(true);
@@ -173,7 +173,6 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
                 if (key.equals(SETTING_JAVA_VERSION)) {
                     handleJavaVersionChange(option);
                 } else if (key.equals(SETTING_DEXER)) {
-                    // Prevent Dx selection if Java 11 or 17 is active
                     String activeJava = projectSettings.getValue(SETTING_JAVA_VERSION, "1.8");
                     if (option.equals("Dx") && (activeJava.equals(SETTING_JAVA_VERSION_11) || activeJava.equals(SETTING_JAVA_VERSION_17))) {
                         SketchwareUtil.toast("Dx cannot be used with Java " + activeJava + ".");
@@ -189,11 +188,11 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    private void setCheckboxValue(CheckBox checkBox, String key, boolean defaultValue) {
+    private void setSwitchValue(MaterialSwitch materialSwitch, String key, boolean defaultValue) {
         String value = projectSettings.getValue(key, defaultValue ? "true" : "false");
-        checkBox.setChecked(value.equals("true"));
+        materialSwitch.setChecked(value.equals("true"));
 
-        checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        materialSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 if (key.equals(SETTING_NO_HTTP_LEGACY)) {
                     SketchwareUtil.toast("Note that this option may cause issues if RequestNetwork component is used");

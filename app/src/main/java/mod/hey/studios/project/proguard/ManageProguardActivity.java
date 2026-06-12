@@ -12,9 +12,9 @@ import java.util.HashMap;
 
 import mod.agus.jcoderz.editor.manage.library.locallibrary.ManageLocalLibrary;
 import mod.hey.studios.code.SrcCodeEditor;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageProguardBinding;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageProguardBinding;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class ManageProguardActivity extends BaseAppCompatActivity {
 
@@ -24,6 +24,7 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        enableEdgeToEdgeNoContrast(); // Ensure Material 3 full screen immersion
         super.onCreate(savedInstanceState);
         binding = ManageProguardBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -45,7 +46,7 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
     private void _initToolbar() {
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(true);
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle("Code Shrinking Manager");
         }

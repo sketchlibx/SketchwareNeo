@@ -21,6 +21,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
+import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.StringRes;
 import androidx.appcompat.content.res.AppCompatResources;
@@ -66,10 +70,10 @@ import a.a.a.wq;
 import mod.agus.jcoderz.beans.ViewBeans;
 import mod.hey.studios.util.ProjectFile;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.R;
-import neo.sketchware.utility.ThemeUtils;
-import neo.sketchware.widgets.IconCustomWidget;
-import neo.sketchware.widgets.WidgetsCreatorManager;
+import pro.sketchware.R;
+import pro.sketchware.utility.ThemeUtils;
+import pro.sketchware.widgets.IconCustomWidget;
+import pro.sketchware.widgets.WidgetsCreatorManager;
 
 @SuppressLint({"ClickableViewAccessibility", "SetTextI18n"})
 public class ViewEditor extends RelativeLayout implements View.OnClickListener, View.OnTouchListener {
@@ -144,14 +148,27 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
     }
 
     private void animateUpDown() {
-        animatorTranslateY = ObjectAnimator.ofFloat(deleteView, "TranslationY", 0.0f);
-        animatorTranslateY.setDuration(500L);
-        animatorTranslateY.setInterpolator(new OvershootInterpolator());
-        animatorTranslateX = ObjectAnimator.ofFloat(deleteView, "TranslationY", deleteView.getHeight() * 2);
-        animatorTranslateX.setDuration(500L);
-        animatorTranslateX.setInterpolator(new OvershootInterpolator());
-        isAnimating = true;
-    }
+    animatorTranslateY = ObjectAnimator.ofFloat(deleteView, "TranslationY", deleteView.getHeight() * 2, 0.0f);
+    animatorTranslateY.setDuration(500L);
+    animatorTranslateY.setInterpolator(new OvershootInterpolator());
+    animatorTranslateY.addListener(new AnimatorListenerAdapter() {
+        @Override
+        public void onAnimationEnd(Animator animation) {
+            isAnimating = false;
+        }
+    });
+
+    animatorTranslateX = ObjectAnimator.ofFloat(deleteView, "TranslationY", 0.0f, deleteView.getHeight() * 2);
+    animatorTranslateX.setDuration(300L);
+    animatorTranslateX.setInterpolator(new DecelerateInterpolator());
+    animatorTranslateX.addListener(new AnimatorListenerAdapter() {
+        @Override
+        public void onAnimationEnd(Animator animation) {
+            deleteView.setVisibility(View.GONE);
+            isAnimating = false;
+        }
+    });
+}
 
     private void addPaletteGroupItems() {
         LinearLayout.LayoutParams paletteLayoutParams =
@@ -311,6 +328,12 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
                     isDragged = false;
                     return true;
                 }
+                if (deleteView.getVisibility() == View.VISIBLE) {
+                animateUpDown();
+                animatorTranslateX.start();
+                deleteView.setVisibility(View.GONE);
+                C = false;
+                }
                 return true;
             } else if (!isDragged) {
                 if (Math.abs(posInitX - motionEvent.getRawX()) >= minDist || Math.abs(posInitY - motionEvent.getRawY()) >= minDist) {
@@ -340,6 +363,7 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
                     dummyView.setAllow(false);
                     viewPane.resetView(true);
                 }
+                
                 return true;
             }
         } else if (!isDragged) {
@@ -797,8 +821,8 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
     }
 
     private void cancelAnimation() {
-        if (animatorTranslateY.isRunning()) animatorTranslateY.cancel();
-        if (animatorTranslateX.isRunning()) animatorTranslateX.cancel();
+    if (animatorTranslateY != null && animatorTranslateY.isRunning()) animatorTranslateY.cancel();
+    if (animatorTranslateX != null && animatorTranslateX.isRunning()) animatorTranslateX.cancel();
     }
 
     private void setPreviewColors(String str) {
@@ -808,27 +832,32 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
     }
 
     private void b(boolean z, boolean isCustomWidget) {
-        if (isCustomWidget) {
-            deleteIcon.setImageDrawable(AppCompatResources.getDrawable(getContext(), R.drawable.ic_mtrl_edit));
-            deleteText.setText("Drag here to see the Actions");
-        } else if (z) {
-            deleteIcon.setImageDrawable(AppCompatResources.getDrawable(getContext(), R.drawable.ic_mtrl_delete));
-            deleteText.setText("Drag here to delete");
-            setDeleteViewIconAndTextUi(false);
-        }
+    if (isCustomWidget) {
+        deleteIcon.setImageDrawable(AppCompatResources.getDrawable(getContext(), R.drawable.ic_mtrl_edit));
+        deleteText.setText("Drag here to see the Actions");
+    } else if (z) {
+        deleteIcon.setImageDrawable(AppCompatResources.getDrawable(getContext(), R.drawable.ic_mtrl_delete));
+        deleteText.setText("Drag here to delete");
+        setDeleteViewIconAndTextUi(false);
+    }
+
+    if (C == z && deleteView.getVisibility() == View.VISIBLE) return; // already showing, skip
+    C = z;
+
+    if (z || isCustomWidget) {
+        // Show delete bar
+        deleteView.setVisibility(View.VISIBLE);
         deleteView.bringToFront();
-        if (!isAnimating) {
-            animateUpDown();
-        }
-        if (C == z) return;
-        C = z;
-        cancelAnimation();
-        if (z) {
-            animatorTranslateY.start();
-        } else {
+        animateUpDown();           // recreate animators fresh every time
+        isAnimating = true;
+        animatorTranslateY.start();
+    } else {
+        // Hide delete bar
+        if (deleteView.getVisibility() == View.VISIBLE) {
             animatorTranslateX.start();
         }
     }
+}
 
     public void initialize(String str, ProjectFileBean projectFileBean) {
         a = str;

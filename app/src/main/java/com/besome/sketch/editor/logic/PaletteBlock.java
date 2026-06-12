@@ -1,7 +1,7 @@
 package com.besome.sketch.editor.logic;
 
-import static neo.sketchware.utility.ThemeUtils.getColor;
-import static neo.sketchware.utility.ThemeUtils.isDarkThemeEnabled;
+import static pro.sketchware.utility.ThemeUtils.getColor;
+import static pro.sketchware.utility.ThemeUtils.isDarkThemeEnabled;
 
 import android.content.Context;
 import android.graphics.Typeface;
@@ -17,8 +17,8 @@ import com.google.android.material.card.MaterialCardView;
 import a.a.a.Rs;
 import a.a.a.Ts;
 import a.a.a.wB;
-import neo.sketchware.R;
-import neo.sketchware.databinding.PaletteBlockBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.PaletteBlockBinding;
 
 public class PaletteBlock extends LinearLayout {
 

@@ -86,8 +86,7 @@ public class ProjectsFragment extends DA {
     }
 
     @Override
-    public void b(int requestCode) {
-    }
+    public void b(int requestCode) { }
 
     public void toDesignActivity(String sc_id) {
         Intent intent = new Intent(requireContext(), DesignActivity.class);
@@ -131,7 +130,7 @@ public class ProjectsFragment extends DA {
         };
 
         new MaterialAlertDialogBuilder(requireActivity())
-                .setTitle("Restore / Import")
+                .setTitle("Restore or Import")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
                         new BackupRestoreManager(getActivity(), this).restore();
@@ -166,13 +165,22 @@ public class ProjectsFragment extends DA {
 
         projectsAdapter = new ProjectsAdapter(this, projectsList);
         binding.myprojects.setAdapter(projectsAdapter);
-        binding.myprojects.setHasFixedSize(true);
+        
+        // Show Loading Initially
+        if (binding.loadingContainer != null) {
+            binding.loadingContainer.setVisibility(View.VISIBLE);
+            binding.myprojects.setVisibility(View.GONE);
+            binding.emptyContainer.setVisibility(View.GONE);
+        }
 
-        binding.myprojects.post(this::refreshProjectsList); 
-        UI.addSystemWindowInsetToPadding(binding.specialActionContainer, true, false, true, false);
-        UI.addSystemWindowInsetToPadding(binding.loadingContainer, true, false, true, true);
-        UI.addSystemWindowInsetToPadding(binding.titleContainer, true, false, true, false);
-        UI.addSystemWindowInsetToPadding(binding.myprojects, true, false, true, true);
+        refreshProjectsList(); 
+        
+        if (binding.specialActionContainer != null) {
+            UI.addSystemWindowInsetToPadding(binding.specialActionContainer, true, false, true, false);
+        }
+        if (binding.titleContainer != null) {
+            UI.addSystemWindowInsetToPadding(binding.titleContainer, true, false, true, false);
+        }
 
         binding.nestedScroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
             if (scrollY > oldScrollY) {
@@ -182,37 +190,47 @@ public class ProjectsFragment extends DA {
             }
         });
 
-        binding.iconSort.setOnClickListener(v -> showProjectSortingDialog());
+        if (binding.iconSort != null) {
+            binding.iconSort.setOnClickListener(v -> showProjectSortingDialog());
+        }
         
-        binding.specialAction.getRoot().setOnClickListener(v -> showImportRestoreDialog());
+        // Fixed Restore Button Click mapping using `.getRoot()` to avoid binding clash
+        if (binding.specialAction != null) {
+            binding.specialAction.getRoot().setOnClickListener(v -> showImportRestoreDialog());
+        }
 
+        setupMenu();
+    }
+    
+    private void setupMenu() {
         menuProvider = new MenuProvider() {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menuInflater.inflate(R.menu.projects_fragment_menu, menu);
-                projectsSearchView = (SearchView) menu.findItem(R.id.searchProjects).getActionView();
-                if (projectsSearchView != null) {
-                    projectsSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-                        @Override
-                        public boolean onQueryTextChange(String s) {
-                            projectsAdapter.filterData(s);
-                            return false;
-                        }
-
-                        @Override
-                        public boolean onQueryTextSubmit(String s) {
-                            return false;
-                        }
-                    });
+                MenuItem searchItem = menu.findItem(R.id.searchProjects);
+                
+                if (searchItem != null) {
+                    projectsSearchView = (SearchView) searchItem.getActionView();
+                    if (projectsSearchView != null) {
+                        projectsSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                            @Override
+                            public boolean onQueryTextChange(String s) {
+                                projectsAdapter.filterData(s);
+                                return false;
+                            }
+                            @Override
+                            public boolean onQueryTextSubmit(String s) {
+                                projectsSearchView.clearFocus();
+                                return false;
+                            }
+                        });
+                    }
                 }
             }
 
             @Override
-            public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
-                return false;
-            }
+            public boolean onMenuItemSelected(@NonNull MenuItem menuItem) { return false; }
         };
-
         requireActivity().addMenuProvider(menuProvider);
     }
 
@@ -240,19 +258,24 @@ public class ProjectsFragment extends DA {
             List<HashMap<String, Object>> loadedProjects = lC.a();
             loadedProjects.sort(new ProjectComparator(preference.d("sortBy"),preference.a("pinnedProject", "-1")));
 
-            DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new ProjectDiffCallback(projectsList, loadedProjects));
-
             requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                
                 if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
-                if (binding.loadingContainer.getVisibility() == View.VISIBLE) {
-                    binding.loadingContainer.setVisibility(View.GONE);
-                    binding.myprojects.setVisibility(View.VISIBLE);
-                }
+                
+                boolean isEmpty = loadedProjects.isEmpty();
+                
+                // Hide loading spinner as data has loaded
+                if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
+                
+                // Show Empty state if list is 0, else show the list
+                if (binding.emptyContainer != null) binding.emptyContainer.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+                if (binding.myprojects != null) binding.myprojects.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+
                 projectsList.clear();
                 projectsList.addAll(loadedProjects);
-                diffResult.dispatchUpdatesTo(projectsAdapter);
-                if (projectsSearchView != null)
-                    projectsAdapter.filterData(projectsSearchView.getQuery().toString());
+                
+                projectsAdapter.updateData(projectsList); 
             });
         });
     }
@@ -262,9 +285,12 @@ public class ProjectsFragment extends DA {
             HashMap<String, Object> newProject = lC.b(sc_id);
             if (newProject != null) {
                 requireActivity().runOnUiThread(() -> {
+                    if (binding == null) return;
+                    binding.emptyContainer.setVisibility(View.GONE);
+                    binding.myprojects.setVisibility(View.VISIBLE);
                     projectsList.add(0, newProject);
-                    projectsAdapter.notifyDataSetChanged();
-                    binding.myprojects.scrollToPosition(0);
+                    projectsAdapter.updateData(projectsList);
+                    binding.nestedScroll.smoothScrollTo(0, 0); 
                 });
             }
         });
@@ -277,7 +303,7 @@ public class ProjectsFragment extends DA {
                 int index = IntStream.range(0, projectsList.size()).filter(i -> projectsList.get(i).get("sc_id").equals(sc_id)).findFirst().orElse(-1);
                 if (index != -1) {
                     projectsList.set(index, updatedProject);
-                    requireActivity().runOnUiThread(() -> projectsAdapter.notifyDataSetChanged());
+                    requireActivity().runOnUiThread(() -> projectsAdapter.updateData(projectsList));
                 }
             }
         });
@@ -294,71 +320,25 @@ public class ProjectsFragment extends DA {
         RadioButton sortOrderDesc = dialogBinding.sortOrderDesc;
 
         int storedValue = preference.a("sortBy", ProjectComparator.DEFAULT);
-        if ((storedValue & ProjectComparator.SORT_BY_NAME) == ProjectComparator.SORT_BY_NAME) {
-            sortByName.setChecked(true);
-        } else if ((storedValue & ProjectComparator.SORT_BY_ID) == ProjectComparator.SORT_BY_ID) {
-            sortByID.setChecked(true);
-        }
-        if ((storedValue & ProjectComparator.SORT_ORDER_ASCENDING) == ProjectComparator.SORT_ORDER_ASCENDING) {
-            sortOrderAsc.setChecked(true);
-        } else if ((storedValue & ProjectComparator.SORT_ORDER_DESCENDING) == ProjectComparator.SORT_ORDER_DESCENDING) {
-            sortOrderDesc.setChecked(true);
-        }
+        if ((storedValue & ProjectComparator.SORT_BY_NAME) == ProjectComparator.SORT_BY_NAME) sortByName.setChecked(true);
+        else if ((storedValue & ProjectComparator.SORT_BY_ID) == ProjectComparator.SORT_BY_ID) sortByID.setChecked(true);
+        
+        if ((storedValue & ProjectComparator.SORT_ORDER_ASCENDING) == ProjectComparator.SORT_ORDER_ASCENDING) sortOrderAsc.setChecked(true);
+        else if ((storedValue & ProjectComparator.SORT_ORDER_DESCENDING) == ProjectComparator.SORT_ORDER_DESCENDING) sortOrderDesc.setChecked(true);
 
         dialog.setView(dialogBinding.getRoot());
         dialog.setPositiveButton("Save", (v, which) -> {
             int sortValue = 0;
-            if (sortByName.isChecked()) {
-                sortValue |= ProjectComparator.SORT_BY_NAME;
-            }
-            if (sortByID.isChecked()) {
-                sortValue |= ProjectComparator.SORT_BY_ID;
-            }
-            if (sortOrderAsc.isChecked()) {
-                sortValue |= ProjectComparator.SORT_ORDER_ASCENDING;
-            }
-            if (sortOrderDesc.isChecked()) {
-                sortValue |= ProjectComparator.SORT_ORDER_DESCENDING;
-            }
+            if (sortByName.isChecked()) sortValue |= ProjectComparator.SORT_BY_NAME;
+            if (sortByID.isChecked()) sortValue |= ProjectComparator.SORT_BY_ID;
+            if (sortOrderAsc.isChecked()) sortValue |= ProjectComparator.SORT_ORDER_ASCENDING;
+            if (sortOrderDesc.isChecked()) sortValue |= ProjectComparator.SORT_ORDER_DESCENDING;
+            
             preference.a("sortBy", sortValue, true);
             v.dismiss();
             refreshProjectsList();
         });
         dialog.setNegativeButton("Cancel", null);
         dialog.show();
-    }
-
-    private static class ProjectDiffCallback extends DiffUtil.Callback {
-        private final List<HashMap<String, Object>> oldList;
-        private final List<HashMap<String, Object>> newList;
-
-        public ProjectDiffCallback(List<HashMap<String, Object>> oldList, List<HashMap<String, Object>> newList) {
-            this.oldList = oldList;
-            this.newList = newList;
-        }
-
-        @Override
-        public int getOldListSize() {
-            return oldList.size();
-        }
-
-        @Override
-        public int getNewListSize() {
-            return newList.size();
-        }
-
-        @Override
-        public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-            String oldId = (String) oldList.get(oldItemPosition).get("sc_id");
-            String newId = (String) newList.get(newItemPosition).get("sc_id");
-            return oldId.equals(newId);
-        }
-
-        @Override
-        public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-            HashMap<String, Object> oldItem = oldList.get(oldItemPosition);
-            HashMap<String, Object> newItem = newList.get(newItemPosition);
-            return oldItem.equals(newItem);
-        }
     }
 }

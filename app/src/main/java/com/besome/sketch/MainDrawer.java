@@ -25,12 +25,12 @@ import a.a.a.mB;
 import dev.chrisbanes.insetter.Insetter;
 import dev.chrisbanes.insetter.Side;
 import mod.hilal.saif.activities.tools.AppSettings;
-import neo.sketchware.R;
-import neo.sketchware.activities.about.AboutActivity;
-import neo.sketchware.utility.UI;
+import pro.sketchware.R;
+import pro.sketchware.activities.about.AboutActivity;
+import pro.sketchware.utility.UI;
 
 public class MainDrawer extends NavigationView {
-    private static final int DEF_STYLE_RES = R.style.Widget_SketchwareNeo_NavigationView_Main;
+    private static final int DEF_STYLE_RES = R.style.Widget_SketchwarePro_NavigationView_Main;
 
     public MainDrawer(@NonNull Context context) {
         this(context, null);

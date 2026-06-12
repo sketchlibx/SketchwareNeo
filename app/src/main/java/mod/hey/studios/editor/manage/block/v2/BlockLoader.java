@@ -18,10 +18,10 @@ import dev.aldi.sayuti.block.ExtraBlockFile;
 import mod.agus.jcoderz.editor.manage.block.palette.PaletteSelector;
 import mod.hey.studios.editor.manage.block.ExtraBlockInfo;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.R;
-import neo.sketchware.SketchApplication;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.SketchApplication;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 
 /**
  * An optimized Custom Blocks loader.
@@ -135,7 +135,7 @@ public class BlockLoader {
 
                 if (color instanceof String) {
                     try {
-                        Context context = new ContextThemeWrapper(SketchApplication.getContext(), R.style.Theme_SketchwareNeo);
+                        Context context = new ContextThemeWrapper(SketchApplication.getContext(), R.style.Theme_SketchwarePro);
                         int harmonizedColor = harmonizeWithPrimary(context, Color.parseColor((String) color));
                         info.setColor(harmonizedColor);
                     } catch (IllegalArgumentException e) {

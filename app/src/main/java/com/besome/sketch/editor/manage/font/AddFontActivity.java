@@ -20,11 +20,11 @@ import a.a.a.uq;
 import a.a.a.yy;
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageFontAddBinding;
-import neo.sketchware.lib.validator.FontNameValidator;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageFontAddBinding;
+import pro.sketchware.lib.validator.FontNameValidator;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class AddFontActivity extends BaseDialogActivity implements View.OnClickListener {
 

@@ -7,7 +7,7 @@ import java.util.HashMap;
 import a.a.a.ProjectBuilder;
 import mod.hey.studios.util.Helper;
 import mod.jbk.build.BuildProgressReceiver;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.utility.FileUtil;
 
 public class StringfogHandler {
 

@@ -22,9 +22,9 @@ import a.a.a.kq;
 import a.a.a.mB;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.VarTypeItemBinding;
-import neo.sketchware.databinding.VarTypeSelectorDialogBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.VarTypeItemBinding;
+import pro.sketchware.databinding.VarTypeSelectorDialogBinding;
 
 @SuppressLint("ViewConstructor")
 public class VariableItemView extends LinearLayout {

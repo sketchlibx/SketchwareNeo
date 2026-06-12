@@ -18,9 +18,9 @@ import a.a.a.bB;
 import a.a.a.uq;
 import a.a.a.wq;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageFontAddBinding;
-import neo.sketchware.lib.validator.FontNameValidator;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageFontAddBinding;
+import pro.sketchware.lib.validator.FontNameValidator;
 
 public class AddFontCollectionActivity extends BaseDialogActivity implements View.OnClickListener {
     public int requestCode;

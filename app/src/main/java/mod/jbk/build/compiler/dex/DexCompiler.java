@@ -16,7 +16,7 @@ import a.a.a.ProjectBuilder;
 import mod.hey.studios.project.ProjectSettings;
 import mod.pranav.build.JarBuilder;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.utility.FileUtil;
 
 public class DexCompiler {
     public static void compileDexFiles(ProjectBuilder builder) throws CompilationFailedException {

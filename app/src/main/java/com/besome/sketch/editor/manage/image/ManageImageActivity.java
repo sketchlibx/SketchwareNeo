@@ -26,9 +26,9 @@ import a.a.a.Op;
 import a.a.a.fu;
 import a.a.a.mB;
 import a.a.a.pu;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageImageBinding;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageImageBinding;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class ManageImageActivity extends BaseAppCompatActivity implements ViewPager.OnPageChangeListener {
     private String sc_id;

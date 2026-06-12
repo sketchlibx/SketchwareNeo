@@ -7,7 +7,7 @@ import com.besome.sketch.beans.ViewBean;
 import com.besome.sketch.editor.view.palette.IconBase;
 
 import mod.agus.jcoderz.beans.ViewBeans;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class IconBadgeView extends IconBase {
 

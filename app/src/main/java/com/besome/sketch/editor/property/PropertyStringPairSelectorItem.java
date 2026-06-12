@@ -19,7 +19,7 @@ import a.a.a.mB;
 import a.a.a.sq;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 @SuppressLint("ViewConstructor")
 public class PropertyStringPairSelectorItem extends RelativeLayout implements View.OnClickListener {

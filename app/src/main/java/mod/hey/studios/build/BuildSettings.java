@@ -3,7 +3,7 @@ package mod.hey.studios.build;
 import java.io.Serializable;
 
 import mod.hey.studios.project.ProjectSettings;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.utility.FileUtil;
 
 public class BuildSettings extends ProjectSettings implements Serializable {
 

@@ -14,7 +14,7 @@ import android.view.WindowManager;
 
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 
-import neo.sketchware.databinding.WindowProgressBinding;
+import pro.sketchware.databinding.WindowProgressBinding;
 
 public class FloatingProgressWindow {
 

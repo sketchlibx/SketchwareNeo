@@ -7,7 +7,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry;
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry;
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.SketchApplication;
+import pro.sketchware.SketchApplication;
 
 public class CodeEditorLanguages {
     public static final String SCOPE_NAME_KOTLIN = "source.kotlin";

@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -14,15 +15,17 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
-        android:layout_marginBottom="8dp"
-        android:text="Project settings"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:layout_marginBottom="16dp"
+        android:text="Project Settings"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textStyle="bold" />
 
     <ScrollView
         android:id="@+id/preference_scroller"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:clipToPadding="false">
 
         <LinearLayout
             android:id="@+id/preference_container"
@@ -36,7 +39,6 @@
                 android:id="@+id/til_application_class_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:hint="Application class name">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -49,20 +51,20 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="16dp"
                 android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/til_minimum_sdk_version"
+                    android:id="@+id/til_compile_sdk_version"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:hint="Min SDK">
+                    android:hint="Compile SDK">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_minimum_sdk_version"
+                        android:id="@+id/et_compile_sdk_version"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="number" />
@@ -84,21 +86,37 @@
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_minimum_sdk_version"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="Minimum SDK">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_minimum_sdk_version"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+            </com.google.android.material.textfield.TextInputLayout>
+
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="12dp"
                 android:text="Advanced Options"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:textColor="?attr/colorPrimary" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp">
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -115,7 +133,7 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -135,7 +153,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Takes automatic snapshots of your project on every save."
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
@@ -143,16 +161,13 @@
                             android:id="@+id/cb_enable_version_history"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:minWidth="0dp"
-                            android:minHeight="0dp" />
+                            android:layout_marginStart="16dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp" />
 
                     <LinearLayout
                         android:id="@+id/enable_viewbinding"
@@ -164,7 +179,7 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -184,7 +199,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Note: Manual changes may be required for widgets used in ASD block"
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
@@ -192,16 +207,13 @@
                             android:id="@+id/cb_enable_viewbinding"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:minWidth="0dp"
-                            android:minHeight="0dp" />
+                            android:layout_marginStart="16dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp" />
 
                     <LinearLayout
                         android:id="@+id/remove_old_methods"
@@ -213,7 +225,7 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -233,7 +245,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Removes deprecated methods like showMessage, getDip, etc."
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
@@ -241,16 +253,13 @@
                             android:id="@+id/cb_remove_old_methods"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:minWidth="0dp"
-                            android:minHeight="0dp" />
+                            android:layout_marginStart="16dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp" />
 
                     <LinearLayout
                         android:id="@+id/use_new_material_components_app_theme"
@@ -262,7 +271,7 @@
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -282,7 +291,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Replaces Button with MaterialButton. Compiler warning: be careful!"
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
@@ -290,9 +299,7 @@
                             android:id="@+id/cb_use_new_material_components_app_theme"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:minWidth="0dp"
-                            android:minHeight="0dp" />
+                            android:layout_marginStart="16dp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -308,7 +315,7 @@
                     style="@style/Widget.Material3Expressive.Button.TonalButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     android:text="@string/common_word_cancel" />
 
@@ -317,6 +324,7 @@
                     style="@style/Widget.Material3Expressive.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:text="@string/common_word_save" />
             </LinearLayout>

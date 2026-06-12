@@ -12,7 +12,7 @@ import android.widget.TextView;
 
 import a.a.a.mB;
 import a.a.a.wB;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class BaseDialogActivity extends BaseAppCompatActivity {
 

@@ -19,7 +19,7 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.project.ProjectSettings;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
 

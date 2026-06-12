@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="assets/Sketchware-Pro.png" style="width: 30%;" />
+  <img src="assets/Sketchware-Neo.png" style="width: 30%;" />
 </p>
 
 # Sketchware Neo
-[![GitHub contributors](https://img.shields.io/github/contributors/Sketchware-Pro/Sketchware-Pro)](https://github.com/Sketchware-Pro/Sketchware-Pro/graphs/contributors)
-[![GitHub last commit](https://img.shields.io/github/last-commit/Sketchware-Pro/Sketchware-Pro)](https://github.com/Sketchware-Pro/Sketchware-Pro/commits/)
+[![GitHub contributors](https://img.shields.io/github/contributors/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo/graphs/contributors)
+[![GitHub last commit](https://img.shields.io/github/last-commit/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo/commits/)
 [![Discord server stats](https://img.shields.io/discord/790686719753846785)](http://discord.gg/kq39yhT4rX)
-[![Total downloads](https://img.shields.io/github/downloads/Sketchware-Pro/Sketchware-Pro/total)](https://github.com/Sketchware-Pro/Sketchware-Pro/releases)
-[![Repository Size](https://img.shields.io/github/repo-size/Sketchware-Pro/Sketchware-Pro)](https://github.com/Sketchware-Pro/Sketchware-Pro)
+[![Total downloads](https://img.shields.io/github/downloads/sketchlibx/SketchwareNeo/total)](https://github.com/sketchlibx/SketchwareNeo/releases)
+[![Repository Size](https://img.shields.io/github/repo-size/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo)
 
 Welcome to Sketchware Neo! Here you'll find the source code of many classes in Sketchware Neo and, most importantly, the place to contribute to Sketchware Neo.
 
@@ -25,7 +25,7 @@ To build the app, you must use Gradle. It's highly recommended to use Android St
 | `a.a.a.Ox`      | Responsible for generating XML files of layouts |
 | `a.a.a.qq`      | Registry of built-in libraries' dependencies |
 | `a.a.a.tq`      | Responsible for the compiling dialog's quizzes |
-| `a.a.a.yq`      | Organizes Sketchware Neojects' file paths    |
+| `a.a.a.yq`      | Organizes Sketchware projects' file paths    |
 
 > [!TIP]
 > You can also check the `mod` package, which contains the majority of contributors' changes.

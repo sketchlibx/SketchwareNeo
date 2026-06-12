@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-import neo.sketchware.databinding.ItemDependencyDownloadBinding;
+import pro.sketchware.databinding.ItemDependencyDownloadBinding;
 
 
 

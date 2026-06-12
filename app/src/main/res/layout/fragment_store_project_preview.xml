@@ -128,7 +128,7 @@
                     android:clipToPadding="false"
                     android:orientation="horizontal"
                     android:paddingHorizontal="24dp"
-                    android:theme="@style/ThemeOverlay.SketchwareNeo.Chip.ProjectPreview" />
+                    android:theme="@style/ThemeOverlay.SketchwarePro.Chip.ProjectPreview" />
 
             </HorizontalScrollView>
 

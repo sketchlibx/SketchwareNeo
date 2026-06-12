@@ -1,5 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- PLEASE, If you're going to create or modify a style -->
+    <!-- please MOVE (not copy) the style to a new styles file (styles_new.xml) -->
+    <!-- THIS FILE IS READ-ONLY (except deleting a style) -->
+
     <style name="AppTheme.Check.White" parent="@style/Base.Widget.AppCompat.CompoundButton.CheckBox">
         <item name="colorControlActivated">@color/color_chk_white_highlight</item>
         <item name="colorControlNormal">@color/color_chk_white_normal</item>
@@ -38,7 +41,7 @@
         <item name="android:minHeight">3dp</item>
     </style>
 
-    <style name="Theme.AppCompat.Light.NoActionBar.Translucent" parent="Theme.SketchwareNeo">
+    <style name="Theme.AppCompat.Light.NoActionBar.Translucent" parent="Theme.SketchwarePro">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowContentOverlay">@null</item>
@@ -57,13 +60,14 @@
         <item name="android:windowSoftInputMode">adjustPan</item>
     </style>
 
-    <style name="AppTheme.Et" parent="Theme.SketchwareNeo">
+    <style name="AppTheme.Et" parent="Theme.SketchwarePro">
         <item name="colorControlHighlight">@android:color/transparent</item>
         <item name="colorControlNormal">@android:color/transparent</item>
         <item name="colorPrimary">#ff212121</item>
         <item name="colorPrimaryDark">#ff000000</item>
     </style>
 
+    <!--  bottom sheet style  -->
     <style name="BottomSheetCardStyle" parent="">
         <item name="cornerFamilyTopLeft">rounded</item>
         <item name="cornerFamilyTopRight">rounded</item>

@@ -12,8 +12,8 @@ android {
     def shortCommitHash = "git rev-parse --short HEAD".execute().text.trim()
 
     defaultConfig {
-        applicationId = "neo.sketchware"
-        namespace = "neo.sketchware"
+        applicationId = "pro.sketchware"
+        namespace = "pro.sketchware"
         //noinspection ExpiredTargetSdkVersion since we don't target getting Sketchware Neo on Google Play.
         targetSdk = 28
         minSdk = 26
@@ -157,9 +157,9 @@ tasks.register('createMockGoogleServices') {
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:699054295113:android:6622da42d5fe77d29dd798",
+        "mobilesdk_app_id": "1:699054295113:android:81451b27e590924c9dd798",
         "android_client_info": {
-          "package_name": "${android.defaultConfig.applicationId}"
+          "package_name": "pro.sketchware"
         }
       },
       "oauth_client": [

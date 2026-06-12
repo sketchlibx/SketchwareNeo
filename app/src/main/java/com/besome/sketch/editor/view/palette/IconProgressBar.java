@@ -5,7 +5,7 @@ import android.content.Context;
 import com.besome.sketch.beans.LayoutBean;
 import com.besome.sketch.beans.ViewBean;
 
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class IconProgressBar extends IconBase {
     public IconProgressBar(Context context) {

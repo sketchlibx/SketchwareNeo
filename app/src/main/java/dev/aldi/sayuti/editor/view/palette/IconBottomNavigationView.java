@@ -11,7 +11,7 @@ import com.besome.sketch.editor.view.AndroidxOrMaterialView;
 import com.besome.sketch.editor.view.palette.IconBase;
 
 import mod.agus.jcoderz.beans.ViewBeans;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class IconBottomNavigationView extends IconBase implements AndroidxOrMaterialView {
 

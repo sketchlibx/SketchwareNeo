@@ -27,8 +27,8 @@ import a.a.a.bB;
 import a.a.a.mB;
 import a.a.a.uq;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageFontImportBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageFontImportBinding;
 
 @SuppressLint("NotifyDataSetChanged")
 public class ManageFontImportActivity extends BaseAppCompatActivity implements View.OnClickListener {

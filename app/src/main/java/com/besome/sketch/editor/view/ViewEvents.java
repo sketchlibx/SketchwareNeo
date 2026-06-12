@@ -25,8 +25,8 @@ import a.a.a.jC;
 import a.a.a.oq;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.EventGridItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.EventGridItemBinding;
 
 public class ViewEvents extends LinearLayout {
     private final ArrayList<EventBean> events = new ArrayList<>();

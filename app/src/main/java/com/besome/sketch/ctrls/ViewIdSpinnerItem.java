@@ -6,8 +6,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
 
-import neo.sketchware.R;
-import neo.sketchware.databinding.VarIdSpinnerItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.VarIdSpinnerItemBinding;
 
 public class ViewIdSpinnerItem extends LinearLayout {
 

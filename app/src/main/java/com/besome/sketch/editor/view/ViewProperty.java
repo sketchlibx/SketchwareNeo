@@ -47,7 +47,7 @@ import a.a.a.wB;
 import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class ViewProperty extends LinearLayout implements Kw {
 
@@ -73,6 +73,7 @@ public class ViewProperty extends LinearLayout implements Kw {
     private ObjectAnimator showAllShower;
     private ObjectAnimator showAllHider;
     private boolean showAllVisible = true;
+    private String currentlySelectedViewId = null;
 
     public ViewProperty(Context context) {
         super(context);
@@ -309,26 +310,39 @@ public class ViewProperty extends LinearLayout implements Kw {
             }
         });
 
-        FrameLayout spinnerContainer = findViewById(R.id.spn_widget_container); 
+        FrameLayout spinnerContainer = findViewById(R.id.spn_widget_container);
         if (spinnerContainer != null) {
-            View overlay = new View(context);
-            overlay.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            overlay.setBackgroundColor(0x00000000); 
-            spinnerContainer.addView(overlay);
-            
-            overlay.setOnClickListener(v -> {
-                if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_TREE_VIEW)) {
-                    if (context instanceof FragmentActivity) {
-                        ViewTreeDrawerDialog drawer = new ViewTreeDrawerDialog(projectActivityViews, viewId -> {
-                            a(viewId); 
-                        });
-                        drawer.show(((FragmentActivity) context).getSupportFragmentManager(), "ViewTreeDrawer");
-                    }
-                } else {
-                    spnWidget.performClick();
-                }
-            });
+    View overlay = new View(context);
+    overlay.setLayoutParams(new FrameLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.MATCH_PARENT
+    ));
+    overlay.setBackgroundColor(0x00000000);
+
+    spinnerContainer.addView(overlay);
+
+    overlay.setOnClickListener(v -> {
+        if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_TREE_VIEW)) {
+            if (context instanceof FragmentActivity) {
+
+                ViewTreeDrawerDialog drawer = new ViewTreeDrawerDialog(
+                    projectActivityViews,
+                    viewId -> {
+                        a(viewId);
+                    },
+                    currentlySelectedViewId
+                );
+
+                drawer.show(
+                    ((FragmentActivity) context).getSupportFragmentManager(),
+                    "ViewTreeDrawer"
+                );
+            }
+        } else {
+            spnWidget.performClick();
         }
+    });
+}
 
         initializeGroups();
         initializeSeeAllAnimations();
@@ -338,6 +352,7 @@ public class ViewProperty extends LinearLayout implements Kw {
     }
 
     private void selectView(ViewBean viewBean) {
+    currentlySelectedViewId = viewBean.id;
         if (propertyTargetChangeListener != null) {
             propertyTargetChangeListener.a(viewBean.id);
         }

@@ -8,8 +8,8 @@ import android.widget.LinearLayout;
 import androidx.annotation.DrawableRes;
 
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.WidgetLayoutBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.WidgetLayoutBinding;
 
 public class BaseWidget extends LinearLayout {
     @DrawableRes

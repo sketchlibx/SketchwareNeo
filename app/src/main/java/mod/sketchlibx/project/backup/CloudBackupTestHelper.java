@@ -171,7 +171,7 @@ public class CloudBackupTestHelper {
                     boolean del = swbFile.delete();
                     Log.d(TAG, "Temp .swb deleted=" + del);
                 }
-                neo.sketchware.utility.FileUtil.deleteFile(CloudBackupFactory.getCloudBackupDir());
+                pro.sketchware.utility.FileUtil.deleteFile(CloudBackupFactory.getCloudBackupDir());
 
                 if (!completed) {
                     report.append("  ✗ Upload TIMED OUT after ")

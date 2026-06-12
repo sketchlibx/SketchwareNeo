@@ -7,8 +7,8 @@ import a.a.a.yq;
 import mod.hey.studios.project.ProjectSettings;
 import mod.jbk.build.BuildProgressReceiver;
 import mod.jbk.build.BuiltInLibraries;
-import neo.sketchware.util.library.BuiltInLibraryManager;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.util.library.BuiltInLibraryManager;
+import pro.sketchware.utility.FileUtil;
 
 public class KotlinCompilerBridge {
 

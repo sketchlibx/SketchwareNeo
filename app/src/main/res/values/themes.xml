@@ -1,72 +1,74 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Base.Theme.SketchwareNeo" parent="Scheme.SketchwareNeo.DayNight" />
-    <style name="Theme.SketchwareNeo" parent="Platform.Theme.SketchwareNeo">
-        <item name="bottomNavigationStyle">@style/Widget.SketchwareNeo.BottomNavigationView</item>
-        <item name="chipStyle">@style/Widget.SketchwareNeo.Chip</item>
+    <style name="Base.Theme.SketchwarePro" parent="Scheme.SketchwarePro.DayNight" />
+    <style name="Theme.SketchwarePro" parent="Platform.Theme.SketchwarePro">
+        <item name="bottomNavigationStyle">@style/Widget.SketchwarePro.BottomNavigationView</item>
+        <item name="chipStyle">@style/Widget.SketchwarePro.Chip</item>
         <item name="collapsingToolbarLayoutStyle">?attr/collapsingToolbarLayoutLargeStyle</item>
         <item name="collapsingToolbarLayoutLargeSize">@dimen/collapsing_toolbar_large_size</item>
-        <item name="collapsingToolbarLayoutLargeStyle">@style/Widget.SketchwareNeo.CollapsingToolbar</item>
+        <item name="collapsingToolbarLayoutLargeStyle">@style/Widget.SketchwarePro.CollapsingToolbar</item>
         <item name="homeAsUpIndicator">@drawable/abc_ic_ab_back_material</item>
-        <item name="textInputStyle">@style/Widget.SketchwareNeo.TextInputLayout</item>
-        <item name="switchPreferenceCompatStyle">@style/Preference.SketchwareNeo.SwitchPreferenceCompat</item>
-        <item name="tabStyle">@style/Widget.SketchwareNeo.TabLayout</item>
-        <item name="alertDialogTheme">@style/ThemeOverlay.SketchwareNeo.AlertDialog</item>
-        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SketchwareNeo.AlertDialog</item>
+        <item name="textInputStyle">@style/Widget.SketchwarePro.TextInputLayout</item>
+        <item name="switchPreferenceCompatStyle">
+            @style/Preference.SketchwarePro.SwitchPreferenceCompat
+        </item>
+        <item name="tabStyle">@style/Widget.SketchwarePro.TabLayout</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.SketchwarePro.AlertDialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.SketchwarePro.AlertDialog</item>
         <item name="popupMenuStyle">@style/Widget.Material3.PopupMenu</item>
         <item name="android:popupMenuStyle">@style/Widget.Material3.PopupMenu</item>
         <item name="materialCardViewStyle">?attr/materialCardViewFilledStyle</item>
-        <item name="materialCardViewFilledStyle">@style/Widget.SketchwareNeo.CardView</item>
-        
-        <!-- Type styles synced to Neo -->
-        <item name="textAppearanceDisplayLarge">@style/TextAppearance.SketchwareNeo.DisplayLarge</item>
-        <item name="textAppearanceDisplayMedium">@style/TextAppearance.SketchwareNeo.DisplayMedium</item>
-        <item name="textAppearanceDisplaySmall">@style/TextAppearance.SketchwareNeo.DisplaySmall</item>
-        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.SketchwareNeo.HeadlineLarge</item>
-        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.SketchwareNeo.HeadlineMedium</item>
-        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.SketchwareNeo.HeadlineSmall</item>
-        <item name="textAppearanceTitleLarge">@style/TextAppearance.SketchwareNeo.TitleLarge</item>
-        <item name="textAppearanceTitleMedium">@style/TextAppearance.SketchwareNeo.TitleMedium</item>
-        <item name="textAppearanceTitleSmall">@style/TextAppearance.SketchwareNeo.TitleSmall</item>
-        <item name="textAppearanceBodyLarge">@style/TextAppearance.SketchwareNeo.BodyLarge</item>
-        <item name="textAppearanceBodyMedium">@style/TextAppearance.SketchwareNeo.BodyMedium</item>
-        <item name="textAppearanceBodySmall">@style/TextAppearance.SketchwareNeo.BodySmall</item>
-        <item name="textAppearanceLabelLarge">@style/TextAppearance.SketchwareNeo.LabelLarge</item>
-        <item name="textAppearanceLabelMedium">@style/TextAppearance.SketchwareNeo.LabelMedium</item>
-        <item name="textAppearanceLabelSmall">@style/TextAppearance.SketchwareNeo.LabelSmall</item>
-        <item name="textAppearanceBodyLargeEmphasized">@style/TextAppearance.SketchwareNeo.BodyLargeEmphasized</item>
+        <item name="materialCardViewFilledStyle">@style/Widget.SketchwarePro.CardView</item>
+        <!-- Type styles. -->
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.SketchwarePro.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.SketchwarePro.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.SketchwarePro.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.SketchwarePro.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.SketchwarePro.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.SketchwarePro.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.SketchwarePro.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.SketchwarePro.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.SketchwarePro.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.SketchwarePro.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.SketchwarePro.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.SketchwarePro.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.SketchwarePro.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.SketchwarePro.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.SketchwarePro.LabelSmall</item>
+        <item name="textAppearanceBodyLargeEmphasized">@style/TextAppearance.SketchwarePro.BodyLargeEmphasized</item>
     </style>
 
-    <style name="Theme.SketchwareNeo.Main">
-        <item name="navigationViewStyle">@style/Widget.SketchwareNeo.NavigationView.Main</item>
+    <style name="Theme.SketchwarePro.Main">
+        <item name="navigationViewStyle">@style/Widget.SketchwarePro.NavigationView.Main</item>
     </style>
 
-    <style name="Theme.SketchwareNeo.ProjectPreview">
-        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SketchwareNeo.BottomSheetDialog</item>
+    <style name="Theme.SketchwarePro.ProjectPreview">
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.SketchwarePro.BottomSheetDialog
+        </item>
     </style>
 
-    <style name="Theme.SketchwareNeo.SmallToolbar">
+    <style name="Theme.SketchwarePro.SmallToolbar">
         <item name="actionBarSize">@dimen/mtrl_toolbar_default_height</item>
-        <item name="toolbarStyle">@style/Widget.SketchwareNeo.Toolbar.SmallText</item>
+        <item name="toolbarStyle">@style/Widget.SketchwarePro.Toolbar.SmallText</item>
     </style>
 
-    <style name="Theme.SketchwareNeo.Starting.Base" parent="Theme.SplashScreen">
+    <style name="Theme.SketchwarePro.Starting.Base" parent="Theme.SplashScreen">
         <item name="windowSplashScreenAnimationDuration">850</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
         <item name="windowSplashScreenBackground">@color/splash_bg_color</item>
-        <item name="postSplashScreenTheme">@style/Theme.SketchwareNeo.Main</item>
+        <item name="postSplashScreenTheme">@style/Theme.SketchwarePro.Main</item>
 
         <item name="android:navigationBarColor">@color/splash_bg_color</item>
         <item name="android:statusBarColor">@color/splash_bg_color</item>
         <item name="android:windowLightStatusBar">@bool/is_light_theme</item>
-        <item name="android:windowLightNavigationBar">@bool/is_light_theme</item>
+        <item name="android:windowLightNavigationBar">@bool/is_light_theme
+        </item>
     </style>
 
-    <style name="Theme.SketchwareNeo.Starting" parent="Theme.SketchwareNeo.Starting.Base" />
+    <style name="Theme.SketchwarePro.Starting" parent="Theme.SketchwarePro.Starting.Base" />
 
-    <style name="Platform.V21.Theme.SketchwareNeo" parent="Base.Theme.SketchwareNeo">
+    <style name="Platform.V21.Theme.SketchwarePro" parent="Base.Theme.SketchwarePro">
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
     </style>
-    <style name="Platform.Theme.SketchwareNeo" parent="Platform.V21.Theme.SketchwareNeo" />
+    <style name="Platform.Theme.SketchwarePro" parent="Platform.V21.Theme.SketchwarePro" />
 </resources>

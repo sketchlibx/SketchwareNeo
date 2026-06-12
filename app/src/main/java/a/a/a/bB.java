@@ -8,9 +8,9 @@ import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.core.content.ContextCompat;
 
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.CustomToastBinding;
-import neo.sketchware.utility.ThemeUtils;
+import pro.sketchware.R;
+import pro.sketchware.databinding.CustomToastBinding;
+import pro.sketchware.utility.ThemeUtils;
 
 public class bB {
 
@@ -27,7 +27,7 @@ public class bB {
 
     public static Toast a(Context context, CharSequence charSequence, int duration, int gravity, float xOffset, float yOffset, int toastType) {
         try {
-            Context themedContext = new ContextThemeWrapper(context, R.style.Theme_SketchwareNeo);
+            Context themedContext = new ContextThemeWrapper(context, R.style.Theme_SketchwarePro);
 
             CustomToastBinding binding = CustomToastBinding.inflate(LayoutInflater.from(themedContext));
 

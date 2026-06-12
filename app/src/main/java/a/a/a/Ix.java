@@ -23,11 +23,11 @@ import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.android_manifest.AndroidManifestInjector;
 import mod.jbk.build.BuiltInLibraries;
-import neo.sketchware.util.library.BuiltInLibraryManager;
-import neo.sketchware.utility.FilePathUtil;
-import neo.sketchware.utility.FileResConfig;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.xml.XmlBuilder;
+import pro.sketchware.util.library.BuiltInLibraryManager;
+import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.utility.FileResConfig;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.xml.XmlBuilder;
 
 public class Ix {
     // 🚀 FEATURE: Updated default target SDK to API 36 (Android 16) for V7.0.0

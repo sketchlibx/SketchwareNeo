@@ -47,12 +47,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import neo.sketchware.R;
-import neo.sketchware.activities.importicon.ImportIconActivity;
-import neo.sketchware.databinding.FrManageImageListBinding;
-import neo.sketchware.databinding.ManageImageListItemBinding;
-import neo.sketchware.utility.FilePathUtil;
-import neo.sketchware.utility.SvgUtils;
+import pro.sketchware.R;
+import pro.sketchware.activities.importicon.ImportIconActivity;
+import pro.sketchware.databinding.FrManageImageListBinding;
+import pro.sketchware.databinding.ManageImageListItemBinding;
+import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.utility.SvgUtils;
 
 public class pu extends qA {
 

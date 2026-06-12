@@ -29,9 +29,9 @@ import com.google.android.material.card.MaterialCardView;
 import java.io.File;
 import java.util.ArrayList;
 
-import neo.sketchware.R;
-import neo.sketchware.databinding.FrManageImageListBinding;
-import neo.sketchware.databinding.ManageImageListItemBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.FrManageImageListBinding;
+import pro.sketchware.databinding.ManageImageListItemBinding;
 
 public class fu extends qA implements View.OnClickListener {
 

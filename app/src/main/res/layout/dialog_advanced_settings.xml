@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
     <com.google.android.material.bottomsheet.BottomSheetDragHandleView
@@ -14,15 +15,17 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="16dp"
         android:text="Advanced Settings"
-        android:textAppearance="?attr/textAppearanceTitleLarge" />
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textStyle="bold" />
 
     <ScrollView
         android:id="@+id/preference_scroller"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:fadeScrollbars="true">
 
         <LinearLayout
             android:id="@+id/preference_container"
@@ -35,7 +38,6 @@
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
                 android:text="Compiler &amp; Injection"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
@@ -44,8 +46,9 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -62,8 +65,8 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -96,11 +99,11 @@
                             android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/row_custom_java"
@@ -111,8 +114,8 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -145,11 +148,11 @@
                             android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/row_custom_manifest"
@@ -160,8 +163,8 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -194,11 +197,11 @@
                             android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <View
+                    <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="16dp"
-                        android:background="?attr/colorOutlineVariant" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/row_multidex"
@@ -209,8 +212,8 @@
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="14dp">
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -256,9 +259,9 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_project_analyzer"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="56dp"
                 android:text="Resource Usage Tracker" />
 
             <LinearLayout
@@ -269,18 +272,19 @@
 
                 <Button
                     android:id="@+id/btn_cancel"
-                    style="@style/Widget.Material3Expressive.Button.TonalButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="12dp"
                     android:layout_weight="1"
                     android:text="@string/common_word_cancel" />
 
                 <Button
                     android:id="@+id/btn_save"
-                    style="@style/Widget.Material3Expressive.Button"
+                    style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="12dp"
                     android:layout_weight="1"
                     android:text="@string/common_word_save" />
             </LinearLayout>

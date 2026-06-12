@@ -28,11 +28,11 @@ import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.ProjectFile;
 import mod.hilal.saif.blocks.CommandBlock;
 import mod.pranav.viewbinding.ViewBindingBuilder;
-import neo.sketchware.SketchApplication;
-import neo.sketchware.util.library.BuiltInLibraryManager;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.xml.XmlBuilder;
-import neo.sketchware.xml.XmlBuilderHelper;
+import pro.sketchware.SketchApplication;
+import pro.sketchware.util.library.BuiltInLibraryManager;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.xml.XmlBuilder;
+import pro.sketchware.xml.XmlBuilderHelper;
 
 public class yq {
 

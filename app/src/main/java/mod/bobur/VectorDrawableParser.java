@@ -14,9 +14,9 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import a.a.a.wq;
-import neo.sketchware.SketchApplication;
-import neo.sketchware.activities.resourceseditor.components.utils.ColorsEditorManager;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.SketchApplication;
+import pro.sketchware.activities.resourceseditor.components.utils.ColorsEditorManager;
+import pro.sketchware.utility.FileUtil;
 
 public class VectorDrawableParser {
 

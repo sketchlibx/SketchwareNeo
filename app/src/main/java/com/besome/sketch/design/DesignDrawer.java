@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,11 +26,11 @@ import com.google.android.material.shape.MaterialShapeUtils;
 import com.google.android.material.shape.ShapeAppearanceModel;
 
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.DesignDrawerItemBinding;
-import neo.sketchware.utility.SketchwareUtil;
-import neo.sketchware.utility.ThemeUtils;
-import neo.sketchware.utility.UI;
+import pro.sketchware.R;
+import pro.sketchware.databinding.DesignDrawerItemBinding;
+import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.ThemeUtils;
+import pro.sketchware.utility.UI;
 
 public class DesignDrawer extends LinearLayout {
     @SuppressLint("NonConstantResourceId")
@@ -63,7 +64,7 @@ public class DesignDrawer extends LinearLayout {
         } else if (id == R.id.item_manifest_manager) {
             designActivity.toAndroidManifestManager();
         } else if (id == R.id.item_gradle_manager) {
-            Intent intent = new Intent(designActivity, neo.sketchware.activities.editor.gradle.ManageGradleActivity.class);
+            Intent intent = new Intent(designActivity, pro.sketchware.activities.editor.gradle.ManageGradleActivity.class);
             intent.putExtra("sc_id", DesignActivity.sc_id);
             designActivity.startActivity(intent);
         } else if (id == R.id.item_used_custom_blocks) {
@@ -111,10 +112,12 @@ public class DesignDrawer extends LinearLayout {
         ScrollView scrollView = new ScrollView(context);
         scrollView.setFillViewport(true);
         scrollView.setClipToPadding(false);
+        scrollView.setScrollBarStyle(SCROLLBARS_OUTSIDE_OVERLAY);
         addView(scrollView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1.0f));
 
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(VERTICAL);
+        content.setPadding(0, 0, 0, SketchwareUtil.dpToPx(8));
         scrollView.addView(content, new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         UI.addSystemWindowInsetToPadding(scrollView, false, true, false, false);
@@ -142,10 +145,7 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_permission_manager, R.drawable.ic_mtrl_shield_check, R.string.text_title_menu_permission, R.string.text_subtitle_menu_permission, content);
         addDrawerItem(R.id.item_appcompat_manager, R.drawable.ic_mtrl_inject, R.string.design_drawer_menu_injection, R.string.design_drawer_menu_injection_subtitle, content);
         addDrawerItem(R.id.item_manifest_manager, R.drawable.ic_mtrl_deployed_code, R.string.design_drawer_menu_androidmanifest, R.string.design_drawer_menu_androidmanifest_subtitle, content);
-        
-        // Custom Gradle Item
         addDrawerItem(R.id.item_gradle_manager, R.drawable.ic_mtrl_settings_applications, R.string.design_drawer_menu_gradle, R.string.design_drawer_menu_gradle_subtitle, content);
-
         addDrawerItem(R.id.item_used_custom_blocks, R.drawable.ic_mtrl_block, R.string.design_drawer_menu_customblocks, R.string.design_drawer_menu_customblocks_subtitle, content);
         addDrawerItem(R.id.item_code_shrinking_manager, R.drawable.ic_mtrl_shield_lock, R.string.design_drawer_menu_proguard, R.string.design_drawer_menu_proguard_subtitle, content);
         addDrawerItem(R.id.item_stringfog_manager, R.drawable.ic_mtrl_regular_expression, R.string.design_drawer_menu_stringfog, R.string.design_drawer_menu_stringfog_subtitle, content);
@@ -153,7 +153,9 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_xml_command_manager, R.drawable.ic_mtrl_code, R.string.design_drawer_menu_title_xml_command, R.string.design_drawer_menu_description_xml_command, content);
         addDrawerItem(R.id.item_logcat_reader, R.drawable.ic_mtrl_article, R.string.design_drawer_menu_title_logcat_reader, R.string.design_drawer_menu_subtitle_logcat_reader, content);
 
-        addDrawerDivider(content);
+        // FIX: Add divider and collection manager directly to 'this' (the main layout), NOT to 'content'.
+        // This keeps them fixed at the bottom outside the ScrollView.
+        addDrawerDivider(this);
         addDrawerItem(R.id.item_collection_manager, R.drawable.ic_mtrl_bookmark, R.string.design_drawer_menu_title_collection, R.string.design_drawer_menu_description_collection, this);
     }
 
@@ -199,8 +201,15 @@ public class DesignDrawer extends LinearLayout {
         subheader.setEllipsize(TextUtils.TruncateAt.END);
         subheader.setGravity(Gravity.CENTER_VERTICAL);
         subheader.setText(subheaderResId);
+        
+        TypedValue typedValue = new TypedValue();
+        getContext().getTheme().resolveAttribute(R.attr.textAppearanceLabelLarge, typedValue, true);
+        subheader.setTextAppearance(getContext(), typedValue.resourceId);
+        
+        subheader.setTextColor(ThemeUtils.getColor(getContext(), R.attr.colorPrimary));
+        
         LayoutParams textLp = new LayoutParams(LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        textLp.topMargin = SketchwareUtil.dpToPx(8);
+        textLp.topMargin = SketchwareUtil.dpToPx(16);
         textLp.bottomMargin = SketchwareUtil.dpToPx(8);
         textLp.setMarginStart(SketchwareUtil.dpToPx(20));
         subheader.setLayoutParams(textLp);

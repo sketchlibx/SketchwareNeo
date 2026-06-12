@@ -16,7 +16,7 @@ import org.cosmic.ide.dependency.resolver.api.Repository
 import org.cosmic.ide.dependency.resolver.eventReciever
 import org.cosmic.ide.dependency.resolver.getArtifact
 import org.cosmic.ide.dependency.resolver.repositories
-import neo.sketchware.utility.FileUtil
+import pro.sketchware.utility.FileUtil
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection

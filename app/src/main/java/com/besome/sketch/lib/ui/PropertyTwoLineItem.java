@@ -6,7 +6,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import a.a.a.wB;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class PropertyTwoLineItem extends RelativeLayout {
     private int key = -1;

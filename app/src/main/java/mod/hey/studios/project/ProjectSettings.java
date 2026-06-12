@@ -1,7 +1,5 @@
 package mod.hey.studios.project;
 
-import android.app.Application;
-import android.content.pm.ApplicationInfo;
 import android.os.Environment;
 import android.util.Log;
 import android.view.View;
@@ -10,6 +8,7 @@ import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 
+import com.besome.sketch.Config;
 import com.google.gson.Gson;
 
 import java.io.File;
@@ -17,15 +16,18 @@ import java.util.HashMap;
 
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.utility.FileUtil;
+import pro.sketchware.utility.FileUtil;
 
 public class ProjectSettings {
 
     public static final String SETTING_MINIMUM_SDK_VERSION = "min_sdk";
+    public static final String SETTING_TARGET_SDK_VERSION = "target_sdk";
+    // NEW: Added Compile SDK mapping constant
+    public static final String SETTING_COMPILE_SDK_VERSION = "compile_sdk_version";
+    
     public static final String SETTING_ENABLE_BRIDGELESS_THEMES = "enable_bridgeless_themes";
     public static final String SETTING_ENABLE_VIEWBINDING = "enable_viewbinding";
     public static final String SETTING_APPLICATION_CLASS = "app_class";
-    public static final String SETTING_TARGET_SDK_VERSION = "target_sdk";
     public static final String SETTING_DISABLE_OLD_METHODS = "disable_old_methods";
     public static final String SETTING_NEW_XML_COMMAND = "xml_command";
     
@@ -63,10 +65,24 @@ public class ProjectSettings {
                 return Integer.parseInt(hashmap.get(SETTING_MINIMUM_SDK_VERSION));
             } catch (NumberFormatException | NullPointerException e) {
                 LogUtil.e(TAG, "Failed to parse the project's minimum SDK version! Defaulting to 21", e);
-                return 21;
+                return Config.VAR_DEFAULT_MIN_SDK_VERSION;
             }
         } else {
-            return 21;
+            return Config.VAR_DEFAULT_MIN_SDK_VERSION;
+        }
+    }
+
+    // NEW: Method to retrieve the selected Compile SDK version, defaults to 34
+    public int getCompileSdkVersion() {
+        if (hashmap.containsKey(SETTING_COMPILE_SDK_VERSION)) {
+            try {
+                return Integer.parseInt(hashmap.get(SETTING_COMPILE_SDK_VERSION));
+            } catch (NumberFormatException | NullPointerException e) {
+                LogUtil.e(TAG, "Failed to parse the project's compile SDK version! Defaulting", e);
+                return Config.VAR_DEFAULT_COMPILE_SDK_VERSION;
+            }
+        } else {
+            return Config.VAR_DEFAULT_COMPILE_SDK_VERSION;
         }
     }
 

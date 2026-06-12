@@ -71,11 +71,11 @@ import mod.jbk.util.LogUtil;
 import mod.jbk.util.TestkeySignBridge;
 import mod.pranav.build.JarBuilder;
 import mod.pranav.viewbinding.ViewBindingBuilder;
-import neo.sketchware.SketchApplication;
-import neo.sketchware.util.library.BuiltInLibraryManager;
-import neo.sketchware.utility.FilePathUtil;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.SketchApplication;
+import pro.sketchware.util.library.BuiltInLibraryManager;
+import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 import proguard.Configuration;
 import proguard.ConfigurationParser;
 import proguard.ParseException;
@@ -83,6 +83,7 @@ import proguard.ProGuard;
 
 public class ProjectBuilder {
     public static final String TAG = "AppBuilder";
+    public static final String ACTION_BUILD_DIAGNOSTICS = "com.sketchware.action.BUILD_DIAGNOSTICS";
 
     private final File aapt2Binary;
     private final Context context;
@@ -127,15 +128,33 @@ public class ProjectBuilder {
         fpu = new FilePathUtil();
         mll = new ManageLocalLibrary(yqVar.sc_id);
         builtInLibraryManager = new BuiltInLibraryManager(yqVar.sc_id);
-        File defaultAndroidJar = new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "android.jar");
-        androidJarPath = build_settings.getValue(BuildSettings.SETTING_ANDROID_JAR_PATH, defaultAndroidJar.getAbsolutePath());
         proguard = new ProguardHandler(yqVar.sc_id);
         settings = new ProjectSettings(yqVar.sc_id);
+
+        int compileSdk = settings.getCompileSdkVersion();
+        File defaultAndroidJar = new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "android.jar");
+        File compileSdkJar = new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "android-" + compileSdk + ".jar");
+
+        if (compileSdkJar.exists()) {
+            androidJarPath = build_settings.getValue(BuildSettings.SETTING_ANDROID_JAR_PATH, compileSdkJar.getAbsolutePath());
+            LogUtil.d(TAG, "Using custom Compile SDK android.jar: " + androidJarPath);
+        } else {
+            androidJarPath = build_settings.getValue(BuildSettings.SETTING_ANDROID_JAR_PATH, defaultAndroidJar.getAbsolutePath());
+            LogUtil.d(TAG, "Custom Compile SDK JAR not found. Falling back to default: " + androidJarPath);
+        }
     }
 
     public ProjectBuilder(BuildProgressReceiver buildAsyncTask, Context context, yq yqVar) {
         this(context, yqVar);
         progressReceiver = buildAsyncTask;
+    }
+
+    // Helper method to send build output to the IDE panel
+    private void broadcastBuildOutput(String output) {
+        Intent intent = new Intent(ACTION_BUILD_DIAGNOSTICS);
+        intent.putExtra("build_output", output);
+        intent.setPackage(context.getPackageName()); // Ensure it stays within app
+        context.sendBroadcast(intent);
     }
 
     public static boolean hasFileChanged(String fileInAssets, String targetFile) {
@@ -457,31 +476,15 @@ public class ProjectBuilder {
         long savedTimeMillis = System.currentTimeMillis();
 
         class EclipseOutOutputStream extends OutputStream {
-
             private final StringBuffer mBuffer = new StringBuffer();
-
-            @Override
-            public void write(int b) {
-                mBuffer.append((char) b);
-            }
-
-            public String getOut() {
-                return mBuffer.toString();
-            }
+            @Override public void write(int b) { mBuffer.append((char) b); }
+            public String getOut() { return mBuffer.toString(); }
         }
 
         class EclipseErrOutputStream extends OutputStream {
-
             private final StringBuffer mBuffer = new StringBuffer();
-
-            @Override
-            public void write(int b) {
-                mBuffer.append((char) b);
-            }
-
-            public String getOut() {
-                return mBuffer.toString();
-            }
+            @Override public void write(int b) { mBuffer.append((char) b); }
+            public String getOut() { return mBuffer.toString(); }
         }
 
         try (EclipseOutOutputStream outOutputStream = new EclipseOutOutputStream();
@@ -493,43 +496,27 @@ public class ProjectBuilder {
             String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
             
             if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
-                args.add("--release");
-                args.add("17");
+                args.add("--release"); args.add("17");
             } else if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_11)) {
-                args.add("--release");
-                args.add("11");
+                args.add("--release"); args.add("11");
             } else {
-                args.add("-" + javaVer);
-                args.add("-source");
-                args.add(javaVer);
-                args.add("-target");
-                args.add(javaVer);
+                args.add("-" + javaVer); args.add("-source"); args.add(javaVer); args.add("-target"); args.add(javaVer);
             }
             
             args.add("-nowarn");
-            if (!build_settings.getValue(BuildSettings.SETTING_NO_WARNINGS,
-                    BuildSettings.SETTING_GENERIC_VALUE_TRUE).equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)) {
+            if (!build_settings.getValue(BuildSettings.SETTING_NO_WARNINGS, BuildSettings.SETTING_GENERIC_VALUE_TRUE).equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)) {
                 args.add("-deprecation");
             }
-            args.add("-d");
-            args.add(yq.compiledClassesPath);
-            args.add("-cp");
-            args.add(getClasspath());
-            args.add("-proc:none");
-            args.add(yq.javaFilesPath);
-            args.add(yq.rJavaDirectoryPath);
+            args.add("-d"); args.add(yq.compiledClassesPath);
+            args.add("-cp"); args.add(getClasspath());
+            args.add("-proc:none"); args.add(yq.javaFilesPath); args.add(yq.rJavaDirectoryPath);
+            
             String pathJava = fpu.getPathJava(yq.sc_id);
-            if (FileUtil.isExistFile(pathJava)) {
-                args.add(pathJava);
-            }
+            if (FileUtil.isExistFile(pathJava)) args.add(pathJava);
             String pathBroadcast = fpu.getPathBroadcast(yq.sc_id);
-            if (FileUtil.isExistFile(pathBroadcast)) {
-                args.add(pathBroadcast);
-            }
+            if (FileUtil.isExistFile(pathBroadcast)) args.add(pathBroadcast);
             String pathService = fpu.getPathService(yq.sc_id);
-            if (FileUtil.isExistFile(pathService)) {
-                args.add(pathService);
-            }
+            if (FileUtil.isExistFile(pathService)) args.add(pathService);
 
             File rJavaFileWithoutPackage = new File(yq.rJavaDirectoryPath, "R.java");
             if (rJavaFileWithoutPackage.exists() && !rJavaFileWithoutPackage.delete()) {
@@ -545,8 +532,10 @@ public class ProjectBuilder {
                 LogUtil.d(TAG, "System.err of Eclipse compiler: " + errOutputStream.getOut());
                 LogUtil.d(TAG, "Compiling Java files took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
             } else {
+                String errorOutput = errOutputStream.getOut();
                 LogUtil.e(TAG, "Failed to compile Java files");
-                throw new zy(errOutputStream.getOut());
+                broadcastBuildOutput(errorOutput); // PHASE 2: Send errors to IDE!
+                throw new zy(errorOutput);
             }
         }
     }
@@ -889,6 +878,7 @@ public class ProjectBuilder {
         }
         
         if (error[0] != null) {
+            broadcastBuildOutput(error[0]); // PHASE 2: Send R8 errors to IDE
             throw new IOException("R8 Compilation Failed:\n" + error[0]);
         }
 

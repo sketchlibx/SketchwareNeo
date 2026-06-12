@@ -27,8 +27,8 @@ import a.a.a.rq;
 import a.a.a.uq;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageScreenActivityAddTempBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageScreenActivityAddTempBinding;
 
 public class AddViewActivity extends BaseAppCompatActivity {
 

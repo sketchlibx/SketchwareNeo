@@ -11,7 +11,7 @@ import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel;
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver;
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.SketchApplication;
+import pro.sketchware.SketchApplication;
 
 public class CodeEditorColorSchemes {
     public static final String THEME_DRACULA = "dracula.json";

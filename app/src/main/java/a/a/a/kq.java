@@ -5,13 +5,13 @@ import static com.google.android.material.color.MaterialColors.harmonizeWithPrim
 import android.content.Context;
 import android.view.ContextThemeWrapper;
 
-import neo.sketchware.R;
-import neo.sketchware.SketchApplication;
-import neo.sketchware.menu.DefaultExtraMenuBean;
+import pro.sketchware.R;
+import pro.sketchware.SketchApplication;
+import pro.sketchware.menu.DefaultExtraMenuBean;
 
 public class kq {
     public static int a(String opcode, String blockType) {
-        Context context = new ContextThemeWrapper(SketchApplication.getContext(), R.style.Theme_SketchwareNeo);
+        Context context = new ContextThemeWrapper(SketchApplication.getContext(), R.style.Theme_SketchwarePro);
         return a(context, opcode, blockType);
     }
 

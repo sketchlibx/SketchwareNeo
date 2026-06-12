@@ -11,7 +11,7 @@ import androidx.core.view.WindowCompat;
 import com.airbnb.lottie.LottieAnimationView;
 
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class LoadingDialog extends Dialog {
 

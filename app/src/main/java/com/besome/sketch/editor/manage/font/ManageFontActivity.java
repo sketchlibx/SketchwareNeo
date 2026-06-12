@@ -19,8 +19,8 @@ import a.a.a.MA;
 import a.a.a.Np;
 import a.a.a.mB;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ManageFontBinding;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ManageFontBinding;
 
 public class ManageFontActivity extends BaseAppCompatActivity {
 

@@ -12,9 +12,9 @@ import java.util.HashMap;
 
 import mod.hey.studios.util.Helper;
 import mod.jbk.util.LogUtil;
-import neo.sketchware.utility.FilePathUtil;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class ManageLocalLibrary {
 

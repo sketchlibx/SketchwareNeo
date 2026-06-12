@@ -11,8 +11,8 @@ import com.besome.sketch.beans.ProjectLibraryBean;
 import com.google.android.material.divider.MaterialDivider;
 
 import a.a.a.wB;
-import neo.sketchware.R;
-import neo.sketchware.utility.ThemeUtils;
+import pro.sketchware.R;
+import pro.sketchware.utility.ThemeUtils;
 
 public class LibraryItemView extends FrameLayout {
     public final ViewGroup container;

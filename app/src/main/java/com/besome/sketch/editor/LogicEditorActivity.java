@@ -122,14 +122,14 @@ import mod.jbk.editor.manage.MoreblockImporter;
 import mod.jbk.util.BlockUtil;
 import mod.jbk.util.LogUtil;
 import mod.pranav.viewbinding.ViewBindingBuilder;
-import neo.sketchware.R;
-import neo.sketchware.activities.editor.view.CodeViewerActivity;
-import neo.sketchware.activities.resourceseditor.ResourcesEditorActivity;
-import neo.sketchware.databinding.ImagePickerItemBinding;
-import neo.sketchware.databinding.SearchWithRecyclerViewBinding;
-import neo.sketchware.menu.ExtraMenuBean;
-import neo.sketchware.utility.FilePathUtil;
-import neo.sketchware.utility.SvgUtils;
+import pro.sketchware.R;
+import pro.sketchware.activities.editor.view.CodeViewerActivity;
+import pro.sketchware.activities.resourceseditor.ResourcesEditorActivity;
+import pro.sketchware.databinding.ImagePickerItemBinding;
+import pro.sketchware.databinding.SearchWithRecyclerViewBinding;
+import pro.sketchware.menu.ExtraMenuBean;
+import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.utility.SvgUtils;
 
 @SuppressLint({"ClickableViewAccessibility", "RtlHardcoded", "SetTextI18n", "DefaultLocale"})
 public class LogicEditorActivity extends BaseAppCompatActivity implements View.OnClickListener, Vs, View.OnTouchListener, MoreblockImporterDialog.CallBack {

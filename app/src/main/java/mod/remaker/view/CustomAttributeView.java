@@ -8,7 +8,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import neo.sketchware.databinding.CustomViewAttributeBinding;
+import pro.sketchware.databinding.CustomViewAttributeBinding;
 
 public class CustomAttributeView extends FrameLayout {
 

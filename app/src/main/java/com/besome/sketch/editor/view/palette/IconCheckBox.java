@@ -5,7 +5,7 @@ import android.content.Context;
 import com.besome.sketch.beans.LayoutBean;
 import com.besome.sketch.beans.ViewBean;
 
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class IconCheckBox extends IconBase {
     public IconCheckBox(Context context) {

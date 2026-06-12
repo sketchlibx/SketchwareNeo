@@ -22,7 +22,7 @@ import a.a.a.wB;
 import a.a.a.jC;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class ViewProperties extends RelativeLayout implements AdapterView.OnItemSelectedListener {
 

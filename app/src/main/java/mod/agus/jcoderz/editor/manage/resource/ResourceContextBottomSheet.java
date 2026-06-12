@@ -10,9 +10,9 @@ import androidx.annotation.Nullable;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
-import neo.sketchware.R;
-import neo.sketchware.databinding.BottomSheetResourceContextBinding;
-import neo.sketchware.utility.ThemeUtils;
+import pro.sketchware.R;
+import pro.sketchware.databinding.BottomSheetResourceContextBinding;
+import pro.sketchware.utility.ThemeUtils;
 
 /**
  * ResourceContextBottomSheet

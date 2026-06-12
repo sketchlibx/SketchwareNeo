@@ -1,6 +1,6 @@
 package com.besome.sketch.editor;
 
-import static neo.sketchware.utility.SketchwareUtil.getDip;
+import static pro.sketchware.utility.SketchwareUtil.getDip;
 
 import android.content.Context;
 import android.content.Intent;
@@ -19,7 +19,7 @@ import a.a.a.Us;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.AppSettings;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class LogicEditorDrawer extends LinearLayout {
 

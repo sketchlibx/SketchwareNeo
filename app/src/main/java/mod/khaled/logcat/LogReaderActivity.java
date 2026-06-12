@@ -1,6 +1,6 @@
 package mod.khaled.logcat;
 
-import static neo.sketchware.utility.FileUtil.createNewFileIfNotPresent;
+import static pro.sketchware.utility.FileUtil.createNewFileIfNotPresent;
 
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
@@ -33,13 +33,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
-import neo.sketchware.databinding.ActivityLogcatreaderBinding;
-import neo.sketchware.databinding.EasyDeleteEdittextBinding;
-import neo.sketchware.databinding.ViewLogcatItemBinding;
-import neo.sketchware.lib.base.BaseTextWatcher;
-import neo.sketchware.utility.FileUtil;
-import neo.sketchware.utility.SketchwareUtil;
+import pro.sketchware.R;
+import pro.sketchware.databinding.ActivityLogcatreaderBinding;
+import pro.sketchware.databinding.EasyDeleteEdittextBinding;
+import pro.sketchware.databinding.ViewLogcatItemBinding;
+import pro.sketchware.lib.base.BaseTextWatcher;
+import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class LogReaderActivity extends BaseAppCompatActivity {
 
@@ -50,7 +50,7 @@ public class LogReaderActivity extends BaseAppCompatActivity {
     private final ArrayList<HashMap<String, Object>> displayList = new ArrayList<>();
     
     private String pkgFilter = "";
-    private String packageName = "neo.sketchware";
+    private String packageName = "pro.sketchware";
     private boolean autoScroll = true;
     private ArrayList<String> pkgFilterList = new ArrayList<>();
 
@@ -75,7 +75,7 @@ public class LogReaderActivity extends BaseAppCompatActivity {
         binding.logsRecyclerView.setAdapter(new Adapter(displayList));
 
         IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("neo.sketchware.ACTION_NEW_DEBUG_LOG");
+        intentFilter.addAction("pro.sketchware.ACTION_NEW_DEBUG_LOG");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(logger, intentFilter, Context.RECEIVER_EXPORTED);
         } else {

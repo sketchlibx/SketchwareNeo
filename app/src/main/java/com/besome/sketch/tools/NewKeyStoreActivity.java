@@ -6,7 +6,6 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 
 import androidx.appcompat.widget.Toolbar;
 
@@ -22,7 +21,7 @@ import a.a.a.iI;
 import a.a.a.mB;
 import a.a.a.wq;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.R;
+import pro.sketchware.R;
 
 public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClickListener {
     private final int validityInYears = 25;
@@ -33,6 +32,7 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
     private RB commonNameValidator;
     private RB organizationalUnitValidator;
     private iI E;
+    
     private EditText alias;
     private EditText password;
     private EditText passwordConfirm;
@@ -42,6 +42,7 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
     private EditText locality;
     private EditText state;
     private EditText country;
+    
     private VB aliasValidator;
     private SB passwordValidator, passwordConfirmValidator;
 
@@ -79,22 +80,17 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
                 bB.b(getApplicationContext(), Helper.getResString(R.string.myprojects_sign_apk_incorrect_password), 0).show();
                 password.setText("");
                 passwordConfirm.setText("");
+                password.requestFocus(); // Auto focus on failure
                 return;
             }
 
-            if (!aliasValidator.b()) return;
-
-            if (!commonNameValidator.b()) return;
-
-            if (!organizationalUnitValidator.b()) return;
-
-            if (!organizationValidator.b()) return;
-
-            if (!localityValidator.b()) return;
-
-            if (!stateValidator.b()) return;
-
-            if (!countryValidator.b()) return;
+            if (!aliasValidator.b()) { alias.requestFocus(); return; }
+            if (!commonNameValidator.b()) { commonName.requestFocus(); return; }
+            if (!organizationalUnitValidator.b()) { organizationalUnit.requestFocus(); return; }
+            if (!organizationValidator.b()) { organization.requestFocus(); return; }
+            if (!localityValidator.b()) { locality.requestFocus(); return; }
+            if (!stateValidator.b()) { state.requestFocus(); return; }
+            if (!countryValidator.b()) { country.requestFocus(); return; }
 
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.append("CN=");
@@ -118,7 +114,6 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
                 showDoneDialog(false, null);
             }
         }
-
     }
 
     @Override
@@ -135,6 +130,7 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        enableEdgeToEdgeNoContrast(); // Add Edge-to-Edge support
         super.onCreate(savedInstanceState);
         if (!super.isStoragePermissionGranted()) {
             finish();
@@ -142,29 +138,31 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
 
         setContentView(R.layout.keystore_new);
         Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar == null) toolbar = findViewById(R.id.topAppBar); // Compatibility check
         setSupportActionBar(toolbar);
-        findViewById(R.id.layout_main_logo).setVisibility(View.GONE);
-        getSupportActionBar().setTitle(Helper.getResString(R.string.myprojects_sign_apk_new_certificate_title_new_certificate));
+        
+        getSupportActionBar().setTitle("New Certificate");
         getSupportActionBar().setSubtitle("Export path: " + wq.D);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setDisplayShowTitleEnabled(true);
         toolbar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        
         E = new iI();
 
-
-        Button var2 = findViewById(R.id.btn_keystore_save);
-        var2.setOnClickListener(this);
-        var2 = findViewById(R.id.btn_keystore_cancel);
-        var2.setOnClickListener(this);
+        Button btnSave = findViewById(R.id.btn_keystore_save);
+        btnSave.setOnClickListener(this);
+        Button btnCancel = findViewById(R.id.btn_keystore_cancel);
+        btnCancel.setOnClickListener(this);
+        
         alias = findViewById(R.id.et_keystore_alias);
         TextInputLayout tilAlias = findViewById(R.id.ti_keystore_alias);
         password = findViewById(R.id.et_keystore_passwd);
         TextInputLayout tilPassword = findViewById(R.id.ti_keystore_passwd);
         passwordConfirm = findViewById(R.id.et_keystore_passwd1);
         TextInputLayout tilPasswordConfirm = findViewById(R.id.ti_keystore_passwd1);
+        
         EditText validity = findViewById(R.id.et_valid_year);
         validity.setText(String.valueOf(validityInYears));
-        ((TextView) findViewById(R.id.tv_cert_title)).setText(Helper.getResString(R.string.myprojects_sign_apk_new_certificate_title_certificate));
+        
         commonName = findViewById(R.id.et_dn_cn);
         TextInputLayout tilCommonName = findViewById(R.id.ti_dn_cn);
         organizationalUnit = findViewById(R.id.et_dn_ou);
@@ -178,7 +176,6 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
         country = findViewById(R.id.et_dn_c);
         TextInputLayout tilCountry = findViewById(R.id.ti_dn_c);
 
-
         aliasValidator = new VB(getApplicationContext(), tilAlias);
         passwordValidator = new SB(getApplicationContext(), tilPassword, 4, 32);
         passwordConfirmValidator = new SB(getApplicationContext(), tilPasswordConfirm, 4, 32);
@@ -188,7 +185,6 @@ public class NewKeyStoreActivity extends BaseAppCompatActivity implements OnClic
         localityValidator = new RB(getApplicationContext(), tilLocality);
         stateValidator = new RB(getApplicationContext(), tilState);
         countryValidator = new RB(getApplicationContext(), tilCountry);
-
 
         alias.setPrivateImeOptions("defaultInputmode=english;");
         commonName.setPrivateImeOptions("defaultInputmode=english;");

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    bg_sc_id_chip.xml
+    Subtle tinted chip background for the sc_id badge in project list items.
+    Uses M3 colorSurfaceContainerHighest — light in light theme, dark-surface in dark theme.
+    No border — just shape + fill.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <corners android:radius="4dp" />
+
+    <solid android:color="?attr/colorSurfaceContainerHighest" />
+
+</shape>
