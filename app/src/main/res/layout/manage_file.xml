@@ -28,7 +28,6 @@
         <!-- Search field — toggled visible/gone by search icon click -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/searchLayout"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="12dp"
@@ -155,7 +154,6 @@
         <!-- Create new -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/createNewButton"
-            style="@style/Widget.Material3.ExtendedFloatingActionButton.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
@@ -165,7 +163,6 @@
         <!-- Close -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/closeButton"
-            style="@style/Widget.Material3.FloatingActionButton.Small.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="8dp"
@@ -175,7 +172,6 @@
         <!-- Import -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/importNewButton"
-            style="@style/Widget.Material3.ExtendedFloatingActionButton.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"

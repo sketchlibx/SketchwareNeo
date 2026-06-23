@@ -29,6 +29,7 @@ import org.cosmic.ide.dependency.resolver.api.Artifact;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -55,6 +56,7 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
     private String dependencyName;
     private String localLibFile;
     private String prefillDependencyUrl = null;
+    private String oldLibraryFolder = null;
     private boolean isUpgradeMode = false;
     private OnLibraryDownloadedTask onLibraryDownloadedTask;
 
@@ -96,24 +98,69 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
         
         prefillDependencyUrl = getArguments().getString("prefillDependency");
         isUpgradeMode = getArguments().getBoolean("isUpgradeMode", false);
+        oldLibraryFolder = getArguments().getString("oldLibraryFolder");
 
         if (prefillDependencyUrl != null && !prefillDependencyUrl.isEmpty()) {
             String[] dp = prefillDependencyUrl.split(":");
             if (dp.length == 3 && isUpgradeMode) {
-                binding.dependencyInput.setText(dp[0] + ":" + dp[1] + ":+");
-                binding.dependencyInfo.setText("Please enter the version you want to upgrade/downgrade to (e.g. 2.9.0) or leave '+' to fetch the latest.");
+                binding.dependencyInput.setText(prefillDependencyUrl);
+                binding.dependencyInfo.setText("Fetching latest version from Maven Central...");
+                fetchLatestVersion(dp[0], dp[1], dp[2]);
             } else {
                 binding.dependencyInput.setText(prefillDependencyUrl);
             }
         } else {
-            // Updated hint to show that URL is also supported
-            binding.dependencyInputLayout.setHint("Dependency (group:artifact:version) OR Direct URL (.aar/.jar)");
+            binding.dependencyInputLayout.setHint("Enter Dependency or URL");
         }
 
         binding.btnDownload.setOnClickListener(v -> initDownloadFlow());
 
         connectivityManager = (ConnectivityManager) requireContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         registerNetworkCallback();
+    }
+
+    private void fetchLatestVersion(String group, String artifact, String currentVersion) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                java.net.URL url = new java.net.URL("https://search.maven.org/solrsearch/select?q=g:%22" + group + "%22+AND+a:%22" + artifact + "%22&rows=1&wt=json");
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                
+                java.io.InputStream in = conn.getInputStream();
+                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(in));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) response.append(line);
+                reader.close();
+                
+                org.json.JSONObject json = new org.json.JSONObject(response.toString());
+                org.json.JSONArray docs = json.getJSONObject("response").getJSONArray("docs");
+                
+                if (docs.length() > 0) {
+                    String latestVersion = docs.getJSONObject(0).getString("latestVersion");
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (binding != null) {
+                            binding.dependencyInput.setText(group + ":" + artifact + ":" + latestVersion);
+                            if (currentVersion.equals(latestVersion)) {
+                                binding.dependencyInfo.setText("You are already on the latest version (" + latestVersion + ").");
+                            } else {
+                                binding.dependencyInfo.setText("Latest version found: " + latestVersion + ". Click Download to upgrade.");
+                            }
+                        }
+                    });
+                } else {
+                    throw new Exception("No docs");
+                }
+            } catch (Exception e) {
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (binding != null) {
+                        binding.dependencyInfo.setText("Could not fetch latest version automatically. Please enter version manually.");
+                    }
+                });
+            }
+        });
     }
 
     private void registerNetworkCallback() {
@@ -185,7 +232,7 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
         }
 
         if (isUpgradeMode) {
-            message = "Old versions of this library will be safely removed and replaced with " + dependencyName + ".\n\n" + message;
+            message = "Old version of this library (" + oldLibraryFolder + ") will be safely replaced with " + dependencyName + ".\n\n" + message;
         }
 
         new MaterialAlertDialogBuilder(requireContext())
@@ -205,20 +252,8 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
 
         setDownloadState(true);
         
-        if (isUpgradeMode && prefillDependencyUrl != null && !prefillDependencyUrl.startsWith("http")) {
-            String[] dp = prefillDependencyUrl.split(":");
-            if (dp.length >= 2) {
-                String libraryId = dp[0] + "-" + dp[1];
-                File libsFolder = new File(Environment.getExternalStorageDirectory(), ".sketchware/libs/local_libs/");
-                if (libsFolder.exists() && libsFolder.listFiles() != null) {
-                    for (File lib : libsFolder.listFiles()) {
-                        if (lib.getName().startsWith(libraryId)) {
-                            FileUtil.deleteFile(lib.getAbsolutePath()); 
-                        }
-                    }
-                }
-            }
-        }
+        // DELETION LOGIC REMOVED FROM HERE! 
+        // It is now strictly handled inside onTaskCompleted() to ensure we don't break existing library if download fails.
 
         var resolver = new DependencyResolver(group, artifact, version,
                 binding.cbSkipSubdependencies.isChecked(), buildSettings);
@@ -355,25 +390,48 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
                     public void onTaskCompleted(@NonNull List<String> dependencies) {
                         handler.post(() -> {
                             SketchwareUtil.toast("Library downloaded successfully");
+                            
+                            // SAFE UPGRADE LOGIC - Run only after successful download
+                            if (isUpgradeMode && oldLibraryFolder != null) {
+                                // 1. Delete physical old folder from disk ONLY if it doesn't match new folder names
+                                if (!dependencies.contains(oldLibraryFolder)) {
+                                    File oldLibPath = new File(Environment.getExternalStorageDirectory(), ".sketchware/libs/local_libs/" + oldLibraryFolder);
+                                    if (oldLibPath.exists()) {
+                                        FileUtil.deleteFile(oldLibPath.getAbsolutePath());
+                                    }
+                                }
+                            }
+                            
                             if (!notAssociatedWithProject) {
                                 var fileContent = FileUtil.readFile(localLibFile);
                                 var enabledLibs = gson.fromJson(fileContent, Helper.TYPE_MAP_LIST);
                                 
-                                if (isUpgradeMode && prefillDependencyUrl != null && !prefillDependencyUrl.startsWith("http")) {
-                                    String oldBaseName = prefillDependencyUrl.split(":")[0] + "-" + prefillDependencyUrl.split(":")[1];
+                                // 2. Remove exactly the old library entry from local_library file
+                                if (isUpgradeMode && oldLibraryFolder != null) {
                                     for (int i = 0; i < enabledLibs.size(); i++) {
-                                        if (enabledLibs.get(i).get("name").toString().startsWith(oldBaseName)) {
+                                        if (enabledLibs.get(i).get("name").toString().equals(oldLibraryFolder)) {
                                             enabledLibs.remove(i);
                                             break;
                                         }
                                     }
                                 }
 
-                                enabledLibs.addAll(dependencies.stream()
-                                        .map(name -> createLibraryMap(name, dependencyName))
-                                        .toList());
+                                // 3. Insert new downloaded libraries without duplicating existing entries
+                                for (String dep : dependencies) {
+                                    boolean exists = false;
+                                    for (Map<String, Object> libMap : enabledLibs) {
+                                        if (libMap.get("name").toString().equals(dep)) {
+                                            exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!exists) {
+                                        enabledLibs.add(createLibraryMap(dep, dependencyName));
+                                    }
+                                }
                                 FileUtil.writeFile(localLibFile, gson.toJson(enabledLibs));
                             }
+                            
                             if (getActivity() == null) return;
                             dismiss();
                             if (onLibraryDownloadedTask != null) onLibraryDownloadedTask.invoke();

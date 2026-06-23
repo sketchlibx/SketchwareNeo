@@ -2156,6 +2156,8 @@ Please try again later"</string>
     <string name="text_subtitle_menu_broadcast">Import Background Service files</string>
     <string name="text_title_menu_java">Java/Kotlin Manager</string>
     <string name="text_subtitle_menu_java">Import Java/Kotlin files</string>
+    <string name="text_title_menu_cpp">C/C++ Manager</string>
+<string name="text_subtitle_menu_cpp">Import C/C++ files</string>
     <string name="component_description_video_ad">Video Ad lets you add video advertisements</string>
     <string name="component_description_progress_dialog">Create popup dialog style progress</string>
     <string name="component_description_date_picker_dialog">Dialog to pick date</string>
@@ -2196,7 +2198,9 @@ Please try again later"</string>
     <string name="code_shrinker_configure_shrinker">Configure R8/ProGuard by editing the rules file. This step is necessary because without a proper configuration, ProGuard might break your project.</string>
     <string name="code_shrinker_full_mode_def">Using this, you can configure specific local libs to be included in R8/ProGuarding process. (Note: Enabling this will ignore DEX files of the local libs you select and it will force Sketchware to compile them to dex, making compilation noticeably slower.)</string>
     <string name="code_shrinker_generate_debug_files">Generate debug files</string>
-    <string name="local_library_manager_dependency_example">Example: org.ow2.asm:asm:9.5</string>
+    <string name="local_library_manager_dependency_example">
+    E.g. org.ow2.asm:asm:9.5 or library.aar URL
+</string>
     <string name="local_library_manager">Local library Manager</string>
     <string name="local_library_manager_download">Download a library</string>
     <string name="local_library_manager_enter_dependency">Enter dependency</string>

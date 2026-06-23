@@ -1,29 +1,32 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:padding="16dp">
+    android:background="?attr/colorSurface"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="24dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:text="Git Configuration"
+            android:text="User Identity"
             android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorPrimary" />
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:startIconDrawable="@drawable/ic_mtrl_profile"
-            android:hint="User Name (e.g. John Doe)">
+            android:hint="User Name (e.g. John Doe)"
+            app:startIconDrawable="@drawable/ic_mtrl_profile">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_git_name"
@@ -37,8 +40,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:startIconDrawable="@drawable/ic_mtrl_email_sent"
-            android:hint="User Email (e.g. john@example.com)">
+            android:hint="User Email (e.g. john@example.com)"
+            app:startIconDrawable="@drawable/ic_mtrl_email_sent">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_git_email"
@@ -52,17 +55,18 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
             android:layout_marginBottom="16dp"
-            android:text="Credentials (For Push/Pull)"
+            android:text="Authentication"
             android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorPrimary" />
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:startIconDrawable="@drawable/ic_mtrl_password"
             android:hint="Personal Access Token (PAT)"
-            app:passwordToggleEnabled="true">
+            app:endIconMode="password_toggle"
+            app:startIconDrawable="@drawable/ic_mtrl_password">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_git_token"
@@ -75,9 +79,9 @@
             android:id="@+id/btn_save_settings"
             style="@style/Widget.Material3.Button"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            app:icon="@drawable/ic_mtrl_save"
-            android:text="Save Settings" />
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:text="Save Settings"
+            app:icon="@drawable/ic_mtrl_save" />
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

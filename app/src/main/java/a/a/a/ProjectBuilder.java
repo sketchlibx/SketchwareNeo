@@ -74,6 +74,8 @@ import mod.pranav.viewbinding.ViewBindingBuilder;
 import pro.sketchware.SketchApplication;
 import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FilePathUtil;
+import mod.hey.studios.activity.managers.cpp.CppExporter;
+import mod.hey.studios.activity.managers.cpp.TermuxNativeCompiler;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import proguard.Configuration;
@@ -149,11 +151,10 @@ public class ProjectBuilder {
         progressReceiver = buildAsyncTask;
     }
 
-    // Helper method to send build output to the IDE panel
     private void broadcastBuildOutput(String output) {
         Intent intent = new Intent(ACTION_BUILD_DIAGNOSTICS);
         intent.putExtra("build_output", output);
-        intent.setPackage(context.getPackageName()); // Ensure it stays within app
+        intent.setPackage(context.getPackageName()); 
         context.sendBroadcast(intent);
     }
 
@@ -224,6 +225,38 @@ public class ProjectBuilder {
     public String getDxRunningText() {
         return (isD8Enabled() ? "D8" : "Dx") + " is running...";
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // NATIVE C/C++ COMPILATION ENGINE
+    // ──────────────────────────────────────────────────────────────────────────
+    public void compileNativeCode() throws zy {
+        String cppSourcePath = fpu.getPathCpp(yq.sc_id);
+        if (!CppExporter.hasCppFiles(cppSourcePath)) {
+            LogUtil.d(TAG, "No C/C++ native source structure detected. Skipping native build stage.");
+            return;
+        }
+        
+        if (progressReceiver != null) {
+            progressReceiver.onProgress("Compiling C/C++ Native Code...", 14);
+        }
+
+        String tempBuildPath = yq.projectMyscPath + File.separator + "cpp_build";
+
+        try {
+            TermuxNativeCompiler.compileOnDevice(
+                    context, 
+                    yq.sc_id, 
+                    cppSourcePath, 
+                    yq.compiledNativeLibsPath,
+                    tempBuildPath 
+            );
+        } catch (Exception e) {
+            String errorMsg = "C/C++ Compilation Error:\n\n" + e.getMessage();
+            broadcastBuildOutput(errorMsg);
+            throw new zy(errorMsg);
+        }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     public void createDexFilesFromClasses() throws Exception {
         FileUtil.makeDir(yq.binDirectoryPath + File.separator + "dex");
@@ -472,6 +505,8 @@ public class ProjectBuilder {
         return extraPackages + mll.getPackageNameLocalLibrary();
     }
 
+    public void MichelJavaCode() throws zy, IOException {} 
+
     public void compileJavaCode() throws zy, IOException {
         long savedTimeMillis = System.currentTimeMillis();
 
@@ -534,7 +569,7 @@ public class ProjectBuilder {
             } else {
                 String errorOutput = errOutputStream.getOut();
                 LogUtil.e(TAG, "Failed to compile Java files");
-                broadcastBuildOutput(errorOutput); // PHASE 2: Send errors to IDE!
+                broadcastBuildOutput(errorOutput); 
                 throw new zy(errorOutput);
             }
         }
@@ -562,6 +597,10 @@ public class ProjectBuilder {
 
             for (String nativeLibraryDirectory : mll.getNativeLibs()) {
                 apkBuilder.addNativeLibraries(new File(nativeLibraryDirectory));
+            }
+            
+            if (CppExporter.hasCompiledNativeLibs(yq)) {
+                apkBuilder.addNativeLibraries(new File(yq.compiledNativeLibsPath));
             }
 
             if (dexesToAddButNotMerge.isEmpty()) {
@@ -878,7 +917,7 @@ public class ProjectBuilder {
         }
         
         if (error[0] != null) {
-            broadcastBuildOutput(error[0]); // PHASE 2: Send R8 errors to IDE
+            broadcastBuildOutput(error[0]); 
             throw new IOException("R8 Compilation Failed:\n" + error[0]);
         }
 

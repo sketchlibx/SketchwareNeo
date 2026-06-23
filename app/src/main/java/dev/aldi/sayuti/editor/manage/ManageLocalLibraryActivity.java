@@ -184,7 +184,8 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
             return false;
         });
 
-        binding.downloadLibraryButton.setOnClickListener(v -> openDownloaderDialog(null, false));
+        // FIXED: Passing null for old folder name when doing fresh download
+        binding.downloadLibraryButton.setOnClickListener(v -> openDownloaderDialog(null, false, null));
 
         binding.searchView.getEditText().addTextChangedListener(new TextWatcher() {
             @Override
@@ -216,7 +217,8 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
         });
     }
 
-    public void openDownloaderDialog(@Nullable String predefinedDependencyUrl, boolean isUpgrade) {
+    // FIXED: Added oldFolderName parameter to target the exact library to replace safely
+    public void openDownloaderDialog(@Nullable String predefinedDependencyUrl, boolean isUpgrade, @Nullable String oldFolderName) {
         if (getSupportFragmentManager().findFragmentByTag("library_downloader_dialog") != null) {
             return;
         }
@@ -229,12 +231,15 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
         if (predefinedDependencyUrl != null && !predefinedDependencyUrl.isEmpty()) {
             bundle.putString("prefillDependency", predefinedDependencyUrl);
             bundle.putBoolean("isUpgradeMode", isUpgrade);
+            if (oldFolderName != null) {
+                bundle.putString("oldLibraryFolder", oldFolderName);
+            }
         }
 
         LibraryDownloaderDialogFragment fragment = new LibraryDownloaderDialogFragment();
         fragment.setArguments(bundle);
         fragment.setOnLibraryDownloadedTask(() -> {
-            LocalLibrariesUtil.clearCache(); // Force refresh from disk when new lib is downloaded
+            LocalLibrariesUtil.clearCache(); 
             runLoadLocalLibrariesTask();
         });
         fragment.show(getSupportFragmentManager(), "library_downloader_dialog");
@@ -394,7 +399,8 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
                     pm.getMenu().add("Select for Deletion");
                     pm.setOnMenuItemClickListener(item -> {
                         if (item.getTitle().toString().contains("Version")) {
-                            openDownloaderDialog(library.getMavenDependency(), true);
+                            // FIXED: Passing exact folder name of old library
+                            openDownloaderDialog(library.getMavenDependency(), true, library.getName());
                         } else {
                             isSelectionModeEnabled = true;
                             toggleLocalLibrary(binding.card, library, onLocalLibrarySelectedStateChangedListener);

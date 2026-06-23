@@ -26,6 +26,8 @@ import java.util.regex.Pattern;
 import mod.hey.studios.build.BuildSettings;
 import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.util.ProjectFile;
+import mod.hey.studios.activity.managers.cpp.CppBuildHelper;
+import mod.hey.studios.activity.managers.cpp.CppExporter;
 import mod.hilal.saif.blocks.CommandBlock;
 import mod.pranav.viewbinding.ViewBindingBuilder;
 import pro.sketchware.SketchApplication;
@@ -40,6 +42,8 @@ public class yq {
     private static final Pattern PACKAGE_PLACEHOLDER_PATTERN = Pattern.compile("<\\?package_name\\?>");
 
     public final String assetsPath;
+    public final String cppFilesPath;
+    public final String compiledNativeLibsPath;
     public final String fontsPath;
     public final String resourcesApkPath;
     public final String classesDexPath;
@@ -129,6 +133,8 @@ public class yq {
         layoutFilesPath = resDirectoryPath + File.separator + "layout";
         importedSoundsPath = resDirectoryPath + File.separator + "raw";
         assetsPath = generatedFilesPath + File.separator + "assets";
+        cppFilesPath  = generatedFilesPath + File.separator + "cpp";
+        compiledNativeLibsPath = generatedFilesPath + File.separator + "jniLibs";
         fontsPath = assetsPath + File.separator + "fonts";
         androidManifestPath = projectMyscPath + "app" + File.separator + "src" + File.separator + "main" + File.separator + "AndroidManifest.xml";
         resourcesApkPath = binDirectoryPath + File.separator + projectName + ".apk.res";
@@ -251,6 +257,12 @@ public class yq {
         fileUtil.b(projectMyscPath + File.separator + "settings.gradle", settingsGradleContent);
 
         fileUtil.b(projectMyscPath + File.separator + "gradle.properties", "android.enableR8.fullMode=false\nandroid.enableJetifier=true\nandroid.useAndroidX=true");
+
+        // generateCppBuildFiles();
+        
+        if (isAndroidStudioExport) {
+            CppExporter.processForAndroidStudioExport(this, sc_id);
+        }
     }
 
     public void a(Context context, String str) {
@@ -778,6 +790,27 @@ public class yq {
 
     private boolean isViewBindingEnable() {
         return generateDataBindingClasses && projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE);
+    }
+    
+    private void generateCppBuildFiles() {
+    if (!CppBuildHelper.hasCppFiles(sc_id)) return;
+
+    // Copy source files to build tree
+    CppBuildHelper.copyCppFilesToBuildDir(sc_id, cppFilesPath);
+
+    // Generate CMakeLists.txt
+    String cmakePath = projectMyscPath + "app" + File.separator + "CMakeLists.txt";
+    if (!FileUtil.isExistFile(cmakePath)) {
+        FileUtil.writeFile(cmakePath, CppBuildHelper.generateCmakeLists(projectName));
+    }
+
+    // Inject externalNativeBuild block into app/build.gradle
+    String appGradlePath = projectMyscPath + "app" + File.separator + "build.gradle";
+    String gradleContent = FileUtil.readFile(appGradlePath);
+    String injected = CppBuildHelper.injectCmakeBlockIntoGradle(gradleContent);
+    if (!injected.equals(gradleContent)) {
+        FileUtil.writeFile(appGradlePath, injected);
+    }
     }
 
     public String getFileSrc(String filename, hC projectFileManager, eC projectDataManager, iC projectLibraryManager) {

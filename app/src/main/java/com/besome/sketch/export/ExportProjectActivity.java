@@ -56,6 +56,8 @@ import mod.jbk.util.TestkeySignBridge;
 import pro.sketchware.R;
 import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
+import mod.hey.studios.activity.managers.cpp.CppExporter;
+import mod.hey.studios.activity.managers.cpp.CppValidator;
 import pro.sketchware.utility.SketchwareUtil;
 
 public class ExportProjectActivity extends BaseAppCompatActivity {
@@ -224,6 +226,20 @@ public class ExportProjectActivity extends BaseAppCompatActivity {
             }
             if (pathNativeLibraries.exists()) {
                 FileUtil.copyDirectory(pathNativeLibraries, new File(project_metadata.generatedFilesPath, "jniLibs"));
+            }
+            
+            File pathCppSources = new File(util.getPathCpp(sc_id));
+            if (pathCppSources.exists() && !new File(project_metadata.cppFilesPath).exists()) {
+                FileUtil.copyDirectory(pathCppSources, new File(project_metadata.cppFilesPath));
+            }
+
+            if (pathCppSources.exists()) {
+                CppValidator.ValidationResult validation =
+                        CppValidator.validate(project_metadata, sc_id);
+                if (!validation.passed) {
+                    android.util.Log.w("ProjectExporter",
+                            "C/C++ export validation issues:" + validation.summary());
+                }
             }
 
             ArrayList<String> toCompress = new ArrayList<>();

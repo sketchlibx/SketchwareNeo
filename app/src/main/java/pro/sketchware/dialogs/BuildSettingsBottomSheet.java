@@ -164,7 +164,12 @@ public class BuildSettingsBottomSheet extends BottomSheetDialogFragment {
             radioButton.setText(option);
             radioButton.setId(View.generateViewId());
             radioButton.setPadding(SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8));
-            radioButton.setLayoutParams(new RadioGroup.LayoutParams(0, -2, 1f));
+            RadioGroup.LayoutParams params =
+        new RadioGroup.LayoutParams(
+                RadioGroup.LayoutParams.WRAP_CONTENT,
+                RadioGroup.LayoutParams.WRAP_CONTENT);
+
+radioButton.setLayoutParams(params);
             if (value.equals(option)) {
                 radioButton.setChecked(true);
             }

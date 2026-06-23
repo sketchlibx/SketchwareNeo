@@ -101,6 +101,7 @@ import mod.agus.jcoderz.editor.manage.permission.ManagePermissionActivity;
 import mod.agus.jcoderz.editor.manage.resource.ManageResourceActivity;
 import mod.bobur.FloatingProgressWindow;
 import mod.hey.studios.activity.managers.assets.ManageAssetsActivity;
+import mod.hey.studios.activity.managers.cpp.ManageCppActivity;
 import mod.hey.studios.activity.managers.java.ManageJavaActivity;
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.project.ProjectSettings;
@@ -132,6 +133,8 @@ import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.apk.ApkSignatures;
+import mod.hey.studios.activity.managers.cpp.TermuxTest;
+
 
 public class DesignActivity extends BaseAppCompatActivity implements View.OnClickListener {
     public static String sc_id;
@@ -999,6 +1002,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     
     void toAppCompatInjectionManager() { if (projectFile != null) launchActivity(ManageAppCompatActivity.class, null, new Pair<>("file_name", projectFile.getXmlName())); }
     void toAssetManager() { launchActivity(ManageAssetsActivity.class, null); }
+    void toCppManager()   { launchActivity(ManageCppActivity.class,   null, new Pair<>("pkgName", q.packageName)); }
     void toCustomBlocksViewer() { new CustomBlocksDialog().show(this, sc_id); }
     void toJavaManager() { launchActivity(ManageJavaActivity.class, null, new Pair<>("pkgName", q.packageName)); }
     void toPermissionManager() { launchActivity(ManagePermissionActivity.class, null); }
@@ -1141,6 +1145,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 onProgress("Java is compiling...", 13);
                 builder.compileJavaCode();
                 if (canceled) return;
+                onProgress("Compiling C/C++ Native Code...", 14);
+builder.compileNativeCode();
+if (canceled) return;
                 StringfogHandler stringfogHandler = new StringfogHandler(sc_id);
                 stringfogHandler.start(this, builder);
                 if (canceled) return;
@@ -1536,11 +1543,18 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         }
         
         if (fileBean != null) {
+            k(); // Loading dialog SHOW
+            
+            boolean isDifferentFile = (this.projectFile == null) || 
+                (!this.projectFile.getJavaName().equals(fileBean.getJavaName()));
+
             this.projectFile = fileBean;
             refreshFileSelector();
-            viewPager.setCurrentItem(result.tabIndex);
+            viewPager.setCurrentItem(result.tabIndex, false);
             refresh();
             
+            int delayTime = isDifferentFile ? 850 : 350;
+
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 try {
                     if (result.category.equals("View") && result.targetId != null) {
@@ -1551,11 +1565,16 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                             }
                         }
                         
+                        if (viewTabAdapter != null) {
+                            viewTabAdapter.showHidePropertyView(true);
+                        }
+                        
                         com.besome.sketch.editor.view.ViewProperty viewProperty = findViewById(R.id.view_property);
                         if (viewProperty != null) {
-                            if (viewTabAdapter != null) viewTabAdapter.showHidePropertyView(true);
-                            viewProperty.a(result.targetId);
+                            viewProperty.setVisibility(View.VISIBLE);
+                            viewProperty.a(result.targetId); // Attach view properties
                         }
+                        
                     } else if (result.category.equals("Logic Block") && result.targetId != null && result.eventName != null) {
                         Intent intent = new Intent(DesignActivity.this, com.besome.sketch.editor.LogicEditorActivity.class);
                         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -1570,8 +1589,10 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     }
                 } catch (Exception e) {
                     Log.e("DeepLink", "Failed to resolve deep link", e);
+                } finally {
+                    h(); // Loading Dialog HIDE
                 }
-            }, 300);
+            }, delayTime);
 
         } else {
             pro.sketchware.utility.SketchwareUtil.toastError("Could not find file: " + result.fileName);

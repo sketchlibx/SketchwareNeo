@@ -133,7 +133,6 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            // Programmatically creating a sleek list item to avoid needing a new XML file
             LinearLayout root = new LinearLayout(parent.getContext());
             root.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             root.setOrientation(LinearLayout.VERTICAL);

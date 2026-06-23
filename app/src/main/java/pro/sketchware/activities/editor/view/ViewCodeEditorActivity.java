@@ -6,7 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.TypedValue;
@@ -37,9 +40,29 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
 
 import a.a.a.ProjectBuilder;
 import a.a.a.cC;
@@ -82,6 +105,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private String sc_id;
     private String filename;
     private String content;
+    private String beforeContent;
     private boolean isEdited = false;
 
     private ProjectFileBean projectFile;
@@ -99,6 +123,9 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private TextView tvLanguage;
     private TabLayout editorTabs;
     private RecyclerView rvExplorer;
+
+    private final Handler diagHandler = new Handler(Looper.getMainLooper());
+    private Runnable diagRunnable;
 
     private final BroadcastReceiver buildDiagnosticsReceiver = new BroadcastReceiver() {
         @Override
@@ -133,18 +160,19 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
                 dialog.setPositiveButton("Save", (v, which) -> {
                     if (filename.endsWith(".xml")) {
-                        if (applyXmlChanges()) { v.dismiss(); finish(); }
+                        if (applyXmlChanges()) { v.dismiss(); setResult(RESULT_OK); finish(); }
                     } else {
                         FileUtil.writeFile(getIntent().getStringExtra("content"), editor.getText().toString());
-                        v.dismiss(); finish();
+                        v.dismiss(); setResult(RESULT_OK); finish();
                     }
                 });
-                dialog.setNegativeButton(Helper.getResString(R.string.common_word_exit), (v, which) -> { v.dismiss(); finish(); });
+                dialog.setNegativeButton(Helper.getResString(R.string.common_word_exit), (v, which) -> { 
+                    v.dismiss(); finish(); 
+                });
                 dialog.setNeutralButton(Helper.getResString(R.string.common_word_cancel), null);
                 dialog.show();
             } else {
-                if (isEdited) { setResult(RESULT_OK); finish(); return; }
-                setEnabled(false);
+                onBackPressedCallback.setEnabled(false);
                 getOnBackPressedDispatcher().onBackPressed();
             }
         }
@@ -162,6 +190,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         sc_id = savedInstanceState == null ? getIntent().getStringExtra("sc_id") : savedInstanceState.getString("sc_id");
         filename = getIntent().getStringExtra("title");
         content = getIntent().getStringExtra("content");
+        beforeContent = content;
         
         rootLayoutManager = new InjectRootLayoutManager(sc_id);
         projectFile = jC.b(sc_id).b(filename);
@@ -204,7 +233,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             if (name.endsWith(".java")) {
                 editor.setEditorLanguage(new JavaLanguage());
                 if(tvLanguage != null) tvLanguage.setText("Java");
-            } else if (name.endsWith(".kt")) {
+            } else if (name.endsWith(".kt") || name.endsWith(".kts")) {
                 editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_KOTLIN));
                 editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(CodeEditorColorSchemes.THEME_DRACULA));
                 if(tvLanguage != null) tvLanguage.setText("Kotlin");
@@ -212,6 +241,13 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_XML));
                 editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
                 if(tvLanguage != null) tvLanguage.setText("XML");
+            } else if (name.endsWith(".json")) {
+                editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage("source.json"));
+                editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
+                if(tvLanguage != null) tvLanguage.setText("JSON");
+            } else if (name.endsWith(".md") || name.endsWith(".txt") || name.endsWith(".properties")) {
+                EditorUtils.loadXmlConfig(editor);
+                if(tvLanguage != null) tvLanguage.setText("Plain Text");
             } else {
                 EditorUtils.loadXmlConfig(editor);
                 if(tvLanguage != null) tvLanguage.setText("Plain Text");
@@ -224,15 +260,39 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(filename);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            // Specifically removed setHomeAsUpIndicator to restore the Back (<-) arrow
+            getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_mtrl_menu); 
         }
-        binding.toolbar.setNavigationOnClickListener(v -> onBackPressed());
+        binding.toolbar.setNavigationOnClickListener(v -> {
+            if (drawerLayout != null) {
+                if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.closeDrawer(GravityCompat.START);
+                else drawerLayout.openDrawer(GravityCompat.START);
+            } else if (onBackPressedCallback.isEnabled()) {
+                onBackPressedCallback.handleOnBackPressed();
+            }
+        });
     }
 
     private void setupTabs() {
         if(editorTabs != null) {
             editorTabs.removeAllTabs();
             editorTabs.addTab(editorTabs.newTab().setText(filename != null ? filename : "layout.xml"));
+        }
+    }
+
+    private void loadXmlToEditor(ProjectFileBean bean) {
+        try {
+            a.a.a.jq buildConfig = new a.a.a.jq();
+            a.a.a.Ox xmlGenerator = new a.a.a.Ox(buildConfig, bean);
+            xmlGenerator.setExcludeAppCompat(true);
+            ArrayList<com.besome.sketch.beans.ViewBean> viewBeans = a.a.a.jC.a(sc_id).d(bean.getXmlName());
+            com.besome.sketch.beans.ViewBean viewFab = a.a.a.jC.a(sc_id).h(bean.getXmlName());
+            xmlGenerator.a(a.a.a.eC.a(viewBeans), viewFab);
+            
+            content = xmlGenerator.b();
+            beforeContent = content;
+            editor.setText(content);
+        } catch(Exception e) {
+            SketchwareUtil.toastError("Failed to generate layout.");
         }
     }
 
@@ -292,12 +352,12 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                     if (filename.endsWith(".xml")) applyXmlChanges();
                     else FileUtil.writeFile(getIntent().getStringExtra("content"), editor.getText().toString());
                 }
+                
                 projectFile = bean;
                 filename = bean.getXmlName();
-                String path = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/files/resource/layout/" + filename;
-                content = FileUtil.readFile(path);
-                editor.setText(content);
-                getIntent().putExtra("content", path);
+                loadXmlToEditor(bean);
+                
+                getIntent().putExtra("content", content);
                 getIntent().putExtra("title", filename);
                 applySyntaxHighlighting();
                 setupToolbar();
@@ -333,6 +393,49 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
     }
 
+    private void triggerRealtimeDiagnostics() {
+        if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
+        diagRunnable = () -> {
+            String text = editor.getText().toString();
+            if (filename != null && filename.endsWith(".xml")) {
+                new Thread(() -> {
+                    List<Diagnostic> diags = new ArrayList<>();
+                    try {
+                        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                        DocumentBuilder builder = factory.newDocumentBuilder();
+                        builder.setErrorHandler(new org.xml.sax.ErrorHandler() {
+                            @Override public void warning(org.xml.sax.SAXParseException e) {
+                                diags.add(new Diagnostic(Diagnostic.Severity.WARNING, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                            }
+                            @Override public void error(org.xml.sax.SAXParseException e) {
+                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                            }
+                            @Override public void fatalError(org.xml.sax.SAXParseException e) {
+                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                            }
+                        });
+                        builder.parse(new org.xml.sax.InputSource(new StringReader(text)));
+                    } catch (Exception e) {
+                        if (e instanceof org.xml.sax.SAXParseException) {
+                            org.xml.sax.SAXParseException sax = (org.xml.sax.SAXParseException) e;
+                            diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, sax.getLineNumber(), sax.getColumnNumber(), sax.getMessage()));
+                        } else if (diags.isEmpty()) {
+                            diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, 1, 0, e.getMessage()));
+                        }
+                    }
+                    runOnUiThread(() -> {
+                        if (diagnosticsBehavior != null && !diags.isEmpty()) {
+                            showDiagnostics(diags);
+                        } else if (diagnosticsBehavior != null && diags.isEmpty()) {
+                            diagnosticsBehavior.setState(BottomSheetBehavior.STATE_HIDDEN);
+                        }
+                    });
+                }).start();
+            }
+        };
+        diagHandler.postDelayed(diagRunnable, 800);
+    }
+
     private void setupEditor() {
         editor.setTypefaceText(EditorUtils.getTypeface(this));
         float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
@@ -351,11 +454,13 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             @Override public void beforeReplace(Content content) { }
             @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) { 
                 runOnUiThread(() -> invalidateOptionsMenu());
+                triggerRealtimeDiagnostics();
             }
 
             @Override
             public void afterInsert(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
                 runOnUiThread(() -> invalidateOptionsMenu());
+                triggerRealtimeDiagnostics();
                 if (insertedContent != null && insertedContent.toString().equals(">")) {
                     try {
                         String lineText = content.getLineString(endLine);
@@ -507,13 +612,51 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     public void onStop() {
         super.onStop();
         try { unregisterReceiver(buildDiagnosticsReceiver); } catch (Exception ignored){}
+        if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
         float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
         prefs.edit().putInt("act_ts", (int) (editor.getTextSizePx() / scaledDensity)).apply();
     }
 
     @Override
+    public void onBackPressed() {
+        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START);
+            return;
+        }
+        if (searchCard != null && searchCard.getVisibility() == View.VISIBLE) {
+            try { editor.getSearcher().stopSearch(); } catch (Exception ignored) {}
+            searchCard.setVisibility(View.GONE);
+            findEdit.setText("");
+            return;
+        }
+
+        if (isContentModified()) {
+            MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(this);
+            dialog.setIcon(R.drawable.ic_mtrl_warning);
+            dialog.setTitle(Helper.getResString(R.string.common_word_warning));
+            dialog.setMessage(Helper.getResString(R.string.src_code_editor_unsaved_changes_dialog_warning_message));
+
+            dialog.setPositiveButton("Save", (v, which) -> {
+                if (filename.endsWith(".xml")) {
+                    if (applyXmlChanges()) { v.dismiss(); setResult(RESULT_OK); finish(); }
+                } else {
+                    FileUtil.writeFile(getIntent().getStringExtra("content"), editor.getText().toString());
+                    v.dismiss(); setResult(RESULT_OK); finish();
+                }
+            });
+            dialog.setNegativeButton(Helper.getResString(R.string.common_word_exit), (v, which) -> { 
+                v.dismiss(); finish(); 
+            });
+            dialog.setNeutralButton(Helper.getResString(R.string.common_word_cancel), null);
+            dialog.show();
+        } else {
+            onBackPressedCallback.setEnabled(false);
+            getOnBackPressedDispatcher().onBackPressed();
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Core Action Icons (Always Visible)
         MenuItem undoItem = menu.add(Menu.NONE, 0, Menu.NONE, "Undo");
         undoItem.setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_undo));
         undoItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -526,12 +669,14 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         saveItem.setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_save));
         saveItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 
-        // Overflow Options (3-dots)
-        menu.add(Menu.NONE, 12, Menu.NONE, "Project Explorer").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        if (filename != null && filename.endsWith(".xml")) {
+            menu.add(Menu.NONE, 12, Menu.NONE, "Project Explorer").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        }
+        
         menu.add(Menu.NONE, 4, Menu.NONE, "Find & Replace").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         menu.add(Menu.NONE, 5, Menu.NONE, "Pretty print").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         
-        if (isFileInLayoutFolder() && getIntent().hasExtra("sc_id")) {
+        if (filename != null && filename.endsWith(".xml")) {
             menu.add(Menu.NONE, 6, Menu.NONE, "Layout Preview").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
         }
         
@@ -561,7 +706,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             try { redoItem.setEnabled(editor.canRedo()); } catch (Exception ignored) {}
         }
         MenuItem saveItem = menu.findItem(2);
-        if (saveItem != null) saveItem.setEnabled(isContentModified());
+        if (saveItem != null) {
+            boolean isModified = !beforeContent.equals(editor.getText().toString());
+            saveItem.setEnabled(isModified);
+        }
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -573,11 +721,14 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             case 2 -> {
                 if (isContentModified()) {
                     if (filename.endsWith(".xml")) {
-                        if (applyXmlChanges()) SketchwareUtil.toast("Saved XML");
+                        if (applyXmlChanges()) {
+                            beforeContent = editor.getText().toString();
+                            SketchwareUtil.toast("Saved XML");
+                        }
                     } else {
                         FileUtil.writeFile(getIntent().getStringExtra("content"), editor.getText().toString());
+                        beforeContent = editor.getText().toString();
                         isEdited = true;
-                        content = editor.getText().toString();
                         SketchwareUtil.toast("Saved File");
                     }
                     invalidateOptionsMenu();
@@ -588,7 +739,6 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START); 
                 return true; 
             }
-            case 3 -> { toAppCompat(); return true; }
             case 4 -> { if(searchCard != null) searchCard.setVisibility(View.VISIBLE); return true; }
             case 5 -> {
                 if (getIntent().hasExtra("java") || (filename != null && filename.endsWith(".java"))) {
@@ -745,7 +895,6 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             cc.a(filename, bean);
 
             jC.a(sc_id).c.put(filename, parsedLayout);
-            setResult(RESULT_OK);
             return true;
 
         } catch (Exception e) {
@@ -757,20 +906,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
     }
 
-    private boolean isFileInLayoutFolder() {
-    String contentLocal = getIntent().getStringExtra("content");
-    if (contentLocal != null) {
-        File file = new File(contentLocal);
-        if (contentLocal.contains("/resource/layout/")) {
-            String layoutFolder = file.getParent();
-            return layoutFolder != null &&
-                   layoutFolder.endsWith("/resource/layout");
-        }
+    private boolean isContentModified() {
+        return !beforeContent.equals(editor.getText().toString());
     }
-    return false;
-}
-
-private boolean isContentModified() {
-    return !content.equals(editor.getText().toString());
-}
 }

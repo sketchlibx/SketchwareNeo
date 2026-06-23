@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="20dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/text_input_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginTop="4dp"
+        android:hint="File or folder name"
+        app:hintEnabled="true">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/input_text"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:imeOptions="actionDone"
+            android:inputType="text"
+            android:singleLine="true" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/java_class_input_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginTop="10dp"
+        android:hint="Java class name (e.g. MainActivity)"
+        android:visibility="gone"
+        app:hintEnabled="true">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/java_class_input"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:imeOptions="actionDone"
+            android:inputType="textCapWords"
+            android:singleLine="true"
+            android:text="MainActivity" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chip_group_types"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginTop="10dp"
+        app:chipSpacingVertical="-5dp"
+        app:selectionRequired="false"
+        app:singleSelection="true">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_c_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".c (C Source)" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cpp_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".cpp (C++ Source)" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_h_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".h (C Header)" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_hpp_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".hpp (C++ Header)" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_jni_bridge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="JNI Bridge" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_cpp_folder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Folder" />
+
+    </com.google.android.material.chip.ChipGroup>
+
+</LinearLayout>

@@ -88,6 +88,10 @@ public class FilePathUtil {
     public String getManifestJava(String sc_id) {
         return new File(SKETCHWARE_DATA, sc_id + "/java").getAbsolutePath();
     }
+    
+    public String getPathCpp(String sc_id) {
+        return new File(SKETCHWARE_DATA, sc_id + "/files/cpp").getAbsolutePath();
+    }
 
     public String getManifestBroadcast(String sc_id) {
         return new File(SKETCHWARE_DATA, sc_id + "/broadcast").getAbsolutePath();

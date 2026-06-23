@@ -51,6 +51,8 @@ public class DesignDrawer extends LinearLayout {
             designActivity.toFontManager();
         } else if (id == R.id.item_java_manager) {
             designActivity.toJavaManager();
+        } else if (id == R.id.item_cpp_manager) {
+            designActivity.toCppManager();
         } else if (id == R.id.item_resource_manager) {
             designActivity.toResourceManager();
         } else if (id == R.id.item_resource_editor) {
@@ -139,6 +141,7 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_sound_manager, R.drawable.ic_mtrl_music, R.string.design_drawer_menu_title_sound, R.string.design_drawer_menu_description_sound, content);
         addDrawerItem(R.id.item_font_manager, R.drawable.ic_mtrl_font, R.string.design_drawer_menu_title_font, R.string.design_drawer_menu_description_font, content);
         addDrawerItem(R.id.item_java_manager, R.drawable.ic_mtrl_java, R.string.text_title_menu_java, R.string.text_subtitle_menu_java, content);
+        addDrawerItem(R.id.item_cpp_manager, R.drawable.ic_mtrl_cpp, R.string.text_title_menu_cpp, R.string.text_subtitle_menu_cpp, content);
         addDrawerItem(R.id.item_resource_manager, R.drawable.ic_mtrl_folder, R.string.text_title_menu_resource, R.string.text_subtitle_menu_resource, content);
         addDrawerItem(R.id.item_resource_editor, R.drawable.ic_mtrl_folder_code, R.string.text_title_menu_resource_editor, R.string.text_subtitle_menu_resource_editor, content);
         addDrawerItem(R.id.item_assets_manager, R.drawable.ic_mtrl_file_present, R.string.text_title_menu_assets, R.string.text_subtitle_menu_assets, content);

@@ -1,8 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:id="@+id/layout_network_ops"
@@ -10,7 +11,9 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingBottom="24dp">
+        android:paddingHorizontal="16dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_git_fetch"
@@ -42,31 +45,22 @@
             android:text="Push" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tv_remotes_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/layout_network_ops"
-        android:text="Configured Remotes"
-        android:textAppearance="?attr/textAppearanceTitleMedium"
-        android:textColor="?attr/colorPrimary" />
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_remotes"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/tv_remotes_title"
-        android:layout_marginTop="16dp" />
+        android:layout_below="@id/layout_network_ops"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="80dp" />
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-        android:id="@+id/fab_new_remote"
+        android:id="@+id/fab_add_remote"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"
-        android:layout_margin="16dp"
-        app:icon="@drawable/ic_mtrl_add"
+        android:layout_margin="24dp"
         android:text="Add Remote"
-        android:contentDescription="Add new remote" />
-
+        app:icon="@drawable/ic_mtrl_add" />
 </RelativeLayout>

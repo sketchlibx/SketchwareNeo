@@ -8,9 +8,12 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -44,10 +47,17 @@ import pro.sketchware.utility.SketchwareUtil;
 public class LogReaderActivity extends BaseAppCompatActivity {
 
     private final BroadcastReceiver logger = new Logger();
-    private final Pattern logPattern = Pattern.compile("^(.*\\d) ([VADEIW]) (.*): (.*)");
+    
+    // Highly robust regex supporting: "MM-dd HH:mm:ss.SSS LEVEL TAG: MSG" OR "MM-dd HH:mm:ss.SSS LEVEL/TAG(PID): MSG"
+    private final Pattern logPattern = Pattern.compile("^.*?(\\d{2}-\\d{2}\\s\\d{2}:\\d{2}:\\d{2}\\.\\d{3})\\s+([VDIWEA])[\\s/]+([^:]+?)(?:\\(\\s*\\d+\\))?:\\s+(.*)$");
     
     private final ArrayList<HashMap<String, Object>> mainList = new ArrayList<>();
     private final ArrayList<HashMap<String, Object>> displayList = new ArrayList<>();
+    
+    // Batching to prevent UI Freezes
+    private final ArrayList<HashMap<String, Object>> pendingLogs = new ArrayList<>();
+    private final Handler batchHandler = new Handler(Looper.getMainLooper());
+    private boolean isBatchScheduled = false;
     
     private String pkgFilter = "";
     private String packageName = "pro.sketchware";
@@ -55,6 +65,7 @@ public class LogReaderActivity extends BaseAppCompatActivity {
     private ArrayList<String> pkgFilterList = new ArrayList<>();
 
     private ActivityLogcatreaderBinding binding;
+    private Adapter adapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,11 +79,12 @@ public class LogReaderActivity extends BaseAppCompatActivity {
     }
 
     private void initialize() {
-        // PRO FIX: Initialized LayoutManager correctly so logs actually render on screen
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(false);
         binding.logsRecyclerView.setLayoutManager(layoutManager);
-        binding.logsRecyclerView.setAdapter(new Adapter(displayList));
+        
+        adapter = new Adapter(displayList);
+        binding.logsRecyclerView.setAdapter(adapter);
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction("pro.sketchware.ACTION_NEW_DEBUG_LOG");
@@ -88,10 +100,9 @@ public class LogReaderActivity extends BaseAppCompatActivity {
             if (id == R.id.action_clear) {
                 mainList.clear();
                 displayList.clear();
-                if (binding.logsRecyclerView.getAdapter() != null) {
-                    binding.logsRecyclerView.getAdapter().notifyDataSetChanged();
-                    ((Adapter) binding.logsRecyclerView.getAdapter()).checkEmptyState();
-                }
+                pendingLogs.clear();
+                adapter.notifyDataSetChanged();
+                adapter.checkEmptyState();
             } else if (id == R.id.action_auto_scroll) {
                 autoScroll = !item.isChecked();
                 item.setChecked(autoScroll);
@@ -129,21 +140,19 @@ public class LogReaderActivity extends BaseAppCompatActivity {
             }
         }
 
-        if (binding.logsRecyclerView.getAdapter() != null) {
-            binding.logsRecyclerView.getAdapter().notifyDataSetChanged();
-            ((Adapter) binding.logsRecyclerView.getAdapter()).checkEmptyState();
-        }
+        adapter.notifyDataSetChanged();
+        adapter.checkEmptyState();
     }
 
     void showFilterDialog() {
         var dialogBinding = EasyDeleteEdittextBinding.inflate(getLayoutInflater());
         View view = dialogBinding.getRoot();
-
         dialogBinding.imgDelete.setVisibility(View.GONE);
+        dialogBinding.easyEdInput.setText(pkgFilter);
 
-        var builder = new MaterialAlertDialogBuilder(this)
-                .setTitle("Filter by package name")
-                .setMessage("For multiple package names, separate them with a comma (,).")
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Filter by Package Name")
+                .setMessage("Separate multiple package names with a comma (,).")
                 .setIcon(R.drawable.ic_mtrl_filter)
                 .setView(view)
                 .setPositiveButton("Apply", (dialog, which) -> {
@@ -158,13 +167,10 @@ public class LogReaderActivity extends BaseAppCompatActivity {
                 .setNeutralButton("Reset", (dialog, which) -> {
                     pkgFilter = "";
                     pkgFilterList.clear();
-                    dialogBinding.easyEdInput.setText("");
                     applyFilters();
                 })
                 .setNegativeButton("Cancel", null)
-                .create();
-
-        builder.show();
+                .show();
     }
 
     private String safeGet(HashMap<String, Object> log, String key) {
@@ -181,18 +187,13 @@ public class LogReaderActivity extends BaseAppCompatActivity {
             String fileName = Calendar.getInstance(Locale.ENGLISH).getTimeInMillis() + ".txt";
             String filePath = Environment.getExternalStorageDirectory() + "/.sketchware/logcat/" + packageName + "/" + fileName;
             String stars = "*".repeat(95);
-            String blank = " ".repeat(87);
             createNewFileIfNotPresent(filePath);
             StringBuilder contentBuilder = new StringBuilder();
             String formattedDate = new SimpleDateFormat("yyyy/MM/dd 'at' HH:mm:ss", Locale.ENGLISH).format(new Date());
 
             contentBuilder.append(stars).append("\n");
-            contentBuilder.append(stars).append("\n");
-            contentBuilder.append("**").append(blank).append("**");
-            contentBuilder.append("\n** Exported logcat reader for ").append(packageName).append(" on ").append(formattedDate).append("  **\n");
-            contentBuilder.append("**").append(blank).append("**\n");
-            contentBuilder.append(stars).append("\n");
-            contentBuilder.append(stars).append("\n");
+            contentBuilder.append("** Exported logcat for ").append(packageName).append(" on ").append(formattedDate).append(" **\n");
+            contentBuilder.append(stars).append("\n\n");
 
             for (HashMap<String, Object> log : logs) {
                 String date = safeGet(log, "date");
@@ -201,18 +202,15 @@ public class LogReaderActivity extends BaseAppCompatActivity {
                 String body = safeGet(log, "body");
 
                 if (!type.isEmpty()) {
-                    contentBuilder.append("\n\n|-- Log Type: ").append(type).append("\n");
-                    contentBuilder.append("    |-- Date: ").append(date).append("\n");
-                    contentBuilder.append("    |-- Tag: ").append(tag).append("\n");
-                    contentBuilder.append("    |-- Message: ").append(body).append("\n");
-                    contentBuilder.append("------------------------------------------------");
+                    contentBuilder.append(String.format(Locale.ENGLISH, "[%s] %s/%s: %s\n", date, type, tag, body));
+                } else {
+                    contentBuilder.append(safeGet(log, "logRaw")).append("\n");
                 }
-
             }
             FileUtil.writeFile(filePath, contentBuilder.toString());
             SketchwareUtil.toast("Logcat exported successfully: " + filePath);
         } catch (Exception ex) {
-            SketchwareUtil.toastError("Something went wrong!");
+            SketchwareUtil.toastError("Export failed!");
         }
     }
 
@@ -226,46 +224,70 @@ public class LogReaderActivity extends BaseAppCompatActivity {
     public void onDestroy() {
         super.onDestroy();
         unregisterReceiver(logger);
+        batchHandler.removeCallbacksAndMessages(null);
     }
+
+    // High performance batch processor
+    private final Runnable processBatchRunnable = () -> {
+        isBatchScheduled = false;
+        if (pendingLogs.isEmpty()) return;
+
+        int startPos = displayList.size();
+        int addedCount = 0;
+        
+        String _charSeq = Helper.getText(binding.searchInput).trim();
+        boolean hasSearchFilter = !_charSeq.isEmpty();
+        boolean hasPkgFilter = !pkgFilterList.isEmpty();
+
+        for (HashMap<String, Object> map : pendingLogs) {
+            boolean matchesSearch = !hasSearchFilter || safeGet(map, "logRaw").toLowerCase().contains(_charSeq.toLowerCase());
+            boolean matchesPkg = !hasPkgFilter || (map.containsKey("pkgName") && pkgFilterList.contains(safeGet(map, "pkgName")));
+
+            if (matchesSearch && matchesPkg) {
+                displayList.add(map);
+                addedCount++;
+            }
+        }
+
+        pendingLogs.clear();
+
+        if (addedCount > 0) {
+            adapter.notifyItemRangeInserted(startPos, addedCount);
+            adapter.checkEmptyState();
+        }
+    };
 
     private class Logger extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            HashMap<String, Object> map = new HashMap<>();
             if (intent.hasExtra("log") && intent.getStringExtra("log") != null) {
+                HashMap<String, Object> map = new HashMap<>();
+                
                 if (intent.hasExtra("packageName")) {
-                    map.put("pkgName", intent.getStringExtra("packageName"));
-                    packageName = intent.getStringExtra("packageName");
+                    String pkg = intent.getStringExtra("packageName");
+                    map.put("pkgName", pkg);
+                    packageName = pkg;
                 }
+                
                 String logRaw = intent.getStringExtra("log");
                 map.put("logRaw", logRaw);
-                if (logRaw == null) return;
 
                 Matcher matcher = logPattern.matcher(logRaw);
                 if (matcher.matches()) {
                     map.put("date", matcher.group(1).trim());
                     map.put("type", matcher.group(2).trim());
-                    map.put("header", matcher.group(3));
-                    map.put("body", matcher.group(4));
+                    map.put("header", matcher.group(3).trim());
+                    map.put("body", matcher.group(4).trim());
                     map.put("culturedLog", "true");
                 }
 
-                // Add to master list always
                 mainList.add(map);
+                pendingLogs.add(map);
 
-                // Check if current log matches active filters
-                boolean hasSearchFilter = !Helper.getText(binding.searchInput).isEmpty();
-                boolean hasPkgFilter = !pkgFilterList.isEmpty();
-
-                boolean matchesSearch = !hasSearchFilter || logRaw.toLowerCase().contains(Helper.getText(binding.searchInput).toLowerCase());
-                boolean matchesPkg = !hasPkgFilter || (map.containsKey("pkgName") && pkgFilterList.contains(safeGet(map, "pkgName")));
-
-                if (matchesSearch && matchesPkg) {
-                    displayList.add(map);
-                    if (binding.logsRecyclerView.getAdapter() != null) {
-                        Adapter adapter = (Adapter) binding.logsRecyclerView.getAdapter();
-                        adapter.notifyItemInsertedSafely();
-                    }
+                // Throttle UI updates to 200ms
+                if (!isBatchScheduled) {
+                    isBatchScheduled = true;
+                    batchHandler.postDelayed(processBatchRunnable, 200);
                 }
             }
         }
@@ -276,11 +298,6 @@ public class LogReaderActivity extends BaseAppCompatActivity {
 
         public Adapter(ArrayList<HashMap<String, Object>> data) {
             this.data = data;
-            checkEmptyState();
-        }
-
-        public void notifyItemInsertedSafely() {
-            notifyItemInserted(data.size() - 1);
             checkEmptyState();
         }
 
@@ -295,64 +312,83 @@ public class LogReaderActivity extends BaseAppCompatActivity {
         @NonNull
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             var listBinding = ViewLogcatItemBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-            var layoutParams = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            listBinding.getRoot().setLayoutParams(layoutParams);
             return new ViewHolder(listBinding);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            var listBinding = holder.listBinding;
+            var lb = holder.listBinding;
             HashMap<String, Object> itemData = data.get(position);
 
-            if (itemData.containsKey("pkgName")) {
-                listBinding.pkgName.setText(safeGet(itemData, "pkgName"));
-                listBinding.pkgName.setVisibility(View.VISIBLE);
-            } else {
-                listBinding.pkgName.setVisibility(View.GONE);
-            }
-            
             if (itemData.containsKey("culturedLog")) {
-                listBinding.dateHeader.setVisibility(View.VISIBLE);
                 String typeStr = safeGet(itemData, "type");
-                listBinding.type.setText(typeStr);
-                listBinding.dateHeader.setText(safeGet(itemData, "date") + " | " + safeGet(itemData, "header"));
+                String tagStr = safeGet(itemData, "header");
                 
+                lb.type.setText(typeStr);
+                lb.dateHeader.setText(String.format("%s | %s", safeGet(itemData, "date"), tagStr));
+                lb.log.setText(safeGet(itemData, "body"));
+
+                // Material 3 Color coding
+                int indicatorColor;
+                int badgeBgColor;
+                int badgeTextColor;
+
                 switch (typeStr) {
-                    case "A" -> listBinding.type.setBackgroundColor(0xFF9C27B0);
-                    case "D" -> listBinding.type.setBackgroundColor(0xFF2196F3);
-                    case "E" -> listBinding.type.setBackgroundColor(0xFFF44336);
-                    case "I" -> listBinding.type.setBackgroundColor(0xFF4CAF50);
-                    case "V" -> listBinding.type.setBackgroundColor(0xFF000000);
-                    case "W" -> listBinding.type.setBackgroundColor(0xFFFFC107);
-                    default -> {
-                        listBinding.type.setBackgroundColor(0xFF000000);
-                        listBinding.type.setText("U");
-                    }
+                    case "E": // Error - Red
+                        indicatorColor = Color.parseColor("#F44336");
+                        badgeBgColor = Color.parseColor("#FFEBEE");
+                        badgeTextColor = Color.parseColor("#D32F2F");
+                        break;
+                    case "W": // Warn - Orange
+                        indicatorColor = Color.parseColor("#FF9800");
+                        badgeBgColor = Color.parseColor("#FFF8E1");
+                        badgeTextColor = Color.parseColor("#E65100");
+                        break;
+                    case "I": // Info - Green
+                        indicatorColor = Color.parseColor("#4CAF50");
+                        badgeBgColor = Color.parseColor("#E8F5E9");
+                        badgeTextColor = Color.parseColor("#2E7D32");
+                        break;
+                    case "A": // Assert - Purple
+                        indicatorColor = Color.parseColor("#9C27B0");
+                        badgeBgColor = Color.parseColor("#F3E5F5");
+                        badgeTextColor = Color.parseColor("#7B1FA2");
+                        break;
+                    case "D": // Debug - Blue
+                        indicatorColor = Color.parseColor("#2196F3");
+                        badgeBgColor = Color.parseColor("#E3F2FD");
+                        badgeTextColor = Color.parseColor("#1976D2");
+                        break;
+                    default: // Verbose/Unknown - Grey
+                        indicatorColor = Color.parseColor("#9E9E9E");
+                        badgeBgColor = Color.parseColor("#F5F5F5");
+                        badgeTextColor = Color.parseColor("#616161");
+                        break;
                 }
-                listBinding.log.setText(safeGet(itemData, "body"));
-                
-                try {
-                    if (position < data.size() - 1 && safeGet(itemData, "date").equals(safeGet(data.get(position + 1), "date"))) {
-                        if (safeGet(itemData, "pkgName").equals(safeGet(data.get(position + 1), "pkgName"))) {
-                            listBinding.pkgName.setVisibility(View.GONE);
-                        }
-                        if (safeGet(itemData, "header").equals(safeGet(data.get(position + 1), "header"))) {
-                            listBinding.dateHeader.setVisibility(View.GONE);
-                        }
-                    }
-                } catch (Exception ignored) { }
-                
+
+                lb.severityIndicator.setBackgroundColor(indicatorColor);
+                lb.badgeType.setCardBackgroundColor(badgeBgColor);
+                lb.type.setTextColor(badgeTextColor);
             } else {
-                listBinding.log.setText(safeGet(itemData, "logRaw"));
-                listBinding.type.setBackgroundColor(0xFF000000);
-                listBinding.type.setText("U");
-                listBinding.dateHeader.setVisibility(View.GONE);
+                lb.log.setText(safeGet(itemData, "logRaw"));
+                lb.type.setText("U");
+                lb.severityIndicator.setBackgroundColor(Color.parseColor("#9E9E9E"));
+                lb.badgeType.setCardBackgroundColor(Color.parseColor("#F5F5F5"));
+                lb.type.setTextColor(Color.parseColor("#616161"));
+                lb.dateHeader.setText("Unknown Format");
+            }
+
+            if (itemData.containsKey("pkgName")) {
+                lb.pkgName.setText(safeGet(itemData, "pkgName"));
+                lb.pkgName.setVisibility(View.VISIBLE);
+            } else {
+                lb.pkgName.setVisibility(View.GONE);
             }
             
-            listBinding.getRoot().setOnLongClickListener(v -> {
+            lb.cardRoot.setOnLongClickListener(v -> {
                 SketchwareUtil.toast("Copied to clipboard");
-                ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("clipboard", safeGet(itemData, "logRaw")));
+                ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE))
+                        .setPrimaryClip(ClipData.newPlainText("log", safeGet(itemData, "logRaw")));
                 return true;
             });
         }
@@ -364,7 +400,6 @@ public class LogReaderActivity extends BaseAppCompatActivity {
 
         private class ViewHolder extends RecyclerView.ViewHolder {
             private final ViewLogcatItemBinding listBinding;
-
             public ViewHolder(@NonNull ViewLogcatItemBinding listBinding) {
                 super(listBinding.getRoot());
                 this.listBinding = listBinding;
