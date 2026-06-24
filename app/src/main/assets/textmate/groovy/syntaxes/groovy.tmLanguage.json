@@ -1,0 +1,102 @@
+{
+  "name": "Groovy",
+  "scopeName": "source.groovy",
+  "fileTypes": ["groovy", "gradle"],
+  "patterns": [
+    { "include": "#comment"       },
+    { "include": "#string"        },
+    { "include": "#keyword"       },
+    { "include": "#storage-type"  },
+    { "include": "#constant"      },
+    { "include": "#gradle-dsl"    },
+    { "include": "#number"        },
+    { "include": "#function-call" },
+    { "include": "#operator"      }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "begin": "/\\*\\*", "end": "\\*/", "name": "comment.block.documentation" },
+        { "begin": "/\\*",    "end": "\\*/", "name": "comment.block"               },
+        { "match": "//.*$",                  "name": "comment"                      }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "name": "string.quoted.double",
+          "patterns": [{ "include": "#string-interpolation" }, { "include": "#escape" }]
+        },
+        {
+          "begin": "'''",
+          "end": "'''",
+          "name": "string.quoted.single"
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double",
+          "patterns": [{ "include": "#string-interpolation" }, { "include": "#escape" }]
+        },
+        {
+          "begin": "'",
+          "end": "'",
+          "name": "string.quoted.single",
+          "patterns": [{ "include": "#escape" }]
+        }
+      ]
+    },
+    "string-interpolation": {
+      "patterns": [
+        {
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "name": "meta.string.interpolation",
+          "patterns": [{ "include": "$self" }]
+        },
+        {
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*",
+          "name": "variable.other"
+        }
+      ]
+    },
+    "escape": {
+      "match": "\\\\(?:[nrtbf\"'\\\\$]|u[0-9a-fA-F]{4})",
+      "name": "constant.character.escape"
+    },
+    "keyword": {
+      "match": "\\b(if|else|while|for|in|do|switch|case|break|continue|return|try|catch|finally|throw|throws|assert|class|interface|extends|implements|new|def|var|import|package|static|abstract|final|private|public|protected|synchronized|transient|volatile|native|strictfp|instanceof|super|this|null|true|false|enum|trait|as|with|it)\\b",
+      "name": "keyword"
+    },
+    "storage-type": {
+      "match": "\\b(void|int|char|short|long|float|double|boolean|byte|String|Integer|Long|Double|Float|Boolean|Object|List|Map|Set|ArrayList|HashMap|HashSet|Closure|GString)\\b",
+      "name": "storage.type"
+    },
+    "constant": {
+      "match": "\\b(true|false|null)\\b",
+      "name": "constant.language"
+    },
+    "gradle-dsl": {
+      "patterns": [
+        {
+          "match": "\\b(apply|plugin|plugins|android|defaultConfig|buildTypes|release|debug|dependencies|implementation|api|compileOnly|runtimeOnly|testImplementation|androidTestImplementation|repositories|mavenCentral|google|jcenter|maven|allprojects|subprojects|buildscript|classpath|compileSdkVersion|minSdkVersion|targetSdkVersion|versionCode|versionName|applicationId|namespace|buildFeatures|viewBinding|composeOptions|kotlinOptions|jvmTarget|sourceSets|lintOptions|packagingOptions|compileOptions|sourceCompatibility|targetCompatibility|externalNativeBuild|cmake|abiFilters|cppFlags|path|version|productFlavors|flavorDimensions|signingConfigs|keyAlias|keyPassword|storeFile|storePassword|buildConfig|resValue|manifestPlaceholders|testOptions|testInstrumentationRunner|multiDexEnabled|vectorDrawables|useSupportLibrary|ndkVersion|minifyEnabled|shrinkResources|proguardFiles|getDefaultProguardFile|consumerProguardFiles|exclude|include|pickFirst|merge|task|doLast|doFirst|println|ext|group|description|publishing|project|rootProject)\\b",
+          "name": "support.function"
+        }
+      ]
+    },
+    "number": {
+      "match": "\\b(?:0[xX][0-9a-fA-F]+[lL]?|[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?[fFdDlLgG]?)\\b",
+      "name": "constant.numeric"
+    },
+    "function-call": {
+      "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*[({])",
+      "captures": { "1": { "name": "entity.name.function" } }
+    },
+    "operator": {
+      "match": "(?:->|\\?:|\\.\\.(?:\\.)?|\\*\\.|[+\\-*/%&|^~!<>=?:@]|\\.@)",
+      "name": "keyword.operator"
+    }
+  }
+}

@@ -17,6 +17,54 @@
       "name": "xml",
       "scopeName": "text.xml",
       "languageConfiguration": "textmate/xml/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/json/syntaxes/JSON.tmLanguage.json",
+      "name": "json",
+      "scopeName": "source.json",
+      "languageConfiguration": "textmate/json/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/groovy/syntaxes/groovy.tmLanguage.json",
+      "name": "groovy",
+      "scopeName": "source.groovy",
+      "languageConfiguration": "textmate/groovy/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/c/syntaxes/c.tmLanguage.json",
+      "name": "c",
+      "scopeName": "source.c",
+      "languageConfiguration": "textmate/c/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/cpp/syntaxes/cpp.tmLanguage.json",
+      "name": "cpp",
+      "scopeName": "source.cpp",
+      "languageConfiguration": "textmate/cpp/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/shellscript/syntaxes/shellscript.tmLanguage.json",
+      "name": "shellscript",
+      "scopeName": "source.shell",
+      "languageConfiguration": "textmate/shellscript/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/cmake/syntaxes/cmake.tmLanguage.json",
+      "name": "cmake",
+      "scopeName": "source.cmake",
+      "languageConfiguration": "textmate/cmake/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/markdown/syntaxes/markdown.tmLanguage.json",
+      "name": "markdown",
+      "scopeName": "text.html.markdown",
+      "languageConfiguration": "textmate/markdown/language-configuration.json"
+    },
+    {
+      "grammar": "textmate/properties/syntaxes/properties.tmLanguage.json",
+      "name": "properties",
+      "scopeName": "source.ini",
+      "languageConfiguration": "textmate/properties/language-configuration.json"
     }
   ]
 }

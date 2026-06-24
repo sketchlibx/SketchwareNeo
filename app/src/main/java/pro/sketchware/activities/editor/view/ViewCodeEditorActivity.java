@@ -83,6 +83,7 @@ import mod.hey.studios.ide.diagnostics.GradleLogParser;
 import mod.hey.studios.util.Helper;
 import mod.jbk.code.CodeEditorColorSchemes;
 import mod.jbk.code.CodeEditorLanguages;
+import mod.jbk.code.CodeEditorLanguages.LanguageSpec;
 import pro.sketchware.R;
 import pro.sketchware.activities.appcompat.ManageAppCompatActivity;
 import pro.sketchware.activities.preview.LayoutPreviewActivity;
@@ -228,31 +229,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private void applySyntaxHighlighting() {
-        if (filename != null) {
-            String name = filename.toLowerCase();
-            if (name.endsWith(".java")) {
-                editor.setEditorLanguage(new JavaLanguage());
-                if(tvLanguage != null) tvLanguage.setText("Java");
-            } else if (name.endsWith(".kt") || name.endsWith(".kts")) {
-                editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_KOTLIN));
-                editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(CodeEditorColorSchemes.THEME_DRACULA));
-                if(tvLanguage != null) tvLanguage.setText("Kotlin");
-            } else if (name.endsWith(".xml")) {
-                editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_XML));
-                editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
-                if(tvLanguage != null) tvLanguage.setText("XML");
-            } else if (name.endsWith(".json")) {
-                editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage("source.json"));
-                editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
-                if(tvLanguage != null) tvLanguage.setText("JSON");
-            } else if (name.endsWith(".md") || name.endsWith(".txt") || name.endsWith(".properties")) {
-                EditorUtils.loadXmlConfig(editor);
-                if(tvLanguage != null) tvLanguage.setText("Plain Text");
-            } else {
-                EditorUtils.loadXmlConfig(editor);
-                if(tvLanguage != null) tvLanguage.setText("Plain Text");
-            }
-        }
+        if (filename == null) return;
+        LanguageSpec spec = CodeEditorLanguages.resolveLanguageSpec(filename);
+        SrcCodeEditor.applyLanguageSpec(this, editor, spec);
+        SrcCodeEditor.languageId = spec.id;
+        if (tvLanguage != null) tvLanguage.setText(spec.label);
     }
 
     private void setupToolbar() {
@@ -763,7 +744,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 startActivity(intent);
                 return true; 
             }
-            case 7 -> { SrcCodeEditor.showSwitchLanguageDialog(this, editor, (dialog, which) -> { SrcCodeEditor.selectLanguage(editor, which); dialog.dismiss(); }); return true; }
+            case 7 -> { SrcCodeEditor.showSwitchLanguageDialog(this, editor, (dialog, which) -> { SrcCodeEditor.selectLanguage(this, editor, which); dialog.dismiss(); }); return true; }
             case 8 -> {
                 SrcCodeEditor.showSwitchThemeDialog(this, editor, (dialog, which) -> {
                     SrcCodeEditor.selectTheme(editor, which);

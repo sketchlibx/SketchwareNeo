@@ -87,6 +87,7 @@ import mod.hey.studios.ide.diagnostics.GradleLogParser;
 import mod.hey.studios.util.Helper;
 import mod.jbk.code.CodeEditorColorSchemes;
 import mod.jbk.code.CodeEditorLanguages;
+import mod.jbk.code.CodeEditorLanguages.LanguageSpec;
 import pro.sketchware.R;
 import pro.sketchware.activities.preview.LayoutPreviewActivity;
 import pro.sketchware.databinding.CodeEditorHsBinding;
@@ -182,12 +183,33 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         }
     }
 
+    public static void selectLanguage(Context context, CodeEditor ed, int which) {
+        LanguageSpec spec = LanguageSpec.fromId(which);
+        applyLanguageSpec(context, ed, spec);
+        languageId = spec.id;
+    }
+
+    @Deprecated
     public static void selectLanguage(CodeEditor ed, int which) {
-        switch (which) {
+        selectLanguage(pro.sketchware.SketchApplication.getContext(), ed, which);
+    }
+
+    public static void applyLanguageSpec(Context context, CodeEditor ed, LanguageSpec spec) {
+        switch (spec.kind) {
+            case JAVA:
+                ed.setEditorLanguage(new JavaLanguage());
+                break;
+            case TEXTMATE:
+                ed.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(spec.scopeName));
+                ed.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(
+                        ThemeUtils.isDarkThemeEnabled(context)
+                                ? CodeEditorColorSchemes.THEME_DRACULA
+                                : CodeEditorColorSchemes.THEME_GITHUB));
+                break;
+            case PLAIN:
             default:
-            case 0: ed.setEditorLanguage(new JavaLanguage()); languageId = 0; break;
-            case 1: ed.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_KOTLIN)); languageId = 1; break;
-            case 2: ed.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_XML)); languageId = 2; break;
+                EditorUtils.loadXmlConfig(ed);
+                break;
         }
     }
 
@@ -263,10 +285,9 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     }
 
     public static void showSwitchLanguageDialog(Activity activity, CodeEditor codeEditor, DialogInterface.OnClickListener listener) {
-        CharSequence[] languagesList = { "Java", "Kotlin", "XML" };
         new MaterialAlertDialogBuilder(activity)
                 .setTitle("Select Language")
-                .setSingleChoiceItems(languagesList, languageId, listener)
+                .setSingleChoiceItems(LanguageSpec.LANGUAGE_LABELS, languageId, listener)
                 .setNegativeButton(R.string.common_word_cancel, null)
                 .show();
     }
@@ -399,37 +420,11 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     }
 
     private void applySyntaxHighlighting() {
-        if (currentTitle != null) {
-            String name = currentTitle.toLowerCase();
-            if (name.endsWith(".java")) {
-                binding.editor.setEditorLanguage(new JavaLanguage());
-                languageId = 0;
-                if(tvLanguage != null) tvLanguage.setText("Java");
-            } else if (name.endsWith(".kt") || name.endsWith(".kts")) {
-                binding.editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_KOTLIN));
-                binding.editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(CodeEditorColorSchemes.THEME_DRACULA));
-                languageId = 1;
-                if(tvLanguage != null) tvLanguage.setText("Kotlin");
-            } else if (name.endsWith(".xml")) {
-                binding.editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(CodeEditorLanguages.SCOPE_NAME_XML));
-                binding.editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
-                languageId = 2;
-                if(tvLanguage != null) tvLanguage.setText("XML");
-            } else if (name.endsWith(".json")) {
-                binding.editor.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage("source.json"));
-                binding.editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(ThemeUtils.isDarkThemeEnabled(getApplicationContext()) ? CodeEditorColorSchemes.THEME_DRACULA : CodeEditorColorSchemes.THEME_GITHUB));
-                languageId = 3;
-                if(tvLanguage != null) tvLanguage.setText("JSON");
-            } else if (name.endsWith(".properties") || name.endsWith(".md") || name.endsWith(".txt")) {
-                EditorUtils.loadXmlConfig(binding.editor);
-                languageId = -1;
-                if(tvLanguage != null) tvLanguage.setText("Plain Text");
-            } else {
-                EditorUtils.loadXmlConfig(binding.editor);
-                languageId = -1;
-                if(tvLanguage != null) tvLanguage.setText(name.endsWith(".gradle") ? "Gradle" : "Plain Text");
-            }
-        }
+        if (currentTitle == null) return;
+        LanguageSpec spec = CodeEditorLanguages.resolveLanguageSpec(currentTitle);
+        applyLanguageSpec(this, binding.editor, spec);
+        languageId = spec.id;
+        if (tvLanguage != null) tvLanguage.setText(spec.label);
     }
 
     private void setupToolbar() {
@@ -916,7 +911,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 startActivity(intent);
                 return true; 
             }
-            case 7 -> { showSwitchLanguageDialog(this, binding.editor, (dialog, which) -> { selectLanguage(binding.editor, which); dialog.dismiss(); }); return true; }
+            case 7 -> { showSwitchLanguageDialog(this, binding.editor, (dialog, which) -> { selectLanguage(this, binding.editor, which); dialog.dismiss(); }); return true; }
             case 8 -> {
                 showSwitchThemeDialog(this, binding.editor, (dialog, which) -> {
                     selectTheme(binding.editor, which);
