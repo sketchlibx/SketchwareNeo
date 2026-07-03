@@ -23,6 +23,9 @@ import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
 import androidx.annotation.StringRes;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.gson.reflect.TypeToken;
@@ -226,4 +229,13 @@ public class Helper {
             dialog.dismiss();
         }
     }
+    
+    public static void copyToClipboard(String text) {
+    ClipboardManager clipboard =
+            (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+
+    if (clipboard != null) {
+        clipboard.setPrimaryClip(ClipData.newPlainText(null, text));
+    }
+}
 }

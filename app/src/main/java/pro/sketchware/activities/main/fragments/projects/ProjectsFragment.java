@@ -135,7 +135,7 @@ public class ProjectsFragment extends DA {
                     if (which == 0) {
                         new BackupRestoreManager(getActivity(), this).restore();
                     } else if (which == 1) {
-                        ASProjectImporter.showPicker(requireActivity(), this);
+                        ASProjectImporter.showPicker(getActivity(), this);
                     }
                 })
                 .show();

@@ -133,9 +133,12 @@ public class Hx {
 
     private void a(ArrayList<EventBean> events, HashMap<String, ArrayList<BlockBean>> logicBlocks) {
         for (EventBean eventBean : events) {
-            ArrayList<BlockBean> eventLogicBlocks = logicBlocks.get(eventBean.targetId + "_" + eventBean.eventName);
+            String eventKey = eventBean.targetId + "_" + eventBean.eventName;
+            ArrayList<BlockBean> eventLogicBlocks = logicBlocks.get(eventKey);
+            
+            // --> Updated Fx call with eventKey pass <--
             String eventLogic = (eventLogicBlocks == null || eventLogicBlocks.isEmpty()) ? "" :
-                    new Fx(projectFileBean.getActivityName(), jq, eventLogicBlocks, isViewBindingEnabled).a();
+                    new Fx(projectFileBean.getActivityName(), eventKey, jq, eventLogicBlocks, isViewBindingEnabled).a();
 
             switch (eventBean.eventType) {
                 case EventBean.EVENT_TYPE_VIEW:

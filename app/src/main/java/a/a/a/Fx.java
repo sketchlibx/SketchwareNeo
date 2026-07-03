@@ -18,6 +18,7 @@ import mod.hey.studios.editor.manage.block.ExtraBlockInfo;
 import mod.hey.studios.editor.manage.block.v2.BlockLoader;
 import mod.hey.studios.moreblock.ReturnMoreblockManager;
 import mod.pranav.viewbinding.ViewBindingBuilder;
+import mod.sketchlibx.sync.SourceMapRegistry;
 
 public class Fx {
 
@@ -34,16 +35,16 @@ public class Fx {
     public String[] arithmetic = {"+", "-", "*", "/", "%", ">", "=", "<", "&&", "||"};
     public String moreBlock = "";
     public String activityName;
+    public String eventName;
     public jq buildConfig;
     public ArrayList<BlockBean> eventBlocks;
     public Map<String, BlockBean> blockMap;
     private final boolean isActivity;
 
-    public Fx(String activityName, jq buildConfig, ArrayList<BlockBean> eventBlocks, boolean isViewBindingEnabled) {
+    public Fx(String activityName, String eventName, jq buildConfig, ArrayList<BlockBean> eventBlocks, boolean isViewBindingEnabled) {
         this.activityName = activityName;
-
+        this.eventName = eventName;
         isActivity = !(activityName.endsWith("DialogFragmentActivity") || activityName.endsWith("BottomDialogFragmentActivity") || activityName.endsWith("FragmentActivity"));
-
         this.buildConfig = buildConfig;
         this.eventBlocks = eventBlocks;
         this.isViewBindingEnabled = isViewBindingEnabled;
@@ -57,23 +58,23 @@ public class Fx {
             for (BlockBean bean : eventBlocks) {
                 blockMap.put(bean.id, bean);
             }
-
+            SourceMapRegistry.startEvent(buildConfig.sc_id, activityName, eventName);
             return generateBlock(eventBlocks.get(0), "");
         } else {
             return "";
         }
     }
-
+    
     public final String generateBlock(BlockBean bean, String var2) {
         ArrayList<String> params = getBlockParams(bean);
-
         String opcode = getBlockCode(bean, params);
-
         String code = opcode;
 
         if (b(bean.opCode, var2)) {
             code = "(" + opcode + ")";
         }
+        
+        SourceMapRegistry.recordBlock(buildConfig.sc_id, activityName, eventName, bean.id, opcode);
 
         if (bean.nextBlock >= 0) {
             code += (code.isEmpty() ? "" : "\r\n") + a(String.valueOf(bean.nextBlock), moreBlock);
@@ -1486,7 +1487,9 @@ public class Fx {
         } else {
             formattedCode = blockInfo.getCode();
         }
-
+        
+        mod.sketchlibx.sync.SourceMapRegistry.recordBlock(buildConfig.sc_id, activityName, eventName, blockBean.id, formattedCode);
+        
         return formattedCode;
     }
 

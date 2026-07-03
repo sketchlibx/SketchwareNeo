@@ -768,17 +768,30 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 FileUtil.writeFile(filePath, getGson().toJson(arrayList));
             }
         } else {
-            FileUtil.writeFile(getIntent().getStringExtra("content"), beforeContent);
+            String filePath = getIntent().getStringExtra("content");
+            if (filePath != null && filePath.endsWith(".java")) {
+                try {
+                    mod.sketchlibx.sync.BlockSyncEngine.syncJavaToBlocks(scId, activityName, beforeContent);
+                } catch (Exception e) {
+                    SketchwareUtil.toastError("Sync failed: " + e.getMessage());
+                }
+            }
+            FileUtil.writeFile(filePath, beforeContent);
         }
         SketchwareUtil.toast("Saved successfully!");
         invalidateOptionsMenu();
     }
-
-    @Override
+    
+        @Override
     public void onStart() {
         super.onStart();
         IntentFilter filter = new IntentFilter(ProjectBuilder.ACTION_BUILD_DIAGNOSTICS);
-        registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED); 
+        // Android 13+ support with correct parameters
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED); 
+        } else {
+            registerReceiver(buildDiagnosticsReceiver, filter); 
+        }
     }
 
     @Override

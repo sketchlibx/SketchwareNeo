@@ -84,6 +84,11 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             "#pragma once\n\n" +
             "// TODO: declare %s\n";
 
+    private static final String MK_TEMPLATE =
+            "# %s.mk\n\n";
+
+    private static final String TXT_TEMPLATE = "";
+
     // ── Fields ────────────────────────────────────────────────────────────────
     private ManageFileBinding binding;
     private String current_path;
@@ -158,7 +163,7 @@ public class ManageCppActivity extends BaseAppCompatActivity {
 
     // ── Setup ─────────────────────────────────────────────────────────────────
     private void setupUI() {
-        binding.topAppBar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
         binding.topAppBar.setTitle("C/C++ Manager");
         setSupportActionBar(binding.topAppBar);
 
@@ -300,6 +305,12 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 } else if (chipId == R.id.chip_hpp_header) {
                     content  = String.format(HPP_TEMPLATE, name, name);
                     finalName = name + ".hpp";
+                } else if (chipId == R.id.chip_txt_file) {
+                    content = TXT_TEMPLATE;
+                    finalName = name + ".txt";
+                } else if (chipId == R.id.chip_mk_file) {
+                    content = String.format(MK_TEMPLATE, name);
+                    finalName = name + ".mk";
                 } else if (chipId == R.id.chip_jni_bridge) {
                     // Derive class name from the extra input field
                     String javaClassName = Helper.getText(dialogBinding.javaClassInput).trim();
@@ -356,7 +367,8 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         FilePickerOptions options = new FilePickerOptions();
         options.setSelectionMode(SelectionMode.BOTH);
         options.setMultipleSelection(true);
-        options.setExtensions(new String[]{"c", "cpp", "h", "hpp"});
+        // ADDED SUPPORT FOR TXT AND MK IMPORTING HERE
+        options.setExtensions(new String[]{"c", "cpp", "h", "hpp", "txt", "mk"});
         options.setTitle("Select C/C++ file(s)");
 
         filePickerDialog = new FilePickerDialogFragment(options, new FilePickerCallback() {
@@ -724,7 +736,8 @@ public class ManageCppActivity extends BaseAppCompatActivity {
      */
     private static int getIconForCppFile(String fileName) {
         String lower = fileName.toLowerCase();
-        if (lower.endsWith(".h") || lower.endsWith(".hpp")) {
+        // ADDED SUPPORT FOR TXT AND MK FILE ICONS
+        if (lower.endsWith(".h") || lower.endsWith(".hpp") || lower.endsWith(".txt") || lower.endsWith(".mk")) {
             return R.drawable.ic_mtrl_file;
         }
         return R.drawable.ic_mtrl_code;

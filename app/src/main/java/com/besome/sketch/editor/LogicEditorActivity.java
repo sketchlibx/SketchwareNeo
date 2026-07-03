@@ -122,6 +122,7 @@ import mod.jbk.editor.manage.MoreblockImporter;
 import mod.jbk.util.BlockUtil;
 import mod.jbk.util.LogUtil;
 import mod.pranav.viewbinding.ViewBindingBuilder;
+import mod.sketchlibx.project.editor.BlocksConverter;
 import pro.sketchware.R;
 import pro.sketchware.activities.editor.view.CodeViewerActivity;
 import pro.sketchware.activities.resourceseditor.ResourcesEditorActivity;
@@ -1324,6 +1325,12 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 v.dismiss();
             }
         });
+        
+        dialog.setNeutralButton("Export", (v, which) -> {
+        exportBlockPatternForAI();
+        v.dismiss();
+        });
+
         dialog.setNegativeButton(R.string.common_word_cancel, null);
         dialog.show();
     }
@@ -1985,7 +1992,17 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         } else if (itemId == R.id.menu_logic_undo) {
             undo();
         } else if (itemId == R.id.menu_logic_showsource) {
-            showSourceCode();
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Source Code")
+                    .setItems(new CharSequence[]{
+                            "View Source Code",
+                            "Code to Blocks"
+                    }, (dialog, which) -> {
+                        if (which == 0) showSourceCode();
+                        else            showCodeToBlocksDialog();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
         }
 
         return super.onOptionsItemSelected(menuItem);
@@ -2461,13 +2478,135 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     public void showSourceCode() {
         yq yq = new yq(this, scId);
         yq.a(jC.c(scId), jC.b(scId), jC.a(scId));
-        String code = new Fx(M.getActivityName(), yq.N, o.getBlocks(), isViewBindingEnabled).a();
+        String code = new Fx(M.getActivityName(), "preview", yq.N, o.getBlocks(), isViewBindingEnabled).a();
         var intent = new Intent(this, CodeViewerActivity.class);
         intent.putExtra("code", code);
         intent.putExtra("sc_id", scId);
         intent.putExtra("scheme", CodeViewerActivity.SCHEME_JAVA);
         startActivity(intent);
     }
+
+        private void showCodeToBlocksDialog() {
+        TextInputLayout inputLayout = new TextInputLayout(this, null, com.google.android.material.R.style.Widget_Material3_TextInputLayout_OutlinedBox);
+        inputLayout.setHint("Drop your Java code here...");
+        inputLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
+        
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        int margin = (int) (20 * getResources().getDisplayMetrics().density);
+        params.setMargins(margin, margin / 2, margin, margin);
+        inputLayout.setLayoutParams(params);
+
+        TextInputEditText editText = new TextInputEditText(inputLayout.getContext());
+        editText.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        editText.setMinLines(10);
+        editText.setMaxLines(20);
+        editText.setVerticalScrollBarEnabled(true);
+        editText.setScrollBarStyle(android.view.View.SCROLLBARS_INSIDE_INSET);
+        editText.setTypeface(android.graphics.Typeface.MONOSPACE);
+        inputLayout.addView(editText);
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(inputLayout);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Convert Code to Blocks")
+                .setMessage("Paste your Java code below. We'll automatically convert loops (if/for/while), variables, and Toasts into native blocks. Anything we don't recognize will be safely kept in an \"Add Source Directly\" block.")
+                .setView(scroll)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Convert", (dialog, which) -> {
+                    String code = editText.getText() == null ? "" : editText.getText().toString().trim();
+                    
+                    if (code.isEmpty()) {
+                        pro.sketchware.utility.SketchwareUtil.toastError("Oops! You forgot to paste the code.");
+                        return;
+                    }
+                    
+                    BlocksConverter.ConversionResult result = BlocksConverter.convert(code);
+                    
+                    if (result.error != null) {
+                        pro.sketchware.utility.SketchwareUtil.toastError("Couldn't convert the code: " + result.error);
+                        return;
+                    }
+                    
+                    int total    = result.blocks.size();
+                    int rec      = result.recognizedCount;
+                    int fallback = result.fallbackCount;
+                    
+                    String blockWord = total == 1 ? "block" : "blocks";
+                    String msg = "Here's what we found:\n\n"
+                            + "✅  " + rec + " native " + (rec == 1 ? "block" : "blocks") + "\n"
+                            + "⚠️  " + fallback + " \"Add Source Directly\" " + (fallback == 1 ? "block" : "blocks") + "\n\n"
+                            + "Ready to add " + total + " " + blockWord + " to your project?";
+
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Ready to Insert?")
+                            .setMessage(msg)
+                            .setNegativeButton("Wait, go back", null)
+                            .setPositiveButton("Yes, insert them", (d2, w2) -> insertConvertedBlocks(result.blocks))
+                            .show();
+                })
+                .show();
+    }
+
+    private void insertConvertedBlocks(java.util.ArrayList<com.besome.sketch.beans.BlockBean> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            pro.sketchware.utility.SketchwareUtil.toastError("No blocks to insert.");
+            return;
+        }
+        // Place blocks at the LEFT side of the block pane so they don't
+        // drift far right when many blocks are generated.
+        int[] oLoc = new int[2];
+        o.getLocationOnScreen(oLoc);
+        int insertX = oLoc[0] + pro.sketchware.utility.SketchwareUtil.dpToPx(16);
+        int insertY = oLoc[1] + pro.sketchware.utility.SketchwareUtil.dpToPx(80);
+
+        java.util.ArrayList<com.besome.sketch.beans.BlockBean> inserted =
+                a(blocks, insertX, insertY, true);
+
+        // Record in undo history
+        bC.d(scId).a(s(), inserted,
+                insertX - oLoc[0], insertY - oLoc[1], null, null);
+
+        C();
+
+        pro.sketchware.utility.SketchwareUtil.toast(
+                inserted.size() + " block" + (inserted.size() != 1 ? "s" : "") + " inserted.");
+    }
+    
+    private void exportBlockPatternForAI() {
+    try {
+        // 1. Get current visual blocks
+        java.util.ArrayList<com.besome.sketch.beans.BlockBean> currentBlocks = o.getBlocks();
+        if (currentBlocks == null || currentBlocks.isEmpty()) {
+            pro.sketchware.utility.SketchwareUtil.toast("No blocks to export!");
+            return;
+        }
+
+        // 2. Generate Java Code for these blocks
+        yq logicHolder = new yq(this, scId);
+        logicHolder.a(a.a.a.jC.c(scId), a.a.a.jC.b(scId), a.a.a.jC.a(scId));
+        String generatedJava = new a.a.a.Fx(M.getActivityName(), "preview", logicHolder.N, currentBlocks, isViewBindingEnabled).a();
+
+        // 3. Convert BlockBeans to JSON so AI can see the exact parameters, subStacks, and opCodes
+        String blockJson = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(currentBlocks);
+
+        // 4. Format the final output
+        String finalOutput = "=== GENERATED JAVA ===\n" 
+                + generatedJava.trim() 
+                + "\n\n=== RAW BLOCK BEANS (JSON PATTERN) ===\n" 
+                + blockJson;
+
+        // 5. Copy to Clipboard
+        mod.hey.studios.util.Helper.copyToClipboard(finalOutput);
+        pro.sketchware.utility.SketchwareUtil.toast("Pattern copied to clipboard! Paste it to AI.");
+
+    } catch (Exception e) {
+        pro.sketchware.utility.SketchwareUtil.toastError("Export failed: " + e.getMessage());
+    }
+}
 
     public void t() {
         fa = ObjectAnimator.ofFloat(O, View.TRANSLATION_X, 0.0f);

@@ -28,10 +28,27 @@ import pro.sketchware.R;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 
+/**
+ * History tab adapter.
+ *
+ * Tapping a commit now opens a "Commit Details" dialog (full message, author,
+ * date, hash) which itself offers "Copy Hash" and "Revert" actions — feature
+ * request #12. Long-press still quick-copies the hash for muscle-memory
+ * compatibility with the previous behaviour.
+ */
 public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.ViewHolder> {
+
+    public interface HistoryActionCallback {
+        void onShowDetails(RevCommit commit);
+    }
 
     private final List<RevCommit> items = new ArrayList<>();
     private final SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
+    private final HistoryActionCallback callback;
+
+    public HistoryAdapter(HistoryActionCallback callback) {
+        this.callback = callback;
+    }
 
     public void updateData(List<RevCommit> newItems) {
         DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
@@ -47,7 +64,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.ViewHold
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         Context ctx = parent.getContext();
-        
+
         LinearLayout root = new LinearLayout(ctx);
         root.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.setOrientation(LinearLayout.HORIZONTAL);
@@ -56,24 +73,24 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.ViewHold
         LinearLayout timelineCol = new LinearLayout(ctx);
         timelineCol.setOrientation(LinearLayout.VERTICAL);
         timelineCol.setGravity(Gravity.CENTER_HORIZONTAL);
-        
+
         View topLine = new View(ctx);
         topLine.setId(View.generateViewId());
         topLine.setBackgroundColor(ThemeUtils.getColor(ctx, R.attr.colorOutlineVariant));
         timelineCol.addView(topLine, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(2), SketchwareUtil.dpToPx(24)));
-        
+
         MaterialCardView dot = new MaterialCardView(ctx);
         dot.setRadius(SketchwareUtil.dpToPx(6));
         dot.setCardBackgroundColor(ThemeUtils.getColor(ctx, R.attr.colorPrimary));
         dot.setStrokeWidth(0);
         dot.setCardElevation(0f);
         timelineCol.addView(dot, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(12), SketchwareUtil.dpToPx(12)));
-        
+
         View bottomLine = new View(ctx);
         bottomLine.setId(View.generateViewId());
         bottomLine.setBackgroundColor(ThemeUtils.getColor(ctx, R.attr.colorOutlineVariant));
         timelineCol.addView(bottomLine, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(2), ViewGroup.LayoutParams.MATCH_PARENT));
-        
+
         root.addView(timelineCol, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(24), ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout content = new LinearLayout(ctx);
@@ -104,17 +121,19 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.ViewHold
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         RevCommit commit = items.get(position);
-        
+
         holder.tvMessage.setText(commit.getShortMessage());
-        
+
         String hash = commit.getName().substring(0, 7);
         String author = commit.getAuthorIdent().getName();
         String date = sdf.format(new Date(commit.getCommitTime() * 1000L));
-        
+
         holder.tvDetails.setText(String.format("%s • %s • %s", hash, author, date));
-        
+
         holder.topLine.setVisibility(position == 0 ? View.INVISIBLE : View.VISIBLE);
         holder.bottomLine.setVisibility(position == items.size() - 1 ? View.INVISIBLE : View.VISIBLE);
+
+        holder.card.setOnClickListener(v -> callback.onShowDetails(commit));
 
         holder.card.setOnLongClickListener(v -> {
             Context ctx = v.getContext();

@@ -265,6 +265,9 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             Fragment current = getFragmentForNavId(currentNavItemId);
             if (current instanceof ProjectsFragment) {
                 navigateToProjectsFragment();
+                if (projectsFragment != null) {
+                    projectsFragment.refreshProjectsList();
+                }
             } else if (current instanceof ProjectsStoreFragment) {
                 navigateToSketchubFragment();
             }

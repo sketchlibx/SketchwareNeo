@@ -54,7 +54,6 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         updateData(allProjects);
     }
 
-    // NEW: Safely update data and maintain search filter state
     public void updateData(List<HashMap<String, Object>> newProjects) {
         this.allProjects = new ArrayList<>(newProjects);
         filterData(currentQuery);

@@ -168,7 +168,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        binding.topAppBar.setTitle("Mod Settings");
+        binding.topAppBar.setTitle("App Settings");
         binding.topAppBar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
 
         setupPreferences(binding.content);

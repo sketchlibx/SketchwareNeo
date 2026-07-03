@@ -123,7 +123,6 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
         }
 
         if (isTreeViewEnabled) {
-            finish();
             super.onBackPressed();
         } else {
             if (Objects.equals(Uri.parse(current_path).getPath(), Uri.parse(fpu.getPathJava(sc_id)).getPath())) {
@@ -136,7 +135,7 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
     }
 
     private void setupUI() {
-        binding.topAppBar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
         binding.topAppBar.setTitle("Java/Kotlin Manager");
         setSupportActionBar(binding.topAppBar);
 

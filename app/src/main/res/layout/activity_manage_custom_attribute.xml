@@ -20,7 +20,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
                 app:layout_collapseMode="pin"
-                app:menu="@menu/manage_custom_attribute_menu"
                 app:navigationIcon="?attr/homeAsUpIndicator"
                 app:title="Manage Custom Attribute" />
         </com.google.android.material.appbar.CollapsingToolbarLayout>

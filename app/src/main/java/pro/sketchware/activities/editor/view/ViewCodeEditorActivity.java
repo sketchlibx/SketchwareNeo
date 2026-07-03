@@ -345,6 +345,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 setupTabs();
                 drawerLayout.closeDrawer(GravityCompat.START);
                 invalidateOptionsMenu();
+                updateMenuState();
             });
         }
         @Override
@@ -374,8 +375,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
     }
 
+    private final java.util.concurrent.atomic.AtomicInteger diagGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
+
     private void triggerRealtimeDiagnostics() {
         if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
+        final int myGen = diagGeneration.incrementAndGet();
         diagRunnable = () -> {
             String text = editor.getText().toString();
             if (filename != null && filename.endsWith(".xml")) {
@@ -386,25 +390,29 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                         DocumentBuilder builder = factory.newDocumentBuilder();
                         builder.setErrorHandler(new org.xml.sax.ErrorHandler() {
                             @Override public void warning(org.xml.sax.SAXParseException e) {
-                                diags.add(new Diagnostic(Diagnostic.Severity.WARNING, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                                diags.add(new Diagnostic(Diagnostic.Severity.WARNING, filename, e.getLineNumber(), e.getColumnNumber(), humanizeXmlError(e)));
                             }
                             @Override public void error(org.xml.sax.SAXParseException e) {
-                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), humanizeXmlError(e)));
                             }
                             @Override public void fatalError(org.xml.sax.SAXParseException e) {
-                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), e.getMessage()));
+                                diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, e.getLineNumber(), e.getColumnNumber(), humanizeXmlError(e)));
                             }
                         });
                         builder.parse(new org.xml.sax.InputSource(new StringReader(text)));
                     } catch (Exception e) {
                         if (e instanceof org.xml.sax.SAXParseException) {
                             org.xml.sax.SAXParseException sax = (org.xml.sax.SAXParseException) e;
-                            diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, sax.getLineNumber(), sax.getColumnNumber(), sax.getMessage()));
+                            diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, sax.getLineNumber(), sax.getColumnNumber(), humanizeXmlError(sax)));
                         } else if (diags.isEmpty()) {
                             diags.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, 1, 0, e.getMessage()));
                         }
                     }
                     runOnUiThread(() -> {
+                        // Ignore results from a stale/older diagnostics pass so a slow thread
+                        // can never overwrite the UI with outdated errors (this was the cause
+                        // of the dialog only "sometimes" appearing / showing wrong info).
+                        if (myGen != diagGeneration.get()) return;
                         if (diagnosticsBehavior != null && !diags.isEmpty()) {
                             showDiagnostics(diags);
                         } else if (diagnosticsBehavior != null && diags.isEmpty()) {
@@ -415,6 +423,52 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             }
         };
         diagHandler.postDelayed(diagRunnable, 800);
+    }
+
+    /**
+     * Converts raw JAXP/SAX parser messages (e.g. "cvc-complex-type.2.4.a...") into a
+     * plain, actionable sentence: what's wrong and on which line, in place of jargon.
+     */
+    private String humanizeXmlError(org.xml.sax.SAXParseException e) {
+        String raw = e.getMessage() == null ? "" : e.getMessage();
+        int line = e.getLineNumber();
+        String lower = raw.toLowerCase();
+
+        if (lower.contains("must be terminated by the matching end-tag")) {
+            String tag = extractQuoted(raw, 0);
+            return "Line " + line + ": <" + tag + "> tag is not closed. Add a matching </" + tag + "> tag.";
+        }
+        if (lower.contains("element type") && lower.contains("must be followed by either attribute specifications")) {
+            return "Line " + line + ": Tag is not written correctly — check for a missing space, '>' or '/>' after the tag name.";
+        }
+        if (lower.contains("the markup in the document following the root element must be well-formed")) {
+            return "Line " + line + ": Extra content found after the closing tag of the root element. Remove anything after the last closing tag.";
+        }
+        if (lower.contains("attribute") && lower.contains("was already specified")) {
+            String attr = extractQuoted(raw, 0);
+            return "Line " + line + ": Attribute \"" + attr + "\" is duplicated on this tag. Remove the repeated one.";
+        }
+        if (lower.contains("not allowed to start with the '?' character") || lower.contains("content is not allowed in prolog")) {
+            return "Line " + line + ": Unexpected text before the XML declaration. Make sure nothing is written before <?xml ...?>.";
+        }
+        if (lower.contains("referenced entity") || lower.contains("entityref")) {
+            return "Line " + line + ": Invalid character like \"&\" used directly. Use \"&amp;\" instead.";
+        }
+        if (lower.contains("must be well-formed")) {
+            return "Line " + line + ": XML structure is broken here — a tag is likely missing, extra, or not closed properly.";
+        }
+        // Fallback: still show original message but prefixed clearly with the line number.
+        return "Line " + line + ": " + raw;
+    }
+
+    private String extractQuoted(String text, int occurrence) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([^\"]+)\"").matcher(text);
+        int count = 0;
+        while (m.find()) {
+            if (count == occurrence) return m.group(1);
+            count++;
+        }
+        return "tag";
     }
 
     private void setupEditor() {
@@ -434,13 +488,13 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         editor.getText().addContentListener(new ContentListener() {
             @Override public void beforeReplace(Content content) { }
             @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) { 
-                runOnUiThread(() -> invalidateOptionsMenu());
+                runOnUiThread(() -> updateMenuState());
                 triggerRealtimeDiagnostics();
             }
 
             @Override
             public void afterInsert(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
-                runOnUiThread(() -> invalidateOptionsMenu());
+                runOnUiThread(() -> updateMenuState());
                 triggerRealtimeDiagnostics();
                 if (insertedContent != null && insertedContent.toString().equals(">")) {
                     try {
@@ -676,22 +730,37 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         return true;
     }
 
+    private Menu optionsMenu;
+
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        MenuItem undoItem = menu.findItem(0);
+        optionsMenu = menu;
+        updateMenuState();
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    /**
+     * Directly pushes undo/redo/save enabled-state onto the toolbar's live MenuItems.
+     * Bug fix: invalidateOptionsMenu() alone does not reliably repaint SHOW_AS_ACTION_ALWAYS
+     * icons until the overflow (3-dot) menu is opened, so this is called explicitly at every
+     * point the state can change (text edits, file switch, save, undo/redo) instead of relying
+     * only on the framework's async menu invalidation.
+     */
+    private void updateMenuState() {
+        if (optionsMenu == null) return;
+        MenuItem undoItem = optionsMenu.findItem(0);
         if (undoItem != null) {
             try { undoItem.setEnabled(editor.canUndo()); } catch (Exception ignored) {}
         }
-        MenuItem redoItem = menu.findItem(1);
+        MenuItem redoItem = optionsMenu.findItem(1);
         if (redoItem != null) {
             try { redoItem.setEnabled(editor.canRedo()); } catch (Exception ignored) {}
         }
-        MenuItem saveItem = menu.findItem(2);
+        MenuItem saveItem = optionsMenu.findItem(2);
         if (saveItem != null) {
             boolean isModified = !beforeContent.equals(editor.getText().toString());
             saveItem.setEnabled(isModified);
         }
-        return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
@@ -713,6 +782,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                         SketchwareUtil.toast("Saved File");
                     }
                     invalidateOptionsMenu();
+                    updateMenuState();
                 } else { SketchwareUtil.toast("No changes to save"); }
                 return true;
             }
@@ -879,9 +949,18 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             return true;
 
         } catch (Exception e) {
-            SketchwareUtil.toastError("XML Syntax Error: " + e.getMessage());
+            String friendlyMsg;
+            int line = 1;
+            if (e instanceof org.xml.sax.SAXParseException) {
+                org.xml.sax.SAXParseException sax = (org.xml.sax.SAXParseException) e;
+                line = sax.getLineNumber();
+                friendlyMsg = humanizeXmlError(sax);
+            } else {
+                friendlyMsg = e.getMessage();
+            }
+            SketchwareUtil.toastError("XML Syntax Error: " + friendlyMsg);
             List<Diagnostic> errors = new ArrayList<>();
-            errors.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, 1, 0, e.getMessage()));
+            errors.add(new Diagnostic(Diagnostic.Severity.ERROR, filename, line, 0, friendlyMsg));
             showDiagnostics(errors);
             return false;
         }

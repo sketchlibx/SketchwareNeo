@@ -82,6 +82,18 @@
             android:text=".hpp (C++ Header)" />
 
         <com.google.android.material.chip.Chip
+            android:id="@+id/chip_txt_file"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".txt (Text File)" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chip_mk_file"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".mk (Make File)" />
+
+        <com.google.android.material.chip.Chip
             android:id="@+id/chip_jni_bridge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

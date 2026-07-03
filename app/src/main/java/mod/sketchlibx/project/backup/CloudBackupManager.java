@@ -381,10 +381,18 @@ public class CloudBackupManager {
      *   <li><b>UNKNOWN</b>       — anything else.</li>
      * </ul>
      */
+    private String extractProjectNumber(String rawMessage) {
+        if (rawMessage == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("project(?:s/|\\s+number\\s+|\\s+)?(\\d{6,})").matcher(rawMessage.toLowerCase());
+        if (m.find()) return m.group(1);
+        return null;
+    }
+
     private String diagnoseDriveError(Exception e) {
         if (e == null) return "UNKNOWN";
 
         String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        String raw = e.getMessage() != null ? e.getMessage() : "";
 
         if (e instanceof com.google.api.client.googleapis.json.GoogleJsonResponseException) {
             com.google.api.client.googleapis.json.GoogleJsonResponseException gje =
@@ -398,6 +406,16 @@ public class CloudBackupManager {
                 case 403 -> {
                     if (msg.contains("quota") || msg.contains("storageQuota")) {
                         yield "QUOTA_EXCEEDED (HTTP 403)";
+                    }
+                    if (msg.contains("accessnotconfigured") || msg.contains("has not been used in project")
+                            || msg.contains("it is disabled") || msg.contains("service_disabled")) {
+                        String projectNum = extractProjectNumber(raw);
+                        yield "DRIVE_API_DISABLED_FOR_PROJECT (HTTP 403 — Google Drive API is not enabled for "
+                                + "project " + (projectNum != null ? projectNum : "the one your app actually uses")
+                                + ". This is usually a DIFFERENT project number than the one in your "
+                                + "google-services.json. Open console.cloud.google.com, switch to project "
+                                + (projectNum != null ? projectNum : "shown in the error") + " specifically, "
+                                + "and enable the Google Drive API there.)";
                     }
                     yield "PERMISSION_DENIED (HTTP 403 — check DRIVE_APPDATA scope)";
                 }

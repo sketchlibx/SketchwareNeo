@@ -112,8 +112,9 @@ public class AndroidManifestInjectionDetails extends BaseAppCompatActivity {
             case "permission" -> "Application Permissions";
             default -> activityName;
         };
+        setSupportActionBar(binding.toolbar);
         binding.toolbar.setTitle(str);
-        binding.toolbar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        binding.toolbar.setNavigationOnClickListener(v -> onBackPressed());
     }
     
     @Override
