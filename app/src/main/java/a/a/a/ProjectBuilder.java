@@ -226,9 +226,6 @@ public class ProjectBuilder {
         return (isD8Enabled() ? "D8" : "Dx") + " is running...";
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // NATIVE C/C++ COMPILATION ENGINE
-    // ──────────────────────────────────────────────────────────────────────────
     public void compileNativeCode() throws zy {
         String cppSourcePath = fpu.getPathCpp(yq.sc_id);
         if (!CppExporter.hasCppFiles(cppSourcePath)) {
@@ -256,7 +253,6 @@ public class ProjectBuilder {
             throw new zy(errorMsg);
         }
     }
-    // ──────────────────────────────────────────────────────────────────────────
 
     public void createDexFilesFromClasses() throws Exception {
         FileUtil.makeDir(yq.binDirectoryPath + File.separator + "dex");
@@ -830,6 +826,9 @@ public class ProjectBuilder {
         config.add(ProguardHandler.ANDROID_PROGUARD_RULES_PATH);
         config.add(yq.proguardAaptRules);
         config.add(proguard.getCustomProguardRules());
+        if (proguard.isKeepLineNumbersEnabled()) {
+            config.add(ProguardHandler.LINE_NUMBER_RULES_PATH);
+        }
         var rules = new ArrayList<>(Arrays.asList(getRJavaRules().split("\n")));
         for (Jp library : builtInLibraryManager.getLibraries()) {
             File f = BuiltInLibraries.getLibraryProguardConfiguration(library.getName());
@@ -948,6 +947,11 @@ public class ProjectBuilder {
 
         args.add("-include");
         args.add(proguard.getCustomProguardRules());
+
+        if (proguard.isKeepLineNumbersEnabled()) {
+            args.add("-include");
+            args.add(ProguardHandler.LINE_NUMBER_RULES_PATH);
+        }
 
         proguardAddLibConfigs(args);
         proguardAddRjavaRules(args);

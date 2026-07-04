@@ -57,16 +57,19 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
         binding.swPgEnabled.setChecked(pg.isShrinkingEnabled());
         binding.swPgDebug.setChecked(pg.isDebugFilesEnabled());
         binding.r8Enabled.setChecked(pg.isR8Enabled());
+        binding.swKeepLineNumbers.setChecked(pg.isKeepLineNumbersEnabled());
 
         binding.swPgEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> pg.setProguardEnabled(isChecked));
         binding.swPgDebug.setOnCheckedChangeListener((buttonView, isChecked) -> pg.setDebugEnabled(isChecked));
         binding.r8Enabled.setOnCheckedChangeListener((buttonView, isChecked) -> pg.setR8Enabled(isChecked));
+        binding.swKeepLineNumbers.setOnCheckedChangeListener((buttonView, isChecked) -> pg.setKeepLineNumbersEnabled(isChecked));
     }
 
     private void initializeClickListeners() {
         binding.rowPgEnabled.setOnClickListener(v -> binding.swPgEnabled.performClick());
         binding.rowPgDebug.setOnClickListener(v -> binding.swPgDebug.performClick());
         binding.rowR8Enabled.setOnClickListener(v -> binding.r8Enabled.performClick());
+        binding.rowKeepLineNumbers.setOnClickListener(v -> binding.swKeepLineNumbers.performClick());
 
         binding.lnPgRules.setOnClickListener(v -> {
             Intent intent = new Intent(this, SrcCodeEditor.class);
@@ -76,6 +79,31 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
         });
 
         binding.lnPgFm.setOnClickListener(v -> showFullModeDialog());
+
+        binding.lnKeepRuleTemplate.setOnClickListener(v -> showKeepRuleTemplateDialog());
+
+        binding.lnAnalyzeLibraries.setOnClickListener(v -> {
+            Intent intent = new Intent(this, AnalyzeLibrariesActivity.class);
+            intent.putExtra("sc_id", sc_id);
+            startActivity(intent);
+        });
+    }
+
+    private void showKeepRuleTemplateDialog() {
+        String[] names = ProguardHandler.KEEP_RULE_TEMPLATES.keySet().toArray(new String[0]);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Add Keep-Rule Template")
+                .setItems(names, (dialog, which) -> {
+                    pg.appendKeepRuleTemplate(names[which]);
+
+                    Intent intent = new Intent(this, SrcCodeEditor.class);
+                    intent.putExtra("title", "proguard-rules.pro");
+                    intent.putExtra("content", pg.getCustomProguardRules());
+                    startActivity(intent);
+                })
+                .setNegativeButton(R.string.common_word_cancel, null)
+                .show();
     }
 
     private void showFullModeDialog() {

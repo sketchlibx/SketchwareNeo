@@ -18,7 +18,7 @@ public class ProjectSettingsDialog {
     private final Activity activity;
     private final ProjectSettings settings;
     public static final String SETTING_ENABLE_VERSION_HISTORY = "enable_version_history";
-    public static final String SETTING_COMPILE_SDK_VERSION = "compile_sdk_version"; // New Constant
+    public static final String SETTING_COMPILE_SDK_VERSION = "compile_sdk_version";
 
     public ProjectSettingsDialog(Activity activity, String sc_id) {
         this.activity = activity;

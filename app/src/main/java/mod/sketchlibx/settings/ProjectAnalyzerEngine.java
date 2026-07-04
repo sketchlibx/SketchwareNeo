@@ -20,7 +20,7 @@ import pro.sketchware.utility.FileUtil;
 public class ProjectAnalyzerEngine {
 
     public static class UnusedResource {
-        public int type; // 1=Image, 2=Sound, 3=Font, 4=CustomLayout
+        public int type;
         public String name;
         public String detail;
         public Object reference;
@@ -48,13 +48,11 @@ public class ProjectAnalyzerEngine {
         yq javaCodeGenerator = new yq(pro.sketchware.SketchApplication.getContext(), sc_id);
         StringBuilder deepScanTextBuilder = new StringBuilder();
 
-        // 1. Blocks and ViewBeans (Direct Sketchware Links)
         for (ProjectFileBean file : allFiles) {
             String targetFileName = file.getXmlName().isEmpty() ? file.getJavaName() : file.getXmlName();
             ArrayList<ViewBean> views = jC.a(sc_id).d(targetFileName);
             HashMap<String, ArrayList<BlockBean>> events = jC.a(sc_id).b(file.getJavaName());
 
-            // Read Generated Java Code
             if (!file.getJavaName().isEmpty()) {
                  deepScanTextBuilder.append(javaCodeGenerator.getFileSrc(file.getJavaName(), jC.b(sc_id), jC.a(sc_id), jC.c(sc_id))).append("\n");
             }
@@ -88,77 +86,71 @@ public class ProjectAnalyzerEngine {
             }
         }
 
-        // 2. (Custom Java, Manifest, Resources, XMLs)
         String basePath = FileUtil.getExternalStorageDir() + "/.sketchware/";
         File dataDir = new File(basePath + "data/" + sc_id);
-        File resDir = new File(basePath + "resources/" + sc_id);
-        
+
         appendDeepScanFiles(dataDir, deepScanTextBuilder);
-        appendDeepScanFiles(resDir, deepScanTextBuilder);
-        
+
         String fullDeepText = deepScanTextBuilder.toString();
 
-        // 3. Identify Unused Images
         ArrayList<ProjectResourceBean> images = jC.d(sc_id).b;
         if (images != null) {
             for (ProjectResourceBean img : images) {
                 if (img.resName.equals("app_icon") || img.resName.equals("NONE")) continue;
-                
-                if (!usedResources.contains(img.resName) && 
-                    !fullDeepText.contains("@drawable/" + img.resName) && 
-                    !fullDeepText.contains("@mipmap/" + img.resName) && 
-                    !fullDeepText.contains("R.drawable." + img.resName) && 
-                    !fullDeepText.contains("R.mipmap." + img.resName)) {
-                    
+
+                if (!usedResources.contains(img.resName) &&
+                        !isReferenced(fullDeepText, img.resName, "@drawable/", "@mipmap/", "R.drawable.", "R.mipmap.")) {
+
                     unusedList.add(new UnusedResource(1, img.resName, "Unused Image Drawable", img));
                 }
             }
         }
 
-        // 4. Identify Unused Sounds
         ArrayList<ProjectResourceBean> sounds = jC.d(sc_id).c;
         if (sounds != null) {
             for (ProjectResourceBean snd : sounds) {
-                if (!usedResources.contains(snd.resName) && 
-                    !fullDeepText.contains("@raw/" + snd.resName) && 
-                    !fullDeepText.contains("R.raw." + snd.resName)) {
-                    
+                if (!usedResources.contains(snd.resName) &&
+                        !isReferenced(fullDeepText, snd.resName, "@raw/", "R.raw.")) {
+
                     unusedList.add(new UnusedResource(2, snd.resName, "Unused Audio File", snd));
                 }
             }
         }
 
-        // 5. Identify Unused Fonts
         ArrayList<ProjectResourceBean> fonts = jC.d(sc_id).d;
         if (fonts != null) {
             for (ProjectResourceBean fnt : fonts) {
-                if (!usedResources.contains(fnt.resName) && 
-                    !fullDeepText.contains("@font/" + fnt.resName) && 
-                    !fullDeepText.contains("R.font." + fnt.resName) &&
-                    !fullDeepText.contains(fnt.resName)) { 
-                    
+                if (!usedResources.contains(fnt.resName) &&
+                        !isReferenced(fullDeepText, fnt.resName, "@font/", "R.font.")) {
+
                     unusedList.add(new UnusedResource(3, fnt.resName, "Unused Font File", fnt));
                 }
             }
         }
 
-        // 6. Identify Unused Custom Views (Layouts)
         ArrayList<ProjectFileBean> customViews = jC.b(sc_id).c();
         if (customViews != null) {
             for (ProjectFileBean cv : customViews) {
                 String rawName = cv.fileName.replace(".xml", "");
-                
-                if (!usedCustomViews.contains(cv.fileName) && 
-                    !usedCustomViews.contains(cv.getXmlName()) &&
-                    !fullDeepText.contains("@layout/" + rawName) && 
-                    !fullDeepText.contains("R.layout." + rawName)) {
-                    
+
+                if (!usedCustomViews.contains(cv.fileName) &&
+                        !usedCustomViews.contains(cv.getXmlName()) &&
+                        !isReferenced(fullDeepText, rawName, "@layout/", "R.layout.")) {
+
                     unusedList.add(new UnusedResource(4, cv.getXmlName(), "Unused Custom Layout", cv));
                 }
             }
         }
 
         return unusedList;
+    }
+
+    private static boolean isReferenced(String fullDeepText, String resName, String... prefixes) {
+        for (String prefix : prefixes) {
+            if (fullDeepText.contains(prefix + resName)) return true;
+        }
+        return java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(resName) + "\\b")
+                .matcher(fullDeepText).find();
     }
     
     private static void appendDeepScanFiles(File dir, StringBuilder builder) {

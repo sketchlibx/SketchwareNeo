@@ -148,7 +148,7 @@ public class GitBranchAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         root.setPadding(dp(ctx, 16), dp(ctx, 12), dp(ctx, 4), dp(ctx, 12));
 
         ImageView icon = new ImageView(ctx);
-        icon.setImageResource(R.drawable.ic_mtrl_share);
+        icon.setImageResource(R.drawable.ic_mtrl_branches);
         root.addView(icon, new LinearLayout.LayoutParams(dp(ctx, 24), dp(ctx, 24)));
 
         TextView title = new TextView(ctx);

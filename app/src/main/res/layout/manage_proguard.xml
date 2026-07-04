@@ -204,6 +204,59 @@
                             android:layout_marginStart="16dp" />
                     </LinearLayout>
 
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="56dp" />
+
+                    <LinearLayout
+                        android:id="@+id/row_keep_line_numbers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mtrl_bug_report"
+                            app:tint="?attr/colorOnSurfaceVariant"
+                            android:layout_marginEnd="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Keep Line Numbers"
+                                android:textAppearance="?attr/textAppearanceTitleMedium"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Preserve source file and line numbers so obfuscated crash reports can be de-obfuscated with the mapping file"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/sw_keep_line_numbers"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp" />
+                    </LinearLayout>
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -390,6 +443,136 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="@string/code_shrinker_full_mode_def"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/selector_ic_chevron_right_24"
+                            app:tint="?attr/colorOutline" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="8dp"
+                android:layout_marginStart="8dp"
+                android:text="Tools"
+                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textColor="?attr/colorPrimary" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/ln_keep_rule_template"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mtrl_code"
+                            app:tint="?attr/colorOnSurfaceVariant"
+                            android:layout_marginEnd="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Add Keep-Rule Template"
+                                android:textAppearance="?attr/textAppearanceTitleMedium"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Insert ready-made rules for common libraries like Gson, Retrofit, Kotlin"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="16dp"
+                            android:src="@drawable/selector_ic_chevron_right_24"
+                            app:tint="?attr/colorOutline" />
+                    </LinearLayout>
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="56dp" />
+
+                    <LinearLayout
+                        android:id="@+id/ln_analyze_libraries"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="14dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mtrl_list"
+                            app:tint="?attr/colorOnSurfaceVariant"
+                            android:layout_marginEnd="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Analyze Libraries &amp; App Size"
+                                android:textAppearance="?attr/textAppearanceTitleMedium"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="See each local library's size and whether it's actually used"
                                 android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>

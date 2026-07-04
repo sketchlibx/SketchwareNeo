@@ -298,7 +298,10 @@
         <activity android:name="pro.sketchware.activities.resourceseditor.ResourcesEditorActivity" />
         
         <activity
-    android:name="mod.sketchlibx.settings.ResourceTrackerActivity" />
+            android:name="mod.sketchlibx.settings.ResourceTrackerActivity" />
+
+        <activity
+            android:name="pro.sketchware.analysis.ui.ProjectInspectorActivity" />
 
         <activity
             android:name="com.besome.sketch.editor.manage.library.material3.Material3LibraryActivity"

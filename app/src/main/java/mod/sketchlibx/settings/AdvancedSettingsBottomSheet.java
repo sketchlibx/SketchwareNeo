@@ -88,6 +88,14 @@ public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
             startActivity(intent);
         });
 
+        root.findViewById(R.id.btn_project_inspector).setOnClickListener(v -> {
+            saveSettings();
+            dismiss();
+            Intent intent = new Intent(activity, pro.sketchware.analysis.ui.ProjectInspectorActivity.class);
+            intent.putExtra(pro.sketchware.analysis.ui.ProjectInspectorActivity.EXTRA_SC_ID, sc_id);
+            startActivity(intent);
+        });
+
         root.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
         root.findViewById(R.id.btn_save).setOnClickListener(v -> {
             saveSettings();

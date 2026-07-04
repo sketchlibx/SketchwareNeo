@@ -5,6 +5,8 @@ import com.google.gson.Gson;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import a.a.a.ProjectBuilder;
 import mod.hey.studios.util.Helper;
@@ -13,6 +15,7 @@ import pro.sketchware.utility.FileUtil;
 
 public class ProguardHandler {
     public static String ANDROID_PROGUARD_RULES_PATH = createAndroidRules();
+    public static String LINE_NUMBER_RULES_PATH = createLineNumberRules();
     public static String DEFAULT_PROGUARD_RULES_PATH = "";
     private final String config_path;
     private final String fm_config_path;
@@ -25,6 +28,19 @@ public class ProguardHandler {
         if (!FileUtil.isExistFile(config_path)) {
             FileUtil.writeFile(config_path, getDefaultConfig());
         }
+    }
+
+    private static String createLineNumberRules() {
+        String rulePath = FileUtil.getExternalStorageDir() + "/.sketchware/libs/line-number-rules.pro";
+
+        if (!FileUtil.isExistFile(rulePath)) {
+            FileUtil.writeFile(rulePath, """
+                    -keepattributes SourceFile,LineNumberTable
+                    -renamesourcefileattribute SourceFile
+                    """);
+        }
+
+        return rulePath;
     }
 
     private static String createAndroidRules() {
@@ -132,6 +148,98 @@ public class ProguardHandler {
 
     public String getCustomProguardRules() {
         return DEFAULT_PROGUARD_RULES_PATH;
+    }
+
+    public boolean isKeepLineNumbersEnabled() {
+        boolean enabled = false;
+        if (FileUtil.isExistFile(config_path)) {
+            try {
+                HashMap<String, String> config = new Gson().fromJson(FileUtil.readFile(config_path), Helper.TYPE_STRING_MAP);
+                String value = config.get("keepLineNumbers");
+                enabled = value != null && value.equals("true");
+            } catch (Exception e) {
+                enabled = false;
+            }
+        }
+        return enabled;
+    }
+
+    public void setKeepLineNumbersEnabled(boolean enabled) {
+        HashMap<String, String> config = new Gson().fromJson(FileUtil.readFile(config_path), Helper.TYPE_STRING_MAP);
+        config.put("keepLineNumbers", String.valueOf(enabled));
+
+        FileUtil.writeFile(config_path, new Gson().toJson(config));
+    }
+
+    public static final Map<String, String> KEEP_RULE_TEMPLATES = createKeepRuleTemplates();
+
+    private static Map<String, String> createKeepRuleTemplates() {
+        Map<String, String> templates = new LinkedHashMap<>();
+
+        templates.put("Gson", """
+                -keepattributes Signature
+                -keepattributes *Annotation*
+                -keep class com.google.gson.** { *; }
+                -keep class * implements com.google.gson.TypeAdapterFactory
+                -keep class * implements com.google.gson.JsonSerializer
+                -keep class * implements com.google.gson.JsonDeserializer
+                -keepclassmembers,allowobfuscation class * {
+                  @com.google.gson.annotations.SerializedName <fields>;
+                }
+                """);
+
+        templates.put("Retrofit", """
+                -keepattributes Signature, InnerClasses, EnclosingMethod
+                -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+                -keepattributes AnnotationDefault
+                -keep class retrofit2.** { *; }
+                -keepclasseswithmembers class * {
+                    @retrofit2.http.* <methods>;
+                }
+                -dontwarn retrofit2.**
+                """);
+
+        templates.put("OkHttp", """
+                -dontwarn okhttp3.**
+                -dontwarn okio.**
+                -keep class okhttp3.** { *; }
+                -keep interface okhttp3.** { *; }
+                """);
+
+        templates.put("Kotlin", """
+                -dontwarn kotlin.**
+                -keep class kotlin.Metadata { *; }
+                -keepclassmembers class **$WhenMappings {
+                    <fields>;
+                }
+                -keepclassmembers class kotlin.Metadata {
+                    public <methods>;
+                }
+                """);
+
+        templates.put("Glide", """
+                -keep public class * implements com.bumptech.glide.module.GlideModule
+                -keep public class * extends com.bumptech.glide.module.AppGlideModule
+                -keep public enum com.bumptech.glide.load.ImageHeaderParser$ImageType {
+                    **[] $VALUES;
+                    public *;
+                }
+                """);
+
+        return templates;
+    }
+
+    public void appendKeepRuleTemplate(String templateName) {
+        String template = KEEP_RULE_TEMPLATES.get(templateName);
+        if (template == null) return;
+
+        String existing = FileUtil.isExistFile(DEFAULT_PROGUARD_RULES_PATH)
+                ? FileUtil.readFile(DEFAULT_PROGUARD_RULES_PATH) : "";
+
+        String updated = existing + (existing.endsWith("\n") || existing.isEmpty() ? "" : "\n")
+                + "\n# " + templateName + "\n" + template;
+
+        FileUtil.writeFile(DEFAULT_PROGUARD_RULES_PATH, updated);
     }
 
     public boolean isDebugFilesEnabled() {

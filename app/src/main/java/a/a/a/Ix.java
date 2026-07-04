@@ -30,7 +30,6 @@ import pro.sketchware.utility.FileUtil;
 import pro.sketchware.xml.XmlBuilder;
 
 public class Ix {
-    // 🚀 FEATURE: Updated default target SDK to API 36 (Android 16) for V7.0.0
     public static final int VAR_DEFAULT_TARGET_SDK_VERSION = 36;
     
     private final BuiltInLibraryManager builtInLibraryManager;

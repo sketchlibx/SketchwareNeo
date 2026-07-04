@@ -66,10 +66,10 @@ public final class BlocksConverter {
 
     // ── Pattern spec param type regex ──────────────────────────────────────────
     private static final Pattern SPEC_PARAM_PAT =
-            Pattern.compile("%s(?:\.inputOnly)?|%b|%d|%m\.\w+");
+            Pattern.compile("%s(?:\\.inputOnly)?|%b|%d|%m\\.\\w+");
     // Detects a Java String.format specifier: %s, %1$s, %2$d, etc.
     private static final Pattern FMT_SPEC_PAT =
-            Pattern.compile("%(([0-9]+)\$)?([sdbf])");
+            Pattern.compile("%(([0-9]+)\\$)?([sdbf])");
 
     // ── CustomBlockMatcher ─────────────────────────────────────────────────────
     private static final class CustomBlockMatcher {

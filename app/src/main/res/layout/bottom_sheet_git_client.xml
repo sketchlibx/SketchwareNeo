@@ -56,7 +56,7 @@
                 android:clickable="false"
                 android:text="main"
                 app:chipBackgroundColor="?attr/colorSurfaceVariant"
-                app:chipIcon="@drawable/ic_mtrl_share"
+                app:chipIcon="@drawable/ic_mtrl_branches"
                 app:chipIconTint="?attr/colorPrimary"
                 app:chipStrokeWidth="0dp"
                 app:ensureMinTouchTargetSize="false" />
@@ -68,7 +68,7 @@
                 android:layout_marginStart="12dp"
                 android:text="0 modified • 0 staged"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="?attr/colorControlNormal" />
         </LinearLayout>
     </LinearLayout>
 

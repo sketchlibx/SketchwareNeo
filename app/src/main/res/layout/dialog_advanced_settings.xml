@@ -264,6 +264,14 @@
                 android:layout_height="56dp"
                 android:text="Resource Usage Tracker" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_project_inspector"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:text="Project Inspector" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
