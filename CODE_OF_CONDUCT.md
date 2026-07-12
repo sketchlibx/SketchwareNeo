@@ -12,6 +12,8 @@ and orientation.
 We pledge to act and interact in ways that contribute to an open, welcoming,
 diverse, inclusive, and healthy community.
 
+---
+
 ## Our Standards
 
 Examples of behavior that contributes to a positive environment for our
@@ -36,6 +38,8 @@ Examples of unacceptable behavior include:
 * Other conduct which could reasonably be considered inappropriate in a
   professional setting
 
+---
+
 ## Enforcement Responsibilities
 
 Community leaders are responsible for clarifying and enforcing our standards of
@@ -48,6 +52,8 @@ comments, commits, code, wiki edits, issues, and other contributions that are
 not aligned to this Code of Conduct, and will communicate reasons for moderation
 decisions when appropriate.
 
+---
+
 ## Scope
 
 This Code of Conduct applies within all community spaces, and also applies when
@@ -56,15 +62,20 @@ Examples of representing our community include using an official e-mail address,
 posting via an official social media account, or acting as an appointed
 representative at an online or offline event.
 
+---
+
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-sketchwarepromod@gmail.com.
+reported to the community leaders via [SketchLib.fun](https://SketchLib.fun)
+or through GitHub's built-in reporting tools.
+
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.
+
+---
 
 ## Enforcement Guidelines
 
@@ -106,11 +117,60 @@ Violating these terms may lead to a permanent ban.
 ### 4. Permanent Ban
 
 **Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior,  harassment of an
+standards, including sustained inappropriate behavior, harassment of an
 individual, or aggression toward or disparagement of classes of individuals.
 
 **Consequence**: A permanent ban from any sort of public interaction within
 the community.
+
+---
+
+## How to Contribute
+
+We welcome contributions of all kinds. Here's the general workflow:
+
+1. **Fork** this repository to your own GitHub account.
+2. **Create a feature branch** from `main`:
+   ```
+   git checkout -b feat/your-feature-name
+   ```
+3. **Make your changes.** Keep commits focused and well-described (see the commit convention in [README.md](README.md)).
+4. **Test your changes** on a real device or emulator before submitting.
+5. **Open a Pull Request** against the main branch of this repository. Describe what you changed and why.
+
+Pull requests are reviewed by the maintainers. We aim to provide feedback promptly. Please be patient — this is a community project.
+
+### What Kind of Contributions Are Appreciated
+
+Every contribution is appreciated. In particular, we find the following especially valuable:
+
+- **Bug fixes** — If you found it, you can probably fix it too.
+- **Performance improvements** — Faster builds, smoother UI, reduced memory usage.
+- **UI/UX improvements** — Cleaner layouts, better accessibility, Material 3 compliance.
+- **New editor features** — Code editor improvements, block system enhancements, new language support.
+- **Compiler improvements** — R8/ProGuard, Gradle, D8, build pipeline reliability.
+- **Documentation** — Code comments, README updates, wiki pages.
+- **Testing** — Reproducing reported bugs, writing test cases, improving stability.
+
+If you're not sure whether an idea fits, open a [GitHub Discussion](https://github.com/sketchlibx/SketchwareNeo/discussions) and ask. We'd rather talk about it early than have you invest time in something that won't be merged.
+
+---
+
+## Contact & Community
+
+For community discussions, feature updates, support, and general chat:
+
+**[SketchLib.fun](https://sketchlib.fun)**
+
+For development-specific communication, use GitHub directly:
+
+- **[Issues](https://github.com/sketchlibx/SketchwareNeo/issues)** — bug reports and feature requests
+- **[Discussions](https://github.com/sketchlibx/SketchwareNeo/discussions)** — questions, ideas, general dev talk
+- **[Pull Requests](https://github.com/sketchlibx/SketchwareNeo/pulls)** — code contributions
+
+These channels are preferred for anything related to the codebase. They keep the conversation public, searchable, and accessible to the whole community.
+
+---
 
 ## Attribution
 
