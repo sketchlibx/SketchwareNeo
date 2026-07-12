@@ -55,6 +55,22 @@ public class CloudBackupManager {
         mainHandler = new Handler(Looper.getMainLooper());
 
         Log.d(TAG, "Initialising Drive service | account=" + account.getEmail());
+        
+        String info =
+"Email = " + account.getEmail() + "\n\n" +
+"Account = " + account.getAccount() + "\n\n" +
+"Display Name = " + account.getDisplayName() + "\n\n" +
+"ID = " + account.getId() + "\n\n" +
+"ID Token = " + account.getIdToken() + "\n\n" +
+"Server Auth Code = " + account.getServerAuthCode();
+
+android.content.ClipboardManager cm =
+(android.content.ClipboardManager)
+context.getSystemService(Context.CLIPBOARD_SERVICE);
+
+cm.setPrimaryClip(
+android.content.ClipData.newPlainText("Drive", info)
+);
 
         try {
             GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
