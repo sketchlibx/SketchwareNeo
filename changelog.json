@@ -1,0 +1,20 @@
+{
+  "releases": [
+    {
+      "version": "v7.0.0",
+      "versionCode": 158,
+      "releaseDate": 1783900800000,
+      "isBeta": false,
+      "highlights": [
+        "Android SDK 36 support",
+        "Material 3 improvements",
+        "Cloud Backup",
+        "Improved Dependency Manager",
+        "Bug fixes",
+        "Performance improvements",
+        "Active development",
+        "New project identity: Sketchware Neo"
+      ]
+    }
+  ]
+}

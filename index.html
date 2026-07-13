@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketchware Neo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EAF1F8;
+    --ink:#12233F;
+    --ink-soft:#3E5876;
+    --line:#B9CCE0;
+    --accent:#FF6B35;
+    --block:#2FB88A;
+    --block-soft:#DCEFE7;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Space Grotesk', sans-serif;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:40px 40px;
+    background-position:-1px -1px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  header{
+    max-width:960px;
+    margin:0 auto;
+    padding:5rem 1.5rem 3rem;
+  }
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:0.5rem;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    padding:0.35rem 0.7rem;
+    border:1px solid var(--ink);
+    border-radius:2px;
+    margin-bottom:1.5rem;
+  }
+  .badge::before{
+    content:"";
+    width:8px; height:8px;
+    background:var(--block);
+    display:inline-block;
+    border-radius:1px;
+  }
+  h1{
+    font-size:clamp(2.4rem, 6vw, 4.2rem);
+    line-height:1.05;
+    font-weight:700;
+    letter-spacing:-0.02em;
+  }
+  h1 span{color:var(--block);}
+  .lede{
+    max-width:560px;
+    margin-top:1.2rem;
+    font-size:1.05rem;
+    color:var(--ink-soft);
+    line-height:1.6;
+  }
+  .cta-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.75rem;
+    margin-top:2.2rem;
+  }
+  .btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    text-decoration:none;
+    padding:0.75rem 1.3rem;
+    border-radius:3px;
+    border:1.5px solid var(--ink);
+    color:var(--ink);
+    transition:transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    display:inline-block;
+  }
+  .btn:hover{transform:translateY(-2px);}
+  .btn.primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  .btn.primary:hover{background:var(--accent); border-color:var(--accent);}
+  .btn.accent{border-color:var(--block); color:var(--block);}
+  .btn.accent:hover{background:var(--block); color:#fff;}
+
+  section{
+    max-width:960px;
+    margin:0 auto;
+    padding:3rem 1.5rem;
+  }
+  .rule{
+    max-width:960px;
+    margin:0 auto;
+    border:none;
+    border-top:1px solid var(--line);
+  }
+  .stack-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    margin-bottom:1.2rem;
+  }
+
+  /* Signature element: snapping blocks, echoing Sketchware's drag/drop block editor */
+  .blocks{
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.6rem;
+    margin-top:0.5rem;
+  }
+  .block{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    background:var(--block-soft);
+    border:1.5px solid var(--block);
+    color:#175C42;
+    padding:0.55rem 0.9rem;
+    border-radius:4px 12px 4px 12px;
+    position:relative;
+    opacity:0;
+    transform:translateY(10px);
+    animation:snap 0.5s ease forwards;
+  }
+  .block:nth-child(1){animation-delay:0.05s;}
+  .block:nth-child(2){animation-delay:0.15s;}
+  .block:nth-child(3){animation-delay:0.25s;}
+  .block:nth-child(4){animation-delay:0.35s;}
+  .block:nth-child(5){animation-delay:0.45s;}
+  .block:nth-child(6){animation-delay:0.55s;}
+  @keyframes snap{
+    to{opacity:1; transform:translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .block{animation:none; opacity:1; transform:none;}
+  }
+
+  .feature-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin-top:1rem;
+  }
+  .feature{
+    background:var(--paper);
+    padding:1.3rem;
+  }
+  .feature h3{
+    font-size:1rem;
+    margin-bottom:0.4rem;
+  }
+  .feature p{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.8rem;
+    color:var(--ink-soft);
+    line-height:1.5;
+  }
+
+  .endpoints{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+    border:1px solid var(--ink);
+    border-radius:4px;
+    overflow:hidden;
+    margin-top:1rem;
+  }
+  .endpoint{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0.75rem 1rem;
+    border-bottom:1px solid var(--line);
+    gap:1rem;
+  }
+  .endpoint:last-child{border-bottom:none;}
+  .endpoint .path{color:var(--ink);}
+  .endpoint .desc{color:var(--ink-soft); text-align:right;}
+  .method{
+    background:var(--block);
+    color:#fff;
+    font-size:0.7rem;
+    padding:0.15rem 0.4rem;
+    border-radius:2px;
+    margin-right:0.6rem;
+  }
+
+  .contrib{
+    border:1.5px dashed var(--ink);
+    border-radius:6px;
+    padding:2rem;
+    text-align:center;
+    margin-top:1rem;
+  }
+  .contrib h3{margin-bottom:0.5rem;}
+  .contrib p{color:var(--ink-soft); margin-bottom:1.2rem;}
+
+  footer{
+    max-width:960px;
+    margin:0 auto;
+    padding:2.5rem 1.5rem 4rem;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">v7.0.0 (158) — active development</div>
+  <h1>Sketchware<br><span>Neo</span></h1>
+  <p class="lede">
+    An independent continuation of Sketchware Pro. Build Android apps by
+    snapping blocks together — now with modern SDK support, Material 3,
+    and a maintainer who actually ships.
+  </p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/sketchlibx/SketchwareNeo">GitHub →</a>
+    <a class="btn" href="https://SketchLib.fun">Website →</a>
+    <a class="btn accent" href="https://t.me/sketchlibneo">Telegram →</a>
+  </div>
+
+  <div class="blocks">
+    <span class="block">SDK 36</span>
+    <span class="block">Material 3</span>
+    <span class="block">Cloud Backup</span>
+    <span class="block">Dependency Manager</span>
+    <span class="block">Modern Build System</span>
+    <span class="block">Community Driven</span>
+  </div>
+</header>
+
+<hr class="rule">
+
+<section>
+  <div class="stack-label">// what's inside</div>
+  <div class="feature-grid">
+    <div class="feature">
+      <h3>Android SDK 36</h3>
+      <p>Built and tested against the latest platform, so your exports stay compliant.</p>
+    </div>
+    <div class="feature">
+      <h3>Material 3 UI</h3>
+      <p>A refreshed editor interface following current Android design guidance.</p>
+    </div>
+    <div class="feature">
+      <h3>Cloud Backup</h3>
+      <p>Keep your projects safe outside of local storage.</p>
+    </div>
+    <div class="feature">
+      <h3>Dependency Manager</h3>
+      <p>An improved way to add and manage libraries in your projects.</p>
+    </div>
+    <div class="feature">
+      <h3>Modern Build System</h3>
+      <p>Faster, more reliable compiles under the hood.</p>
+    </div>
+    <div class="feature">
+      <h3>Active Development</h3>
+      <p>Regular releases, maintained by SketchLibX.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <div class="stack-label">// about api endpoints</div>
+  <div class="endpoints">
+    <div class="endpoint">
+      <span class="path"><span class="method">GET</span>about.json</span>
+      <span class="desc">project identity &amp; core team</span>
+    </div>
+    <div class="endpoint">
+      <span class="path"><span class="method">GET</span>changelog.json</span>
+      <span class="desc">release history</span>
+    </div>
+    <div class="endpoint">
+      <span class="path"><span class="method">GET</span>beta.json</span>
+      <span class="desc">current beta status</span>
+    </div>
+    <div class="endpoint">
+      <span class="path"><span class="method">GET</span>contributors.json</span>
+      <span class="desc">contributor list</span>
+    </div>
+    <div class="endpoint">
+      <span class="path"><span class="method">GET</span>announcements.json</span>
+      <span class="desc">in-app announcements</span>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<section>
+  <div class="contrib">
+    <h3>Want to contribute?</h3>
+    <p>Open a Pull Request or contact us through SketchLib.fun.</p>
+    <a class="btn primary" href="https://github.com/sketchlibx/SketchwareNeo">Open a Pull Request →</a>
+  </div>
+</section>
+
+<footer>
+  <span>Sketchware Neo — maintained by SketchLibX</span>
+  <span>github.com/sketchlibx/SketchwareNeo</span>
+</footer>
+
+</body>
+</html>

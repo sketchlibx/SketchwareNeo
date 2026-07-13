@@ -13,7 +13,7 @@
 bin/
 gen/
 out/
-.kotlin/
+.idea
 
 # Gradle files
 .gradle/
@@ -25,8 +25,6 @@ local.properties
 # Log Files
 *.log
 
-# Patch Files
-*.patch
 # Android Studio Navigation editor temp files
 .navigation/
 
@@ -36,6 +34,9 @@ captures/
 # IntelliJ
 *.iml
 .idea/
+
+# Patches
+*.patch
 
 # Keystore files
 # Uncomment the following lines if you do not want to check your keystore files in.
@@ -59,10 +60,4 @@ fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
 fastlane/readme.md
-.idea/render.experimental.xml
 .DS_Store
-
-# For users who uses android ide for building app
-.androidide/
-/actions-runner
-release/

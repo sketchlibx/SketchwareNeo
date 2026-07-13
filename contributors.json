@@ -1,0 +1,13 @@
+{
+  "contributors": [
+    {
+      "username": "SketchLibX",
+      "role": "Founder",
+      "status": "Active"
+    }
+  ],
+  "call_to_action": {
+    "title": "Want to contribute?",
+    "message": "Open a Pull Request or contact us through SketchLib.fun."
+  }
+}
