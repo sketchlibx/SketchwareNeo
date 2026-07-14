@@ -5,13 +5,19 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -38,6 +44,11 @@ public class DebugActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        Window window = getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.parseColor("#16161E"));
+        window.setNavigationBarColor(Color.parseColor("#16161E"));
+
         Intent intent = getIntent();
         String errorMessage = "No error message available.";
         if (intent != null && intent.hasExtra("error")) {
@@ -57,69 +68,99 @@ public class DebugActivity extends Activity {
             }
         }
 
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#121212")); // Dark Surface
-        root.setPadding(dpToPx(24), dpToPx(32), dpToPx(24), dpToPx(24));
+        root.setBackgroundColor(Color.parseColor("#16161E")); // Deep Modern Dark
+        root.setPadding(dpToPx(24), dpToPx(40), dpToPx(24), dpToPx(24));
+
+        TextView iconView = new TextView(this);
+        iconView.setText("⚠️");
+        iconView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 42);
+        iconView.setGravity(Gravity.CENTER);
+        root.addView(iconView);
+        animateView(iconView, 0);
 
         TextView title = new TextView(this);
-        title.setText("⚠️ Application Crashed");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        title.setTypeface(null, Typeface.BOLD);
-        title.setTextColor(Color.parseColor("#EF5350")); // Material Red
+        title.setText("App Crashed");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        title.setTextColor(Color.parseColor("#F7768E")); // Soft Pastel Red
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dpToPx(8), 0, 0);
         root.addView(title);
+        animateView(title, 50);
 
         TextView exceptionView = new TextView(this);
         exceptionView.setText(exceptionType);
-        exceptionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        exceptionView.setTypeface(null, Typeface.BOLD);
-        exceptionView.setTextColor(Color.parseColor("#E0E0E0"));
-        exceptionView.setPadding(0, dpToPx(8), 0, 0);
+        exceptionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        exceptionView.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        exceptionView.setTextColor(Color.parseColor("#A9B1D6")); // Soft Gray/Blue
+        exceptionView.setGravity(Gravity.CENTER);
+        exceptionView.setPadding(0, dpToPx(8), 0, dpToPx(16));
         root.addView(exceptionView);
+        animateView(exceptionView, 100);
 
         if (!friendlyMessage.isEmpty()) {
+            LinearLayout hintContainer = new LinearLayout(this);
+            hintContainer.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12));
+            GradientDrawable hintBg = new GradientDrawable();
+            hintBg.setColor(Color.parseColor("#2A2A3A")); // Slightly lighter card
+            hintBg.setCornerRadius(dpToPx(12));
+            hintContainer.setBackground(hintBg);
+
             TextView hintView = new TextView(this);
-            hintView.setText("Hint: " + friendlyMessage);
+            hintView.setText("💡 Hint: " + friendlyMessage);
             hintView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-            hintView.setTextColor(Color.parseColor("#FFCA28")); // Amber
-            hintView.setPadding(0, dpToPx(4), 0, 0);
-            root.addView(hintView);
+            hintView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            hintView.setTextColor(Color.parseColor("#E0AF68")); // Pastel Yellow
+            hintContainer.addView(hintView);
+            
+            LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            hintParams.setMargins(0, 0, 0, dpToPx(16));
+            hintContainer.setLayoutParams(hintParams);
+            
+            root.addView(hintContainer);
+            animateView(hintContainer, 150);
         }
 
         LinearLayout terminalContainer = new LinearLayout(this);
         terminalContainer.setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16));
         GradientDrawable terminalBg = new GradientDrawable();
-        terminalBg.setColor(Color.parseColor("#1E1E1E"));
-        terminalBg.setCornerRadius(dpToPx(12));
-        terminalBg.setStroke(dpToPx(1), Color.parseColor("#333333"));
+        terminalBg.setColor(Color.parseColor("#1A1B26")); // Deep Terminal Dark
+        terminalBg.setCornerRadius(dpToPx(16));
+        terminalBg.setStroke(dpToPx(1), Color.parseColor("#292E42")); // Soft Border
         terminalContainer.setBackground(terminalBg);
 
         TextView errorLog = new TextView(this);
         errorLog.setText(errorMessage);
-        errorLog.setTextColor(Color.parseColor("#AEEA00")); // Light Green for logs
+        errorLog.setTextColor(Color.parseColor("#9ECE6A")); // Pastel Green (Terminal vibe)
         errorLog.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         errorLog.setTypeface(Typeface.MONOSPACE);
         errorLog.setTextIsSelectable(true);
+        errorLog.setLineSpacing(0, 1.2f);
 
         HorizontalScrollView hScroll = new HorizontalScrollView(this);
+        hScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         hScroll.addView(errorLog);
         terminalContainer.addView(hScroll);
 
         ScrollView vScroll = new ScrollView(this);
+        vScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f);
-        scrollParams.setMargins(0, dpToPx(24), 0, dpToPx(24));
+        scrollParams.setMargins(0, 0, 0, dpToPx(24));
         vScroll.setLayoutParams(scrollParams);
         vScroll.addView(terminalContainer);
         root.addView(vScroll);
+        animateView(vScroll, 200);
 
         LinearLayout buttonRow = new LinearLayout(this);
         buttonRow.setOrientation(LinearLayout.HORIZONTAL);
         buttonRow.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        Button btnCopy = createButton("Copy Log", "#2196F3", "#1976D2");
+        Button btnCopy = createSmoothButton("Copy Log", "#292E42", "#3B4261", "#A9B1D6");
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
         copyParams.setMarginEnd(dpToPx(8));
         btnCopy.setLayoutParams(copyParams);
@@ -135,7 +176,7 @@ public class DebugActivity extends Activity {
         });
         buttonRow.addView(btnCopy);
 
-        Button btnRestart = createButton("Restart App", "#4CAF50", "#388E3C");
+        Button btnRestart = createSmoothButton("Restart App", "#7AA2F7", "#5684E5", "#16161E");
         LinearLayout.LayoutParams restartParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
         restartParams.setMarginStart(dpToPx(8));
         btnRestart.setLayoutParams(restartParams);
@@ -152,26 +193,49 @@ public class DebugActivity extends Activity {
         buttonRow.addView(btnRestart);
 
         root.addView(buttonRow);
+        animateView(buttonRow, 250);
         
         setContentView(root);
     }
 
-
-    private Button createButton(String text, String colorHex, String pressedColorHex) {
+    private Button createSmoothButton(String text, String bgColorHex, String rippleColorHex, String textColorHex) {
         Button btn = new Button(this);
         btn.setText(text);
-        btn.setTextColor(Color.WHITE);
+        btn.setTextColor(Color.parseColor(textColorHex));
         btn.setAllCaps(false);
-        btn.setTypeface(null, Typeface.BOLD);
-        btn.setElevation(dpToPx(2));
-        btn.setPadding(0, dpToPx(12), 0, dpToPx(12));
-
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        btn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        btn.setPadding(0, dpToPx(14), 0, dpToPx(14));
+        btn.setElevation(dpToPx(0));
+        btn.setStateListAnimator(null);
+        
         GradientDrawable defaultBg = new GradientDrawable();
-        defaultBg.setColor(Color.parseColor(colorHex));
-        defaultBg.setCornerRadius(dpToPx(24));
+        defaultBg.setColor(Color.parseColor(bgColorHex));
+        defaultBg.setCornerRadius(dpToPx(12));
+        
+        RippleDrawable ripple = new RippleDrawable(
+                ColorStateList.valueOf(Color.parseColor(rippleColorHex)),
+                defaultBg,
+                null
+        );
 
-        btn.setBackground(defaultBg);
+        btn.setBackground(ripple);
         return btn;
+    }
+
+    /**
+     * Slide-up & Fade-in entry animation for a smooth UX.
+     */
+    private void animateView(View view, int delay) {
+        view.setAlpha(0f);
+        view.setTranslationY(dpToPx(30));
+        view.animate()
+                .alpha(1f)
+                .translationY(0)
+                .setDuration(400)
+                .setStartDelay(delay)
+                .setInterpolator(new DecelerateInterpolator(1.5f))
+                .start();
     }
 
     private int dpToPx(int dp) {
