@@ -109,6 +109,16 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private String beforeContent;
     private boolean isEdited = false;
 
+    // Bug 4 fix: ContentListener must be a field, not an anonymous inner class
+    // created once in setupEditor(). sora-editor's editor.setText() replaces the
+    // internal Content object entirely, detaching any listeners registered on the
+    // OLD Content. After a file switch in ScreenAdapter, the listener is orphaned
+    // and afterInsert/afterDelete never fire — so updateMenuState() is never called
+    // from edits, leaving Save/Undo/Redo icons stale until the overflow menu is
+    // opened (which triggers onPrepareOptionsMenu → updateMenuState as a side effect).
+    // Storing it as a field lets loadXmlToEditor() re-register it on the new Content.
+    private ContentListener editorContentListener;
+
     private ProjectFileBean projectFile;
     private ProjectLibraryBean projectLibrary;
     private InjectRootLayoutManager rootLayoutManager;
@@ -260,6 +270,18 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
     }
 
+    /**
+     * Bug 4 fix: re-attach the content listener to whatever Content object
+     * sora-editor is currently using. Must be called every time editor.setText()
+     * is used, because setText() replaces the internal Content instance and the
+     * previously registered listener is silently orphaned on the old object.
+     */
+    private void registerEditorContentListener() {
+        if (editorContentListener != null) {
+            editor.getText().addContentListener(editorContentListener);
+        }
+    }
+
     private void loadXmlToEditor(ProjectFileBean bean) {
         try {
             a.a.a.jq buildConfig = new a.a.a.jq();
@@ -272,6 +294,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             content = xmlGenerator.b();
             beforeContent = content;
             editor.setText(content);
+            // Bug 4 fix: editor.setText() replaces the internal Content object.
+            // Re-register the listener on the new Content so afterInsert/afterDelete
+            // keep firing and updateMenuState() keeps the toolbar icons accurate.
+            registerEditorContentListener();
         } catch(Exception e) {
             SketchwareUtil.toastError("Failed to generate layout.");
         }
@@ -485,9 +511,12 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         
         editor.getColorScheme().setColor(EditorColorScheme.MATCHED_TEXT_BACKGROUND, 0x66FFEB3B);
 
-        editor.getText().addContentListener(new ContentListener() {
+        // Bug 4 fix: build the listener once into the field, then register it.
+        // registerEditorContentListener() is also called in loadXmlToEditor() after
+        // editor.setText() so the listener stays attached across file switches.
+        editorContentListener = new ContentListener() {
             @Override public void beforeReplace(Content content) { }
-            @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) { 
+            @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) {
                 runOnUiThread(() -> updateMenuState());
                 triggerRealtimeDiagnostics();
             }
@@ -512,7 +541,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                     } catch (Exception ignored) {}
                 }
             }
-        });
+        };
+        registerEditorContentListener();
     }
 
     private void setupDiagnosticsPanel() {

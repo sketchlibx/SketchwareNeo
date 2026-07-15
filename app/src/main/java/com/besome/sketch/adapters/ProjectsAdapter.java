@@ -61,14 +61,22 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
     public void filterData(String query) {
         this.currentQuery = query == null ? "" : query;
-        List<HashMap<String, Object>> newProjects = currentQuery.isEmpty() ? allProjects : new ArrayList<>();
-        
+        // Bug fix: NEVER assign allProjects directly to newProjects.
+        // When they share the same reference, any in-place mutation of allProjects
+        // (e.g. deleteProject calling allProjects.remove()) also mutates shownProjects,
+        // so DiffUtil sees identical old/new lists and dispatches zero changes —
+        // the deleted item never disappears from the RecyclerView.
+        // Always build a fresh list so DiffUtil receives genuinely independent snapshots.
+        List<HashMap<String, Object>> newProjects;
         if (!currentQuery.isEmpty()) {
+            newProjects = new ArrayList<>();
             for (HashMap<String, Object> project : allProjects) {
                 if (matchesQuery(project, currentQuery)) {
                     newProjects.add(project);
                 }
             }
+        } else {
+            newProjects = new ArrayList<>(allProjects);
         }
 
         DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
@@ -200,8 +208,13 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
             lC.a(activity, scId);
             activity.runOnUiThread(() -> {
                 progressDialog.dismiss();
-                allProjects.remove(projectMap);
-                updateData(allProjects);
+                // Bug fix: delegate refresh to the Fragment instead of mutating
+                // allProjects directly. Direct mutation was the second half of Bug 1 —
+                // the Fragment's projectsList still held the deleted entry, so any
+                // subsequent sort/filter/pull-to-refresh would restore the ghost item.
+                // refreshProjectsList() reads fresh from disk and updates both
+                // projectsList (Fragment) and the adapter in one clean pass.
+                projectsFragment.refreshProjectsList();
             });
         }).start();
     }

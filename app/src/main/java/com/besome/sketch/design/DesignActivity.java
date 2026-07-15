@@ -685,6 +685,34 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         }
     }
 
+    /**
+     * Bug 5 fix: refresh the Custom Java / Custom Manifest-dependent menu items
+     * immediately after Advanced Settings are saved, without requiring a tab switch.
+     *
+     * Root cause: bottomMenu.findItem(9) visibility was ONLY updated inside
+     * ViewPager.OnPageChangeListener.onPageSelected(). If the user saves Advanced
+     * Settings while already on tab 1 or 2, onPageSelected() never fires and the
+     * menu item stays in its previous state until the user manually swipes tabs.
+     * activity.invalidateOptionsMenu() in AdvancedSettingsBottomSheet only refreshes
+     * the ActionBar options menu — it has no effect on the PopupMenu (bottomMenu).
+     *
+     * Called by AdvancedSettingsBottomSheet.saveSettings().
+     */
+    public void refreshAdvancedSettingsUI() {
+        if (bottomMenu == null) return;
+        boolean isCustomJavaEnabled = new ProjectSettings(sc_id)
+                .getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false")
+                .equals("true");
+        handler.post(() -> {
+            // Item 9 is visible on tabs 1 and 2 only (same logic as onPageSelected).
+            // Tab 0 always hides it regardless of the setting.
+            boolean shouldShow = (currentTabNumber == 1 || currentTabNumber == 2)
+                    && isCustomJavaEnabled;
+            bottomMenu.findItem(9).setVisible(shouldShow);
+        });
+        invalidateOptionsMenu();
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();

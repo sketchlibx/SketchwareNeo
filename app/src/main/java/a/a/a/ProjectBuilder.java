@@ -526,12 +526,25 @@ public class ProjectBuilder {
             ArrayList<String> args = new ArrayList<>();
             String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
             
+            // Bug fix: --release N is an Oracle JDK flag that requires ct.sym
+            // (cross-compilation tables) at runtime. On Android, ct.sym is not
+            // bundled with the APK, so Eclipse JDT (ECJ) silently produces ZERO
+            // .class files when --release is passed, while globalErrorsCount stays 0.
+            // The result: compiledClassesDir is empty, DexCompiler skips adding
+            // programFiles, and D8 produces classes.dex with no project classes.
+            //
+            // Fix: use -source N -target N for all Java versions. ECJ supports
+            // -source/-target without needing ct.sym, and the behaviour is
+            // equivalent for Sketchware Neo's use case (Android app compilation).
             if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
-                args.add("--release"); args.add("17");
+                args.add("-source"); args.add("17");
+                args.add("-target"); args.add("17");
             } else if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_11)) {
-                args.add("--release"); args.add("11");
+                args.add("-source"); args.add("11");
+                args.add("-target"); args.add("11");
             } else {
-                args.add("-" + javaVer); args.add("-source"); args.add(javaVer); args.add("-target"); args.add(javaVer);
+                args.add("-source"); args.add(javaVer);
+                args.add("-target"); args.add(javaVer);
             }
             
             args.add("-nowarn");

@@ -99,7 +99,13 @@ public class AdvancedSettingsBottomSheet extends BottomSheetDialogFragment {
         root.findViewById(R.id.btn_cancel).setOnClickListener(v -> dismiss());
         root.findViewById(R.id.btn_save).setOnClickListener(v -> {
             saveSettings();
-            activity.invalidateOptionsMenu(); 
+            // Bug 5 fix: invalidateOptionsMenu() only refreshes the ActionBar menu.
+            // bottomMenu (a PopupMenu) is NOT affected by it. The Custom Java menu
+            // item (id=9) was only updated in onPageSelected(), so it stayed stale
+            // if the user saved Advanced Settings without switching tabs.
+            // refreshAdvancedSettingsUI() reads the new setting value and updates
+            // bottomMenu item 9 visibility immediately on the current tab.
+            activity.refreshAdvancedSettingsUI();
             dismiss();
         });
 
