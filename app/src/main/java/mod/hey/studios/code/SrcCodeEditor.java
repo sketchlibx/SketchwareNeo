@@ -434,6 +434,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
         if (isJava) {
             switch (word) {
+            // Java Snippets
                 case "toast": return "Toast.makeText(getApplicationContext(), \"|\", Toast.LENGTH_SHORT).show();";
                 case "logd": return "Log.d(\"TAG\", \"|\");";
                 case "loge": return "Log.e(\"TAG\", \"|\", e);";
@@ -444,14 +445,128 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 case "ifelse": return "if (|) {\n    \n} else {\n    \n}";
                 case "tryc": return "try {\n    |\n} catch (Exception e) {\n    e.printStackTrace();\n}";
                 case "find": return "findViewById(R.id.|);";
+				case "et": return "EditText | = findViewById(R.id.|);";
+				case "tvf": return "TextView | = findViewById(R.id.|);";
+				case "btnf": return "Button | = findViewById(R.id.|);";
+				case "ivf": return "ImageView | = findViewById(R.id.|);";
+				case "cbf": return "CheckBox | = findViewById(R.id.|);";
+				case "rbf": return "RadioButton | = findViewById(R.id.|);";
+				case "swf": return "Switch | = findViewById(R.id.|);";
+				case "spf": return "Spinner | = findViewById(R.id.|);";
+				case "rvf": return "RecyclerView | = findViewById(R.id.|);";
+				case "lvf": return "ListView | = findViewById(R.id.|);";
+				case "gvf": return "GridView | = findViewById(R.id.|);";
+				case "cvf": return "CardView | = findViewById(R.id.|);";
+				case "pbf": return "ProgressBar | = findViewById(R.id.|);";
+				case "fabf": return "FloatingActionButton | = findViewById(R.id.|);";
+				
+				case "onclick": return "setOnClickListener(v -> {\n    |\n});";
+				case "thread": return "new Thread(() -> {\n    |\n}).start();";
+				case "runui": return "runOnUiThread(() -> {\n    |\n});";
+				case "handler": return "new Handler().postDelayed(() -> {\n    |\n}, 1000);";
+				case "finish": return "finish();";
+				case "finisha": return "finishAffinity();";
+				case "back": return "onBackPressed();";
+				case "random": return "Random random = new Random();\nint | = random.nextInt();";
+				case "array": return "ArrayList<String> | = new ArrayList<>();";
+				case "hashmap": return "HashMap<String, Object> | = new HashMap<>();";
+				case "dialog": return "new AlertDialog.Builder(this)\n.setTitle(\"|\")\n.setMessage(\"\")\n.setPositiveButton(\"OK\", null)\n.show();";
+				case "date": return "String | = new SimpleDateFormat(\"dd/MM/yyyy\", Locale.getDefault()).format(new Date());";
+				case "time": return "String | = new SimpleDateFormat(\"HH:mm\", Locale.getDefault()).format(new Date());";
+				case "switch": return "switch (|) {\n    case :\n        break;\n    default:\n        break;\n}";
+				case "while": return "while (|) {\n    \n}";
+				case "dowhile": return "do {\n    |\n} while ();";
+				case "foreach": return "for (Object item : |) {\n    \n}";
+				case "return": return "return |;";
+				case "newobj": return "| obj = new |();";
+				case "bundle": return "Bundle bundle = new Bundle();";
+				case "putextra": return "intent.putExtra(\"|\", \"\");";
+				case "getextra": return "String | = getIntent().getStringExtra(\"\");";
+				case "shared": return "SharedPreferences sp = getSharedPreferences(\"data\", MODE_PRIVATE);";
+				case "editor": return "SharedPreferences.Editor editor = sp.edit();";
+				case "commit": return "editor.commit();";
+				case "apply": return "editor.apply();";
+				case "prefput": return "editor.putString(\"|\", \"\");";
+				case "prefget": return "String | = sp.getString(\"\", \"\");";
+				case "anim": return "overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);";
+				case "post": return "view.post(() -> {\n    |\n});";
+				case "visible": return "|.setVisibility(View.VISIBLE);";
+				case "gone": return "|.setVisibility(View.GONE);";
+				case "invisible": return "|.setVisibility(View.INVISIBLE);";
+				case "enable": return "|.setEnabled(true);";
+				case "disable": return "|.setEnabled(false);";
+				case "text": return "|.setText(\"\");";
+				case "gettext": return "|.getText().toString();";
+				case "hint": return "|.setHint(\"\");";
+				case "focus": return "|.requestFocus();";
+				case "clear": return "|.setText(\"\");";
+				case "img": return "|.setImageResource(R.drawable.|);";
+				case "bg": return "|.setBackgroundResource(R.drawable.|);";
+				case "color": return "|.setTextColor(Color.parseColor(\"#000000\"));";
+				case "parse": return "Integer.parseInt(|);";
+				case "str": return "String.valueOf(|);";
+				case "equals": return "|.equals(\"\")";
+				case "isempty": return "TextUtils.isEmpty(|)";
+				case "len": return "|.length()";
+				case "trim": return "|.trim()";
+				case "upper": return "|.toUpperCase()";
+				case "lower": return "|.toLowerCase()";
+				case "contains": return "|.contains(\"\")";
+				case "replace": return "|.replace(\"\", \"\")";
+				case "split": return "|.split(\",\")";
+				case "sleep": return "Thread.sleep(|);";
+				case "exit": return "System.exit(0);";
             }
         } else if (isXml) {
             switch (word) {
+            // XML Snippets
                 case "ll": return "<LinearLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\"\n    android:orientation=\"vertical\">\n    |\n</LinearLayout>";
                 case "rl": return "<RelativeLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n    |\n</RelativeLayout>";
                 case "tv": return "<TextView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
                 case "btn": return "<Button\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
-                case "iv": return "<ImageView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:src=\"@drawable/|\" />";
+                case "iv": return "<ImageView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:src=\"@drawable/|\" />";				
+
+				case "cl": return "<androidx.constraintlayout.widget.ConstraintLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\">\n\n    |\n\n</androidx.constraintlayout.widget.ConstraintLayout>";
+				
+				case "sv": return "<ScrollView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\">\n\n    |\n\n</ScrollView>";
+				
+				case "hsv": return "<HorizontalScrollView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n\n    |\n\n</HorizontalScrollView>";
+				
+				case "et": return "<EditText\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\"\n    android:hint=\"|\" />";
+				
+				case "cb": return "<CheckBox\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
+				
+				case "rb": return "<RadioButton\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
+				
+				case "rg": return "<RadioGroup\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\">\n    |\n</RadioGroup>";
+				
+				case "sw": return "<Switch\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\" />";
+				
+				case "pb": return "<ProgressBar\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\" />";
+				
+				case "seek": return "<SeekBar\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\" />";
+				
+				case "rating": return "<RatingBar\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\" />";
+				
+				case "spinner": return "<Spinner\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\" />";
+				
+				case "lv": return "<ListView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
+				
+				case "gv": return "<GridView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
+				
+				case "rv": return "<androidx.recyclerview.widget.RecyclerView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
+				
+				case "card": return "<androidx.cardview.widget.CardView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n\n    |\n\n</androidx.cardview.widget.CardView>";
+				
+				case "space": return "<Space\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"16dp\" />";
+				
+				case "view": return "<View\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"1dp\"\n    android:background=\"#DDDDDD\" />";
+				
+				case "include": return "<include layout=\"@layout/|\" />";
+				
+				case "merge": return "<merge>\n    |\n</merge>";
+				
+				case "frag": return "<fragment\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\"\n    android:name=\"|\" />";
             }
         }
         return null;
