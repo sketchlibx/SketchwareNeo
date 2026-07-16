@@ -7,17 +7,17 @@ import androidx.lifecycle.ViewModel;
 import java.util.ArrayList;
 
 public class AboutAppViewModel extends ViewModel {
-    private final MutableLiveData<String> discordInviteLink = new MutableLiveData<>();
+    private final MutableLiveData<String> telegramLink = new MutableLiveData<>();
     private final MutableLiveData<ArrayList<AboutResponseModel.TeamMember>> teamMembers = new MutableLiveData<>();
     private final MutableLiveData<ArrayList<AboutResponseModel.ChangeLogs>> changelog = new MutableLiveData<>();
     private final MutableLiveData<ArrayList<AboutResponseModel.CommitDetails>> commitDetailsList = new MutableLiveData<>();
 
-    public LiveData<String> getDiscordInviteLink() {
-        return discordInviteLink;
+    public LiveData<String> getTelegramLink() {
+        return telegramLink;
     }
 
-    public void setDiscordInviteLink(String discordInviteLink) {
-        this.discordInviteLink.setValue(discordInviteLink);
+    public void setTelegramLink(String telegramLink) {
+        this.telegramLink.setValue(telegramLink);
     }
 
     public LiveData<ArrayList<AboutResponseModel.TeamMember>> getTeamMembers() {
@@ -25,6 +25,11 @@ public class AboutAppViewModel extends ViewModel {
     }
 
     public void setTeamMembers(ArrayList<AboutResponseModel.TeamMember> teamMembers) {
+        if (teamMembers == null) {
+            this.teamMembers.setValue(new ArrayList<>());
+            return;
+        }
+
         ArrayList<AboutResponseModel.TeamMember> coreTeamActive = new ArrayList<>();
         ArrayList<AboutResponseModel.TeamMember> coreTeamInactive = new ArrayList<>();
         ArrayList<AboutResponseModel.TeamMember> activeContributors = new ArrayList<>();
@@ -37,10 +42,12 @@ public class AboutAppViewModel extends ViewModel {
                 } else {
                     coreTeamInactive.add(member);
                 }
-            } else if (member.isActive()) {
-                activeContributors.add(member);
             } else {
-                inactiveContributors.add(member);
+                if (member.isActive()) {
+                    activeContributors.add(member);
+                } else {
+                    inactiveContributors.add(member);
+                }
             }
         }
 
@@ -52,7 +59,6 @@ public class AboutAppViewModel extends ViewModel {
 
         this.teamMembers.setValue(sortedTeamMembers);
     }
-
 
     public ArrayList<String> getCoreTeamMembers() {
         ArrayList<String> coreTeam = new ArrayList<>();

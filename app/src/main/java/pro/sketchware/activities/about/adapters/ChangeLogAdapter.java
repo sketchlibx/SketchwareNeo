@@ -119,7 +119,7 @@ public class ChangeLogAdapter extends RecyclerView.Adapter<ChangeLogAdapter.View
 
     @Override
     public int getItemCount() {
-        return changelog.size();
+        return changelog != null ? changelog.size() : 0;
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {

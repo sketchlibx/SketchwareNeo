@@ -53,12 +53,17 @@ public class AboutActivity extends BaseAppCompatActivity {
 
     private void initViews() {
         binding.toolbar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        
+
+        binding.discordButton.setIconResource(R.drawable.ic_telegram);
+        binding.discordButton.setText("Telegram");
         binding.discordButton.setOnClickListener(v -> {
-            String discordLink = aboutAppData.getDiscordInviteLink().getValue();
-            if (discordLink != null) {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(discordLink)));
+            String link = aboutAppData.getTelegramLink().getValue();
+            if (link != null && !link.isEmpty()) {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(link)));
             }
         });
+        
         AboutAdapter adapter = new AboutAdapter(this);
         binding.viewPager.setOffscreenPageLimit(3);
         binding.viewPager.setAdapter(adapter);
@@ -101,15 +106,21 @@ public class AboutActivity extends BaseAppCompatActivity {
             }
             if (response == null) return;
 
-            Gson gson = new Gson();
-            AboutResponseModel aboutResponseModel = gson.fromJson(response, AboutResponseModel.class);
-            aboutAppData.setDiscordInviteLink(aboutResponseModel.getDiscordInviteLink());
-            aboutAppData.setTeamMembers(aboutResponseModel.getTeam());
-            aboutAppData.setChangelog(aboutResponseModel.getChangelog());
+            try {
+                Gson gson = new Gson();
+                AboutResponseModel aboutResponseModel = gson.fromJson(response, AboutResponseModel.class);
+                
+                if (aboutResponseModel != null) {
+                    aboutAppData.setTelegramLink(aboutResponseModel.getTelegramLink());
+                    aboutAppData.setTeamMembers(aboutResponseModel.getTeam());
+                    aboutAppData.setChangelog(aboutResponseModel.getChangelog());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         });
     }
 
-    // ----------------- classes ----------------- //
 
     public static class AboutAdapter extends FragmentStateAdapter {
         public AboutAdapter(AppCompatActivity activity) {

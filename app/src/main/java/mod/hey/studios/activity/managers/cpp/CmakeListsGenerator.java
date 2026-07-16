@@ -15,8 +15,8 @@ public final class CmakeListsGenerator {
             "cmake_minimum_required(VERSION 3.22.1)\n\n" +
             "project(\"%s\")\n\n" +
             "file(GLOB_RECURSE CPP_SOURCES\n" +
-            "        \"src/main/cpp/*.c\"\n" +
-            "        \"src/main/cpp/*.cpp\")\n\n" +
+            "        \"src/main/jni/*.c\"\n" +
+            "        \"src/main/jni/*.cpp\")\n\n" +
             "add_library(\n" +
             "        %s\n" +
             "        SHARED\n" +

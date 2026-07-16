@@ -90,7 +90,7 @@ public class FilePathUtil {
     }
     
     public String getPathCpp(String sc_id) {
-        return new File(SKETCHWARE_DATA, sc_id + "/files/cpp").getAbsolutePath();
+        return new File(SKETCHWARE_DATA, sc_id + "/files/jni").getAbsolutePath();
     }
 
     public String getManifestBroadcast(String sc_id) {

@@ -21,8 +21,8 @@ public final class CppBuildHelper {
             "project(\"%s\")\n\n" +
             "# Collect all C/C++ sources recursively\n" +
             "file(GLOB_RECURSE CPP_SOURCES\n" +
-            "        \"src/main/cpp/*.c\"\n" +
-            "        \"src/main/cpp/*.cpp\")\n\n" +
+            "        \"src/main/jni/*.c\"\n" +
+            "        \"src/main/jni/*.cpp\")\n\n" +
             "add_library(\n" +
             "        %s\n" +
             "        SHARED\n" +
@@ -102,7 +102,7 @@ public final class CppBuildHelper {
 
     /**
      * Copies the user's cpp source directory into the Android Studio export build path
-     * ({projectMyscPath}/app/src/main/cpp/), creating it if it does not exist.
+     * ({projectMyscPath}/app/src/main/jni/), creating it if it does not exist.
      *
      * @param sc_id       project identifier
      * @param cppBuildPath  yq.cppFilesPath — the target path inside the build tree

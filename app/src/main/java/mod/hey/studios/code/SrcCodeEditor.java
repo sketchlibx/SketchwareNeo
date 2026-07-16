@@ -351,7 +351,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             }
         }
 
-        // Realtime Diagnostics & State Tracking
+        // Realtime Diagnostics & State Tracking + LIVE SNIPPETS
         binding.editor.getText().addContentListener(new ContentListener() {
             @Override public void beforeReplace(Content content) {}
             @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) {
@@ -361,6 +361,9 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             @Override public void afterInsert(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
                 runOnUiThread(() -> invalidateOptionsMenu());
                 triggerRealtimeDiagnostics();
+                
+                // --- LIVE SNIPPETS ENGINE ---
+                checkAndApplySnippets(startLine, startColumn, endLine, endColumn, insertedContent);
             }
         });
 
@@ -371,6 +374,89 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         View navView = findViewById(R.id.nav_view_explorer);
         if(navView != null) UI.addSystemWindowInsetToPadding(navView, true, true, true, true);
     }
+    
+    // --- LIVE SNIPPETS LOGIC STARTS HERE ---
+    private void checkAndApplySnippets(int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
+        if (insertedContent == null || insertedContent.length() != 1) return;
+        char trigger = insertedContent.charAt(0);
+        // Only trigger snippet replacement when user hits Space or Enter
+        if (trigger != ' ' && trigger != '\n') return;
+
+        try {
+            Content content = binding.editor.getText();
+            String lineText = content.getLineString(startLine);
+            
+            int wordEnd = startColumn;
+            int wordStart = wordEnd - 1;
+            
+            while (wordStart >= 0 && Character.isLetterOrDigit(lineText.charAt(wordStart))) {
+                wordStart--;
+            }
+            wordStart++; 
+            
+            if (wordStart < wordEnd) {
+                String word = lineText.substring(wordStart, wordEnd);
+                String snippet = getSnippetFor(word);
+                
+                if (snippet != null) {
+                    final int fWordStart = wordStart;
+                    binding.editor.post(() -> {
+                        try {
+                            int cursorIndex = snippet.indexOf('|');
+                            String cleanSnippet = snippet.replace("|", "");
+                            
+                            binding.editor.getText().delete(startLine, fWordStart, endLine, endColumn);
+                            binding.editor.getText().insert(startLine, fWordStart, cleanSnippet);
+                            
+                            if (cursorIndex != -1) {
+                                int linesAdded = 0;
+                                int lastNewLine = -1;
+                                for(int i=0; i<cursorIndex; i++) {
+                                    if(cleanSnippet.charAt(i) == '\n') {
+                                        linesAdded++;
+                                        lastNewLine = i;
+                                    }
+                                }
+                                int targetLine = startLine + linesAdded;
+                                int targetColumn = (lastNewLine == -1) ? (fWordStart + cursorIndex) : (cursorIndex - lastNewLine - 1);
+                                binding.editor.setSelection(targetLine, targetColumn);
+                            }
+                        } catch (Exception e) { e.printStackTrace(); }
+                    });
+                }
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private String getSnippetFor(String word) {
+        boolean isJava = (languageId == 1) || (currentTitle != null && currentTitle.endsWith(".java"));
+        boolean isXml = (currentTitle != null && currentTitle.endsWith(".xml"));
+
+        if (isJava) {
+            switch (word) {
+                case "toast": return "Toast.makeText(getApplicationContext(), \"|\", Toast.LENGTH_SHORT).show();";
+                case "logd": return "Log.d(\"TAG\", \"|\");";
+                case "loge": return "Log.e(\"TAG\", \"|\", e);";
+                case "intent": return "Intent intent = new Intent(|);\nstartActivity(intent);";
+                case "fori": return "for (int i = 0; i < |; i++) {\n    \n}";
+                case "psfs": return "public static final String | = \"\";";
+                case "if": return "if (|) {\n    \n}";
+                case "ifelse": return "if (|) {\n    \n} else {\n    \n}";
+                case "tryc": return "try {\n    |\n} catch (Exception e) {\n    e.printStackTrace();\n}";
+                case "find": return "findViewById(R.id.|);";
+            }
+        } else if (isXml) {
+            switch (word) {
+                case "ll": return "<LinearLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\"\n    android:orientation=\"vertical\">\n    |\n</LinearLayout>";
+                case "rl": return "<RelativeLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n    |\n</RelativeLayout>";
+                case "tv": return "<TextView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
+                case "btn": return "<Button\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
+                case "iv": return "<ImageView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:src=\"@drawable/|\" />";
+            }
+        }
+        return null;
+    }
+    // --- LIVE SNIPPETS LOGIC ENDS HERE ---
     
     private boolean isLayoutFile() {
         return currentTitle != null && currentTitle.endsWith(".xml") && isFileInLayoutFolder();

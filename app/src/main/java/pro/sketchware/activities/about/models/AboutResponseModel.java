@@ -1,5 +1,6 @@
 package pro.sketchware.activities.about.models;
 
+import com.google.gson.annotations.SerializedName;
 import com.google.gson.internal.LinkedTreeMap;
 
 import java.time.LocalDate;
@@ -13,13 +14,25 @@ import mod.hey.studios.util.Helper;
 import pro.sketchware.R;
 
 public class AboutResponseModel {
+    private Project project;
+    
     private String discordInviteLink;
+
+    @SerializedName(value = "core_team", alternate = {"team"})
     private ArrayList<TeamMember> team;
+
     private ArrayList<ChangeLogs> changelog;
 
-    // Getters
-    public String getDiscordInviteLink() {
-        return discordInviteLink;
+    public static class Project {
+        private String telegram;
+        public String getTelegram() { return telegram; }
+    }
+
+    public String getTelegramLink() {
+        if (project != null && project.getTelegram() != null) {
+            return project.getTelegram();
+        }
+        return discordInviteLink; // Fallback
     }
 
     public ArrayList<TeamMember> getTeam() {
@@ -31,35 +44,21 @@ public class AboutResponseModel {
     }
 
     public static class TeamMember {
+        @SerializedName(value = "username", alternate = {"user_username"})
         private String user_username;
         private String description;
+        @SerializedName(value = "img", alternate = {"user_img"})
         private String user_img;
-        private boolean is_core_team;
+        @SerializedName(value = "is_core_team")
+        private boolean is_core_team = true;
         private boolean is_active;
 
-        public String getMemberUsername() {
-            return user_username;
-        }
-
-        public String getMemberImg() {
-            return user_img;
-        }
-
-        public boolean isCoreTeamMember() {
-            return is_core_team;
-        }
-
-        public boolean isActive() {
-            return is_active;
-        }
-
-        public String getTitle() {
-            return is_core_team ? "Core Team Members" : "Contributors";
-        }
-
-        public String getDescription() {
-            return description.trim();
-        }
+        public String getMemberUsername() { return user_username; }
+        public String getMemberImg() { return user_img; }
+        public boolean isCoreTeamMember() { return is_core_team; }
+        public boolean isActive() { return is_active; }
+        public String getTitle() { return is_core_team ? "Core Team Members" : "Contributors"; }
+        public String getDescription() { return description != null ? description.trim() : ""; }
     }
 
     public static class ChangeLogs {
@@ -69,29 +68,14 @@ public class AboutResponseModel {
         private boolean isBeta;
         private boolean isTitled;
 
-        public String getTitle() {
-            return title;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public long getReleaseDate() {
-            return releaseDate;
-        }
-
-        public boolean isBeta() {
-            return isBeta;
-        }
-
-        public boolean isTitled() {
-            return isTitled;
-        }
+        public String getTitle() { return title; }
+        public String getDescription() { return description; }
+        public long getReleaseDate() { return releaseDate; }
+        public boolean isBeta() { return isBeta; }
+        public boolean isTitled() { return isTitled; }
     }
 
     public static class CommitDetails {
-
         private final LinkedTreeMap<String, Object> commit = new LinkedTreeMap<>();
         private final LinkedTreeMap<String, Object> author = new LinkedTreeMap<>();
         private String sha;
@@ -116,14 +100,10 @@ public class AboutResponseModel {
         public String getCommitDate() {
             try {
                 LinkedTreeMap<?, ?> committerDetails = (LinkedTreeMap<?, ?>) commit.get("committer");
-                if (committerDetails == null) {
-                    return Helper.getResString(R.string.github_api_date_unavailable);
-                }
+                if (committerDetails == null) return Helper.getResString(R.string.github_api_date_unavailable);
 
                 String commitDateString = (String) committerDetails.get("date");
-                if (commitDateString == null || commitDateString.isEmpty()) {
-                    return Helper.getResString(R.string.github_api_date_unavailable);
-                }
+                if (commitDateString == null || commitDateString.isEmpty()) return Helper.getResString(R.string.github_api_date_unavailable);
 
                 OffsetDateTime commitDateTime = OffsetDateTime.parse(commitDateString, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
                 LocalDate commitDate = commitDateTime.toLocalDate();
@@ -134,9 +114,7 @@ public class AboutResponseModel {
         }
 
         private String safeGetValueFromMap(LinkedTreeMap<String, Object> map, String key) {
-            if (map == null || !map.containsKey(key)) {
-                return "";
-            }
+            if (map == null || !map.containsKey(key)) return "";
             Object value = map.get(key);
             return value != null ? value.toString() : "";
         }
@@ -144,27 +122,18 @@ public class AboutResponseModel {
         private String formatCommitDate(LocalDate commitDate) {
             LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
-            if (commitDate.equals(today)) {
-                return "Today";
-            } else if (commitDate.equals(today.minusDays(1))) {
-                return "Yesterday";
-            } else if (commitDate.isAfter(today.minusWeeks(1))) {
-                return "This week";
-            } else if (commitDate.isAfter(today.minusWeeks(2))) {
-                return "Last week";
-            } else if (commitDate.isAfter(today.minusMonths(1))) {
-                return "Last month";
-            } else {
+            if (commitDate.equals(today)) return "Today";
+            else if (commitDate.equals(today.minusDays(1))) return "Yesterday";
+            else if (commitDate.isAfter(today.minusWeeks(1))) return "This week";
+            else if (commitDate.isAfter(today.minusWeeks(2))) return "Last week";
+            else if (commitDate.isAfter(today.minusMonths(1))) return "Last month";
+            else {
                 long monthsAgo = ChronoUnit.MONTHS.between(commitDate.withDayOfMonth(1), today.withDayOfMonth(1));
-                if (monthsAgo <= 12) {
-                    return monthsAgo + (monthsAgo == 1 ? " month ago" : " months ago");
-                }
+                if (monthsAgo <= 12) return monthsAgo + (monthsAgo == 1 ? " month ago" : " months ago");
 
                 long yearsAgo = ChronoUnit.YEARS.between(commitDate, today);
                 return yearsAgo + (yearsAgo == 1 ? " year ago" : " years ago");
             }
         }
-
     }
-
 }
