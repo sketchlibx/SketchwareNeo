@@ -9,7 +9,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo/releases/latest)
 [![Total downloads](https://img.shields.io/github/downloads/sketchlibx/SketchwareNeo/total)](https://github.com/sketchlibx/SketchwareNeo/releases)
 [![Repository Size](https://img.shields.io/github/repo-size/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo)
-[![Discord](https://img.shields.io/discord/790686719753846785)](http://discord.gg/kq39yhT4rX)
+[![Telegram](https://img.shields.io/badge/Telegram-sketchwareneo-26A5E4?logo=telegram)](https://t.me/sketchwareneo)
 
 **Sketchware Neo** is a community-maintained Android IDE that lets you build real Android apps — entirely from your Android device. No desktop required.
 
