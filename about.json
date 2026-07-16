@@ -6,8 +6,8 @@
     "versionName": "v7.0.0",
     "versionCode": 158,
     "repository": "https://github.com/sketchlibx/SketchwareNeo",
-    "website": "https://SketchLib.fun",
-    "telegram": "https://t.me/sketchlibneo"
+    "website": "https://sketchLib.fun",
+    "telegram": "https://t.me/sketchwareneo"
   },
   "core_team": [
     {
@@ -16,8 +16,8 @@
       "role": "Founder • Lead Developer • Project Maintainer",
       "description": "Maintainer of Sketchware Neo. Building a modern, actively maintained continuation of Sketchware Pro.",
       "github": "https://github.com/sketchlibx/SketchwareNeo",
-      "website": "https://SketchLib.fun",
-      "telegram": "https://t.me/sketchlibneo",
+      "website": "https://sketchLib.fun",
+      "telegram": "https://t.me/sketchwareneo",
       "is_active": true
     }
   ]
