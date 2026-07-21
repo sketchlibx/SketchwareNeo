@@ -21,12 +21,11 @@ import mod.hey.studios.util.Helper;
 
 public class LocalLibrariesUtil {
     private static final String localLibsPath = getExternalStorageDir().concat("/.sketchware/libs/local_libs/");
-    
+
+    public static final String ARTIFACT_METADATA_FILE_NAME = "artifact.txt";
+
     private static List<LocalLibrary> cachedLibraries = null;
 
-    /**
-     * Clears the memory cache so the next load forces a disk read.
-     */
     public static void clearCache() {
         cachedLibraries = null;
     }
@@ -42,13 +41,44 @@ public class LocalLibrariesUtil {
 
         List<LocalLibrary> localLibraries = localLibraryFiles.parallelStream()
                 .filter(File::isDirectory)
-                .map(LocalLibrary::fromFile)
+                .map(file -> {
+                    LocalLibrary library = LocalLibrary.fromFile(file);
+                    String artifactMetaPath = new File(file, ARTIFACT_METADATA_FILE_NAME).getAbsolutePath();
+                    if (isExistFile(artifactMetaPath)) {
+                        String artifact = readFile(artifactMetaPath).trim();
+                        if (!artifact.isEmpty()) {
+                            library.setMavenDependency(artifact);
+                        }
+                    }
+                    return library;
+                })
                 .collect(Collectors.toList());
 
-        // Save to cache for next quick access
         cachedLibraries = new ArrayList<>(localLibraries);
 
         return localLibraries;
+    }
+
+    public static void writeArtifactMetadata(String libraryFolderName, String mavenDependency) {
+        if (libraryFolderName == null || mavenDependency == null || mavenDependency.isEmpty()) {
+            return;
+        }
+        String path = localLibsPath + libraryFolderName + File.separator + ARTIFACT_METADATA_FILE_NAME;
+        writeFile(path, mavenDependency);
+    }
+
+    public static LocalLibrary findInstalledLibraryByGroupArtifact(String group, String artifact) {
+        if (group == null || artifact == null) {
+            return null;
+        }
+        String prefix = group + ":" + artifact + ":";
+        for (LocalLibrary library : getAllLocalLibraries()) {
+            String dependency = library.getMavenDependency();
+            if (dependency != null && dependency.startsWith(prefix)) {
+                return library;
+            }
+        }
+        return null;
     }
 
     public static ArrayList<HashMap<String, Object>> getLocalLibraries(String scId) {

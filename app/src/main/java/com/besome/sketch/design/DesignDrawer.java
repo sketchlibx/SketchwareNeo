@@ -19,6 +19,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import java.util.List;
 
 import com.google.android.material.divider.MaterialDivider;
 import com.google.android.material.shape.MaterialShapeDrawable;
@@ -156,10 +157,43 @@ public class DesignDrawer extends LinearLayout {
         addDrawerItem(R.id.item_xml_command_manager, R.drawable.ic_mtrl_code, R.string.design_drawer_menu_title_xml_command, R.string.design_drawer_menu_description_xml_command, content);
         addDrawerItem(R.id.item_logcat_reader, R.drawable.ic_mtrl_article, R.string.design_drawer_menu_title_logcat_reader, R.string.design_drawer_menu_subtitle_logcat_reader, content);
 
-        // FIX: Add divider and collection manager directly to 'this' (the main layout), NOT to 'content'.
-        // This keeps them fixed at the bottom outside the ScrollView.
         addDrawerDivider(this);
         addDrawerItem(R.id.item_collection_manager, R.drawable.ic_mtrl_bookmark, R.string.design_drawer_menu_title_collection, R.string.design_drawer_menu_description_collection, this);
+
+        addPluginDrawerEntries(content);
+    }
+
+    private void addPluginDrawerEntries(ViewGroup content) {
+        List<neo.sketchware.plugin.NeoDrawerEntry> entries;
+        try {
+            entries = neo.sketchware.plugin.PluginManager.getDrawerEntries();
+        } catch (Throwable t) {
+            return;
+        }
+        if (entries == null || entries.isEmpty()) return;
+
+        addDrawerDivider(content);
+        addDrawerSubheaderItem(R.string.design_drawer_menu_title_plugins, content);
+
+        for (neo.sketchware.plugin.NeoDrawerEntry entry : entries) {
+            try {
+                addDrawerItemDirect(entry.iconResId(), entry.title(), entry.description(), content, v -> {
+                    try {
+                        entry.onClick().run();
+                    } catch (Throwable t) {
+                        SketchwareUtil.toastError("Plugin action failed: " + t.getMessage());
+                    }
+                });
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private void addDrawerItemDirect(int iconResId, String title, String description, ViewGroup view, OnClickListener listener) {
+        DrawerItem drawerItem = new DrawerItem(getContext());
+        drawerItem.setContent(iconResId, title, description);
+        drawerItem.setOnClickListener(View.NO_ID, listener);
+        view.addView(drawerItem, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     @Override

@@ -180,6 +180,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 default -> new EditorColorScheme();
             };
             ed.setColorScheme(scheme);
+            scheme.setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, 0xFF87CEEB);
         }
     }
 
@@ -211,6 +212,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 EditorUtils.loadXmlConfig(ed);
                 break;
         }
+        ed.getColorScheme().setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, 0xFF87CEEB);
     }
 
     public static String prettifyXml(String xml, int indentAmount, Intent extras) {

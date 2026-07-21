@@ -22,7 +22,7 @@ public class DependencyDownloadItem {
     private String statusMessage;
     private final long bytesDownloaded;
     private final long totalBytes;
-    private final int progress; // 0-100
+    private final int progress;
     private String errorMessage;
     private final Artifact artifact;
 

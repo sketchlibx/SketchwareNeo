@@ -58,6 +58,14 @@ public class DependencyDownloadAdapter extends RecyclerView.Adapter<DependencyDo
         notifyItemInserted(dependencies.size() - 1);
     }
 
+    public void removeDependency(@NonNull DependencyDownloadItem item) {
+        int index = dependencies.indexOf(item);
+        if (index != -1) {
+            dependencies.remove(index);
+            notifyItemRemoved(index);
+        }
+    }
+
     public List<DependencyDownloadItem> getDependencies() {
         return new ArrayList<>(dependencies);
     }

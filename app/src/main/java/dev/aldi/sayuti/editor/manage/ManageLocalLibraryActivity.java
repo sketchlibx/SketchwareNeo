@@ -217,7 +217,6 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
         });
     }
 
-    // FIXED: Added oldFolderName parameter to target the exact library to replace safely
     public void openDownloaderDialog(@Nullable String predefinedDependencyUrl, boolean isUpgrade, @Nullable String oldFolderName) {
         if (getSupportFragmentManager().findFragmentByTag("library_downloader_dialog") != null) {
             return;

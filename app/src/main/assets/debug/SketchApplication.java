@@ -40,7 +40,6 @@ public class SketchApplication extends Application {
             System.exit(1);
         });
 
-        // 3. Automated Activity Lifecycle Logging
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
             public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {

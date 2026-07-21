@@ -50,7 +50,6 @@ public class ConfigActivity extends BaseAppCompatActivity {
 
     public static final File SETTINGS_FILE = new File(FileUtil.getExternalStorageDir(), ".sketchware/data/settings.json");
     
-    // Constants kept exactly as requested to maintain compilation
     public static final String SETTING_ALWAYS_SHOW_BLOCKS = "always-show-blocks";
     public static final String SETTING_BACKUP_DIRECTORY = "backup-dir";
     public static final String SETTING_ROOT_AUTO_INSTALL_PROJECTS = "root-auto-install-projects";
@@ -177,43 +176,35 @@ public class ConfigActivity extends BaseAppCompatActivity {
     private void setupPreferences(ViewGroup content) {
         content.removeAllViews();
 
-        // --- General ---
         content.addView(createCategoryHeader("General"));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_block, "Always Show Blocks", "Keep code blocks visible even in invalid states", SETTING_ALWAYS_SHOW_BLOCKS));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_puzzle, "Show Built-in Blocks", "Display standard blocks in custom palettes", SETTING_SHOW_BUILT_IN_BLOCKS));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_view_module, "Show Every Single Block", "Unhide experimental and deprecated blocks", SETTING_SHOW_EVERY_SINGLE_BLOCK));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER));
 
-        // --- Project Explorer ---
         content.addView(createCategoryHeader("Project Explorer"));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_folder_open, "Enable Tree View", "Display project files in a hierarchical tree structure", SETTING_TREE_VIEW));
 
-        // --- Backup & Restore ---
         content.addView(createCategoryHeader("Backup & Restore"));
         TextView[] backupDirDesc = new TextView[1];
         content.addView(createActionPreference(R.drawable.ic_mtrl_folder, "Backup Directory", getBackupPath(), v -> showBackupDirDialog(backupDirDesc[0]), backupDirDesc));
         TextView[] backupNameDesc = new TextView[1];
         content.addView(createActionPreference(R.drawable.ic_mtrl_file, "Backup Filename Format", "Configure SWB naming syntax", v -> showBackupNameDialog(), backupNameDesc));
 
-        // --- Version Control ---
         content.addView(createCategoryHeader("Version Control"));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_version_control, "New Version Control", "Use optimized Git-based system for project history", SETTING_USE_NEW_VERSION_CONTROL));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_upload, "Git Direct Commit & Push", "Single action to commit and push changes", SETTING_GIT_DIRECT_PUSH));
 
-        // --- Root Features ---
         content.addView(createCategoryHeader("Root Features"));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_code, "Auto Install Projects (Root)", "Silently install compiled APKs using root access", SETTING_ROOT_AUTO_INSTALL_PROJECTS));
         content.addView(createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING));
 
-        // --- Block Manager ---
         content.addView(createCategoryHeader("Block Manager"));
         TextView[] palDirDesc = new TextView[1];
         content.addView(createActionPreference(R.drawable.ic_mtrl_palette, "Palette File Path", "Set custom palette.json location", v -> showPathDialog("Palette Path", SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH, palDirDesc[0]), palDirDesc));
         TextView[] blkDirDesc = new TextView[1];
         content.addView(createActionPreference(R.drawable.ic_mtrl_moreblock, "Block File Path", "Set custom block.json location", v -> showPathDialog("Block Path", SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, blkDirDesc[0]), blkDirDesc));
     }
-
-    // --- Modern M3 UI Generators ---
 
     private View createCategoryHeader(String titleText) {
         TextView tv = new TextView(this);
@@ -334,8 +325,6 @@ public class ConfigActivity extends BaseAppCompatActivity {
 
         return row;
     }
-
-    // --- Input Dialogs ---
 
     private void showBackupDirDialog(TextView descView) {
         showInputDialog("Backup Directory", "e.g. /.sketchware/backups/", getBackupPath(), text -> {

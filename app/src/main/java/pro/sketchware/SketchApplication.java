@@ -35,5 +35,11 @@ public class SketchApplication extends Application {
         });
         super.onCreate();
         ThemeManager.applyTheme(this, ThemeManager.getCurrentTheme(this));
+
+        try {
+            neo.sketchware.plugin.PluginManager.init(this);
+        } catch (Throwable t) {
+            Log.e("SketchApplication", "Plugin initialization failed", t);
+        }
     }
 }

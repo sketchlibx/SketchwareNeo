@@ -90,7 +90,6 @@ public class AppSettings extends BaseAppCompatActivity {
         var binding = ActivityAppSettingsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        // Fix padding for edge-to-edge
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
             androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -129,6 +128,7 @@ public class AppSettings extends BaseAppCompatActivity {
         managersCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_component, "Component manager", "Manage your own components", new ActivityLauncher(new Intent(getApplicationContext(), ManageCustomComponentActivity.class))), true);
         managersCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_list, "Event manager", "Manage your own events", openSettingsActivity(SettingsActivity.EVENTS_MANAGER_FRAGMENT)), true);
         managersCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_box, "Local library manager", "Manage and download local libraries", new ActivityLauncher(new Intent(getApplicationContext(), ManageLocalLibraryActivity.class), new Pair<>("sc_id", "system"))), true);
+        managersCategory.addLibraryItem(createPreference(android.R.drawable.ic_menu_manage, "Plugins", "Install and manage IDE plugins", new ActivityLauncher(new Intent(getApplicationContext(), neo.sketchware.plugin.ui.ManagePluginsActivity.class))), true);
         managersCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_article, Helper.getResString(R.string.design_drawer_menu_title_logcat_reader), Helper.getResString(R.string.design_drawer_menu_subtitle_logcat_reader), new ActivityLauncher(new Intent(getApplicationContext(), LogReaderActivity.class))), false);
 
         LibraryCategoryView cloudCategory = new LibraryCategoryView(this);
@@ -163,7 +163,6 @@ public class AppSettings extends BaseAppCompatActivity {
         }
     }
 
-    // Modern BottomSheet Design for Cloud Disclaimer
     private void showCloudDisclaimerDialog(Runnable onAccepted) {
         BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
         LinearLayout container = new LinearLayout(this);
@@ -245,7 +244,6 @@ public class AppSettings extends BaseAppCompatActivity {
         }
     }
 
-    // Modern BottomSheet Dashboard for Cloud Actions
     private void showCloudDashboard(GoogleSignInAccount account) {
         BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
         LinearLayout container = new LinearLayout(this);
@@ -301,7 +299,6 @@ public class AppSettings extends BaseAppCompatActivity {
         row.setClickable(true);
         row.setFocusable(true);
         
-        // Android Standard Ripple Effect
         TypedValue outValue = new TypedValue();
         getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
         row.setBackgroundResource(outValue.resourceId);
@@ -352,7 +349,6 @@ public class AppSettings extends BaseAppCompatActivity {
                 .create();
     }
 
-    // --- Rest of your original methods below, unchanged but perfectly integrated ---
     
     private void showErrorDialog(String title, String errorMessage) {
         new MaterialAlertDialogBuilder(this)

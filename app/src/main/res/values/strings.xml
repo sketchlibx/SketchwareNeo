@@ -1081,6 +1081,7 @@ ex)\"*/*\", \"image/*\", \"audio/*\", \"text/*\""</string>
     <string name="design_drawer_menu_description_view">Manage multiple screens</string>
     <string name="design_drawer_menu_description_xml_command">Modify built-in XML files</string>
     <string name="design_drawer_menu_title">Configuration</string>
+    <string name="design_drawer_menu_title_plugins">Plugins</string>
     <string name="design_drawer_menu_title_collection">Collection Manager</string>
     <string name="design_drawer_menu_title_font">Font Manager</string>
     <string name="design_drawer_menu_title_image">Image Manager</string>

@@ -104,31 +104,6 @@ import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 
-/**
- * Git Client bottom sheet — full audit/refactor.
- *
- * Architectural fixes baked into this version (see inline comments at each
- * relevant method for the bug number they resolve):
- *  1) Commit & Push is now one atomic, verified workflow (commitAndPush()).
- *  2) Status uses the real JGit Status API plus rename detection; clean/
- *     ignored files are never shown.
- *  3) tv_repo_status is rebuilt from a single source of truth (applyStatus)
- *     after every operation that can change it.
- *  4) Push is only ever reported successful after inspecting RemoteRefUpdate
- *     statuses AND independently verifying via git.lsRemote().
- *  5) Remotes are always reloaded from a freshly-loaded StoredConfig.
- *  6) Branches always show local + remote, grouped, with Checkout/Rename/
- *     Delete, and deleting/checking out the active branch is disabled.
- *  7) Fetch/Pull show the exact outcome (ref count, fast-forward, conflict,
- *     already up to date) instead of a generic toast.
- *  8/9) ALL JGit calls funnel through a single-thread executor (no more raw
- *     per-adapter Thread spawning, which caused races and inconsistent
- *     index reads). ViewPager keeps every tab alive via offscreenPageLimit
- *     so adapters are never null and never lose scroll position on swipe.
- *  10) Branch/Remote dialogs validate in real time and disable the action
- *      button until valid.
- *  14) All exceptions are translated by GitErrorMapper before being shown.
- */
 public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private String sc_id;
@@ -147,8 +122,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private GitBranchAdapter branchAdapter;
     private GitRemoteAdapter remoteAdapter;
 
-    // Cached snapshots: whichever tab is (re)created always has data to show
-    // immediately, instead of being empty until the next manual refresh.
     private List<ChangesAdapter.GitFile> lastChangeList = new ArrayList<>();
     private List<RevCommit> lastCommitList = new ArrayList<>();
     private List<Ref> lastBranchList = new ArrayList<>();
@@ -157,10 +130,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private AlertDialog progressDialog;
 
-    // Single thread: every JGit command in this class runs here, in order.
-    // Running JGit commands from multiple uncoordinated threads against the
-    // same Repository was the root cause behind several reported bugs
-    // (random freezes, wrong file lists, index.lock contention).
     private final ExecutorService gitExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -215,13 +184,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         viewPager = view.findViewById(R.id.view_pager);
         tabLayout = view.findViewById(R.id.tab_layout);
         viewPager.setAdapter(new GitPagerAdapter(requireContext()));
-        // Bug #8/#9 root cause: with the default offscreenPageLimit (1), tabs
-        // 2+ swipes away get destroyed and their RecyclerView/adapter
-        // recreated from scratch, which both causes the visible "freeze" on
-        // swipe and explains data silently not showing (a refresh that ran
-        // before a tab was ever instantiated had nowhere to deliver its
-        // result). Keeping all tabs alive for the life of this small, fixed
-        // 5-tab sheet eliminates both problems.
         viewPager.setOffscreenPageLimit(Math.max(1, tabTitles.length - 1));
         tabLayout.setupWithViewPager(viewPager);
 
@@ -282,13 +244,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Generic task runner. EVERY Git operation in this class (besides the
-    // two bespoke multi-stage flows, commitAndPush/refreshSourceThenAll,
-    // which still execute on the same gitExecutor) goes through here so
-    // there is exactly one place that serializes JGit access and maps
-    // exceptions to friendly text.
-    // ---------------------------------------------------------------------
     private interface GitTask<T> { T run() throws Exception; }
     private interface GitTaskCallback<T> { void onSuccess(T result); void onError(String message); }
 
@@ -316,13 +271,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Status (bug #2 + #3): real JGit Status API, plus a from-scratch rename
-    // scan since plain Status never detects renames. Two scans are run:
-    // HEAD-vs-Index for staged renames, Index-vs-WorkingTree for unstaged
-    // renames. Matched pairs are removed from Added/Removed/Untracked/
-    // Missing so a rename never shows up twice.
-    // ---------------------------------------------------------------------
     private static final class RepoStatusSummary {
         int stagedCount, unstagedCount, untrackedCount, conflictCount, ahead, behind;
         String currentBranch = "";
@@ -369,8 +317,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 }
             }
         } catch (IOException ignored) {
-            // Rename detection is a best-effort enhancement; on failure we
-            // simply fall back to showing the plain Added/Deleted pair.
         }
     }
 
@@ -544,9 +490,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // Bug #5: always force a reload of the StoredConfig from disk before
-    // reading remotes, so stale in-memory state is never the reason the
-    // Remotes tab looks empty.
     private List<RemoteConfig> computeRemoteList() throws Exception {
         StoredConfig config = git.getRepository().getConfig();
         try { config.load(); } catch (Exception ignored) {}
@@ -572,14 +515,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         refreshRemotes();
     }
 
-    // ---------------------------------------------------------------------
-    // Bug #11: the heavy "regenerate Sketchware source" step is now its own
-    // method, only ever invoked by the explicit "Refresh & Sync" button.
-    // Every other action (stage, commit, push, checkout, ...) calls the
-    // cheap refreshGitStatus()/refreshHistory()/refreshBranches()/
-    // refreshRemotes() combination it actually needs instead of paying for
-    // a full source regeneration every time.
-    // ---------------------------------------------------------------------
     private void refreshSourceThenAll() {
         if (git == null) return;
         showProgressDialog("Generating Sketchware Source Code...");
@@ -639,17 +574,20 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
         File manifestSrc = new File(project_metadata.projectMyscPath, "AndroidManifest.xml");
         if (manifestSrc.exists()) FileUtil.copyFile(manifestSrc.getAbsolutePath(), new File(appDir, "AndroidManifest.xml").getAbsolutePath());
+
+        File rootGradleSrc = new File(project_metadata.projectMyscPath, "build.gradle");
+        if (rootGradleSrc.exists()) FileUtil.copyFile(rootGradleSrc.getAbsolutePath(), new File(repoDir, "build.gradle").getAbsolutePath());
+
+        File settingsGradleSrc = new File(project_metadata.projectMyscPath, "settings.gradle");
+        if (settingsGradleSrc.exists()) FileUtil.copyFile(settingsGradleSrc.getAbsolutePath(), new File(repoDir, "settings.gradle").getAbsolutePath());
+
+        File gradlePropertiesSrc = new File(project_metadata.projectMyscPath, "gradle.properties");
+        if (gradlePropertiesSrc.exists()) FileUtil.copyFile(gradlePropertiesSrc.getAbsolutePath(), new File(repoDir, "gradle.properties").getAbsolutePath());
+
+        File appGradleSrc = new File(project_metadata.projectMyscPath, "app" + File.separator + "build.gradle");
+        if (appGradleSrc.exists()) FileUtil.copyFile(appGradleSrc.getAbsolutePath(), new File(repoDir, "app" + File.separator + "build.gradle").getAbsolutePath());
     }
 
-    // ---------------------------------------------------------------------
-    // Bug #1 + #4: Commit & Push as ONE atomic, verified workflow.
-    //   Stage All -> Commit (only if there's something to commit) -> verify
-    //   a remote exists -> Fetch -> Push -> verify the push via
-    //   RemoteRefUpdate status AND an independent git.lsRemote() check ->
-    //   refresh UI. The success toast only ever fires after every step
-    //   above has actually succeeded; any failure shows the real JGit
-    //   reason and stops immediately (no fake success).
-    // ---------------------------------------------------------------------
     private void commitAndPush(String rawMessage) {
         String message = rawMessage == null ? "" : rawMessage.trim();
         if (git == null) return;
@@ -705,7 +643,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 mainHandler.post(() -> {
                     hideProgressDialog();
                     SketchwareUtil.toastError(friendly);
-                    refreshGitStatus(); // reflect whatever partial state actually happened
+                    refreshGitStatus();
                 });
             }
         });
@@ -736,8 +674,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             throw new IllegalStateException(failures.length() > 0 ? failures.toString().trim() : "Push rejected by remote.");
         }
 
-        // Do not trust the push result alone — independently verify against
-        // the remote (bug #4 requirement).
         Collection<Ref> remoteRefs = git.lsRemote()
                 .setRemote(remoteName)
                 .setCredentialsProvider(getCredentials())
@@ -988,9 +924,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // History tab (feature request #12: Commit Details / Copy Hash / Revert)
-    // ---------------------------------------------------------------------
     private void setupHistoryTab(View view) {
         historyTabView = view;
         RecyclerView rvHistory = view.findViewById(R.id.rv_history);
@@ -1046,10 +979,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 .show();
     }
 
-    // ---------------------------------------------------------------------
-    // Branches tab (bug #6 + feature request #12: Checkout / Rename /
-    // Delete, grouped Local/Remote, active branch protected from delete).
-    // ---------------------------------------------------------------------
     private void setupBranchesTab(View view) {
         RecyclerView rvBranches = view.findViewById(R.id.rv_branches);
         rvBranches.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -1158,11 +1087,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 });
     }
 
-    // ---------------------------------------------------------------------
-    // Remotes tab (bug #5 + feature request #12: Edit / Remove / Test
-    // Connection, plus a validated Add Remote dialog with its own Test
-    // Connection action before saving).
-    // ---------------------------------------------------------------------
     private void setupRemotesTab(View view) {
         RecyclerView rvRemotes = view.findViewById(R.id.rv_remotes);
         rvRemotes.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -1363,11 +1287,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Bug #10: Material 3 dialog with real-time validation — the action
-    // button stays disabled until the input is valid, and the reason is
-    // shown inline via TextInputLayout.setError() instead of a toast.
-    // ---------------------------------------------------------------------
     private interface NameValidator { String validate(String text); } // null == valid
     private interface OnValidatedSave { void onSave(String text); }
 
