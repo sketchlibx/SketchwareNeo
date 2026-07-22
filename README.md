@@ -45,6 +45,9 @@ Beyond what Sketchware Pro offered, Sketchware Neo adds:
 - Performance improvements throughout
 - Many bug fixes from the upstream forks
 
+**Extensibility**
+- Plugin system — drop in an external `.jar`/`.apk` and it loads at runtime, no rebuild needed. Plugins can add entries to the Managers drawer and hook into build success/failure. Still early: a plugin can't bring its own full-screen UI yet, and code-block injection works structurally but hasn't been proven against a real block spec.
+
 > This list isn't exhaustive. Most active development happens in the `mod` package. Check recent commits for the latest.
 
 ---
@@ -89,9 +92,39 @@ cd SketchwareNeo
 | `a.a.a.qq` | Registry of built-in library dependencies |
 | `a.a.a.tq` | Compiling dialog quiz strings |
 | `a.a.a.yq` | Manages Sketchware project file paths |
+| `neo.sketchware.plugin.PluginManager` | Loads and manages external plugins via `DexClassLoader` |
+| `neo.sketchware.plugin.NeoPluginInterface` | The contract a plugin implements to hook into the IDE |
 
 > [!TIP]
 > The `mod` package contains the majority of contributor changes. If you're looking for a specific feature, it's likely there.
+
+---
+
+## Writing Plugins
+
+Sketchware Neo can load plugins at runtime — no rebuild, no updating the base APK. A plugin is a `.jar` or `.apk` with a class implementing `NeoPluginInterface`, plus a `plugin.json` sitting at its root:
+
+```java
+public interface NeoPluginInterface {
+    String getPluginId();
+    int getPluginApiVersion();
+    void onLoad(NeoPluginContext context) throws Exception;
+    void onUnload();
+    // optional: getDrawerEntries(), getBlockContributions(), onBuildError(), onBuildSuccess()
+}
+```
+
+```json
+{
+  "pluginId": "com.example.myplugin",
+  "entryClass": "com.example.myplugin.MyPlugin",
+  "apiVersion": 1
+}
+```
+
+Build it however you like — a plain Android app module works fine, `assembleDebug` already produces valid DEX. Drop the resulting file into `.sketchware/plugins/` on the device, or install it from **App Settings → Plugins** (also reachable from the Managers drawer inside a project). It loads immediately, and you can enable, disable, or remove it from the same screen.
+
+Two things aren't there yet: a plugin can't bring its own full-screen Activity (Android doesn't really let you register new Activities at runtime without some ugly workarounds), and block/palette injection is wired up but hasn't been checked against a real block spec. If you're poking at either of these, open a Discussion and tell us what broke.
 
 ---
 
@@ -142,7 +175,7 @@ Examples:
 - `refactor: Simplify block ID mapping in LogicEditorActivity`
 
 > [!IMPORTANT]
-> New features that don't need to touch existing packages should go into `pro.sketchware`, respecting the existing directory and file naming conventions. Prefer Java over Kotlin unless Kotlin is clearly the better fit for the task.
+> New features that don't need to touch existing packages should go into `pro.sketchware`, respecting the existing directory and file naming conventions. Prefer Java over Kotlin unless Kotlin is clearly the better fit for the task. The one exception is bigger, self-contained subsystems (like the plugin system, under `neo.sketchware.plugin`) — those get their own `neo.sketchware.*` package so they stay easy to find and don't get tangled up with everything else.
 
 ---
 
