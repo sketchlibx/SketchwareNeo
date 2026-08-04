@@ -67,7 +67,7 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders via [SketchLib.fun](https://SketchLib.fun)
+reported to the community leaders via [sketchlib.in](https://sketchlib.in)
 or through GitHub's built-in reporting tools.
 
 All complaints will be reviewed and investigated promptly and fairly.
@@ -160,7 +160,7 @@ If you're not sure whether an idea fits, open a [GitHub Discussion](https://gith
 
 For community discussions, feature updates, support, and general chat:
 
-**[SketchLib.fun](https://sketchlib.fun)**
+**[sketchlib.in](https://sketchlib.in)**
 
 For development-specific communication, use GitHub directly:
 

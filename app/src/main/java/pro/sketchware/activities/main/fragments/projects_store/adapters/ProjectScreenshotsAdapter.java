@@ -14,10 +14,16 @@ import pro.sketchware.databinding.ViewStoreProjectScreenshotBinding;
 
 public class ProjectScreenshotsAdapter extends RecyclerView.Adapter<ProjectScreenshotsAdapter.ViewHolder> {
 
-    private final List<String> screenshots;
+    public interface OnScreenshotClickListener {
+        void onScreenshotClick(int position);
+    }
 
-    public ProjectScreenshotsAdapter(List<String> screenshots) {
+    private final List<String> screenshots;
+    private final OnScreenshotClickListener listener;
+
+    public ProjectScreenshotsAdapter(List<String> screenshots, OnScreenshotClickListener listener) {
         this.screenshots = screenshots;
+        this.listener = listener;
     }
 
     @NonNull
@@ -32,6 +38,12 @@ public class ProjectScreenshotsAdapter extends RecyclerView.Adapter<ProjectScree
     public void onBindViewHolder(ProjectScreenshotsAdapter.ViewHolder holder, int position) {
         String screenshot = screenshots.get(position);
         loadImageFromUrl(holder.binding.screenshot, screenshot);
+        holder.binding.getRoot().setOnClickListener(v -> {
+            int adapterPosition = holder.getBindingAdapterPosition();
+            if (listener != null && adapterPosition != RecyclerView.NO_POSITION) {
+                listener.onScreenshotClick(adapterPosition);
+            }
+        });
     }
 
     @Override

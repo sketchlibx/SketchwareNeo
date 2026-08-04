@@ -183,7 +183,7 @@ Examples:
 
 For discussions, help, feature suggestions, and community updates, visit:
 
-**[SketchLib.fun](https://SketchLib.fun)**
+**[sketchlib.in](https://sketchlib.in)**
 
 For development-related communication, prefer:
 - **GitHub Issues** — bug reports, feature requests

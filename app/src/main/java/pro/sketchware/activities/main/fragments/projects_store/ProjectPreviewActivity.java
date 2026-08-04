@@ -28,6 +28,7 @@ public class ProjectPreviewActivity extends BaseAppCompatActivity {
 
     private FragmentStoreProjectPreviewBinding binding;
     private ProjectModel.Project project;
+    private ArrayList<String> screenshots;
     private boolean isTitleContainerShown;
 
     @Override
@@ -81,7 +82,7 @@ public class ProjectPreviewActivity extends BaseAppCompatActivity {
         binding.toolbarTitle.setText(project.getTitle());
         binding.toolbarSubtitle.setText(project.getUserName());
 
-        ArrayList<String> screenshots = new ArrayList<>();
+        screenshots = new ArrayList<>();
         for (int i = 0; i <= 4; i++) {
             String screenshot = getScreenshot(i);
             if (screenshot != null && !screenshot.isEmpty()) {
@@ -89,9 +90,11 @@ public class ProjectPreviewActivity extends BaseAppCompatActivity {
             }
         }
 
-        binding.screenshots.setAdapter(new ProjectScreenshotsAdapter(screenshots));
+        binding.screenshots.setAdapter(new ProjectScreenshotsAdapter(screenshots, this::openScreenshotViewer));
 
         UI.loadImageFromUrl(binding.icon, project.getIcon());
+        binding.icon.setOnClickListener(v -> openIconViewer());
+
         UI.addSystemWindowInsetToPadding(binding.content, true, true, true, true);
         UI.addSystemWindowInsetToMargin(binding.buttonsContainer, true, false, true, true);
         UI.addSystemWindowInsetToPadding(binding.topScrim, false, true, false, false);
@@ -141,6 +144,23 @@ public class ProjectPreviewActivity extends BaseAppCompatActivity {
     private void openCommentsSheet() {
         CommentsBottomSheet sheet = new CommentsBottomSheet();
         sheet.show(getSupportFragmentManager(), /* tag= */ CommentsBottomSheet.class.getSimpleName());
+    }
+
+    private void openScreenshotViewer(int position) {
+        Intent intent = new Intent(this, ImageViewerActivity.class);
+        intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGES, screenshots);
+        intent.putExtra(ImageViewerActivity.EXTRA_START_INDEX, position);
+        startActivity(intent);
+    }
+
+    private void openIconViewer() {
+        ArrayList<String> icon = new ArrayList<>();
+        icon.add(project.getIcon());
+
+        Intent intent = new Intent(this, ImageViewerActivity.class);
+        intent.putStringArrayListExtra(ImageViewerActivity.EXTRA_IMAGES, icon);
+        intent.putExtra(ImageViewerActivity.EXTRA_START_INDEX, 0);
+        startActivity(intent);
     }
 
     private String getScreenshot(int index) {
