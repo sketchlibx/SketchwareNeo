@@ -745,7 +745,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         ImagePickerAdapter adapter = new ImagePickerAdapter(images, (String) ss.getArgValue(), selectedImage::set);
         binding.recyclerView.setAdapter(adapter);
 
-
         binding.searchInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -846,7 +845,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                                 var eC = jC.a(scId);
                                 var view = eC.c(xmlName, id);
                                 if (view == null) {
-                                    // Event is of a Drawer View
                                     view = eC.c("_drawer_" + xmlName, id);
                                 }
                                 if (view != null) {
@@ -1028,8 +1026,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                                         case "resource_bg":
                                         case "resource":
                                             for (String str : jC.d(scId).m()) {
-                                                // Like this in vanilla Sketchware. Don't ask me why.
-                                                //noinspection StatementWithEmptyBody
                                                 if (parameter.equals(str)) {
                                                 }
                                             }
@@ -1037,8 +1033,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
                                         case "activity":
                                             for (String str : jC.b(scId).d()) {
-                                                // Like this in vanilla Sketchware. Don't ask me why.
-                                                //noinspection StatementWithEmptyBody
                                                 if (parameter.equals(str.substring(str.indexOf(".java")))) {
                                                 }
                                             }
@@ -1046,8 +1040,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
                                         case "sound":
                                             for (String str : jC.d(scId).p()) {
-                                                // Like this in vanilla Sketchware. Don't ask me why.
-                                                //noinspection StatementWithEmptyBody
                                                 if (parameter.equals(str)) {
                                                 }
                                             }
@@ -2276,9 +2268,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     rs10.E = w;
                     w.p().k();
                 } else {
-                    // somehow the blocks is moving to the last position
-                    // commenting it to fix it too
-                    // rs10.p().k();
                 }
                 ArrayList<BlockBean> arrayList2 = new ArrayList<>();
                 for (Rs rs : rs10.getAllChildren()) {
@@ -2486,35 +2475,58 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         startActivity(intent);
     }
 
-        private void showCodeToBlocksDialog() {
-        TextInputLayout inputLayout = new TextInputLayout(this, null, com.google.android.material.R.style.Widget_Material3_TextInputLayout_OutlinedBox);
-        inputLayout.setHint("Drop your Java code here...");
-        inputLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
-        
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        int margin = (int) (20 * getResources().getDisplayMetrics().density);
-        params.setMargins(margin, margin / 2, margin, margin);
-        inputLayout.setLayoutParams(params);
+            private void showCodeToBlocksDialog() {
+        int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
+        int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
+        int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
 
-        TextInputEditText editText = new TextInputEditText(inputLayout.getContext());
-        editText.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp24, dp24, dp24, dp8);
+
+        TextView title = new TextView(this);
+        title.setText("Code to Blocks");
+        title.setTextSize(20);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        root.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Paste your Java snippet below. Supported syntax (loops, variables, APIs) will become blocks. Unrecognized code is wrapped safely.");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+        subParams.setMargins(0, dp8, 0, dp16);
+        subtitle.setLayoutParams(subParams);
+        root.addView(subtitle);
+
+        com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+        card.setCardElevation(0);
+        card.setRadius(dp8);
+        card.setStrokeWidth((int)(1 * getResources().getDisplayMetrics().density));
+        card.setStrokeColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+
+        EditText editText = new EditText(this);
+        editText.setHint("public void myLogic() {\n    // Code here\n}");
+        editText.setBackground(null); // Transparent background
+        editText.setPadding(dp16, dp16, dp16, dp16);
+        editText.setInputType(android.text.InputType.TYPE_CLASS_TEXT 
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE 
                 | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        editText.setMinLines(10);
-        editText.setMaxLines(20);
+        editText.setMinLines(8);
+        editText.setMaxLines(18);
+        editText.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         editText.setVerticalScrollBarEnabled(true);
-        editText.setScrollBarStyle(android.view.View.SCROLLBARS_INSIDE_INSET);
         editText.setTypeface(android.graphics.Typeface.MONOSPACE);
-        inputLayout.addView(editText);
+        editText.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        editText.setHintTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
 
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-        scroll.addView(inputLayout);
+        card.addView(editText, new ViewGroup.LayoutParams(-1, -2));
+        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Convert Code to Blocks")
-                .setMessage("Paste your Java code below. We'll automatically convert loops (if/for/while), variables, and Toasts into native blocks. Anything we don't recognize will be safely kept in an \"Add Source Directly\" block.")
-                .setView(scroll)
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setView(root)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Convert", (dialog, which) -> {
                     String code = editText.getText() == null ? "" : editText.getText().toString().trim();
@@ -2523,31 +2535,67 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         pro.sketchware.utility.SketchwareUtil.toastError("Oops! You forgot to paste the code.");
                         return;
                     }
-                    
-                    BlocksConverter.ConversionResult result = BlocksConverter.convert(code);
-                    
-                    if (result.error != null) {
-                        pro.sketchware.utility.SketchwareUtil.toastError("Couldn't convert the code: " + result.error);
+
+                    java.util.List<neo.sketchware.plugin.NeoBlockConverter> pluginConverters =
+                            neo.sketchware.plugin.PluginManager.getAllBlockConverters();
+
+                    if (pluginConverters.isEmpty()) {
+                        runConversion(code, () -> BlocksConverter.convert(code));
                         return;
                     }
-                    
-                    int total    = result.blocks.size();
-                    int rec      = result.recognizedCount;
-                    int fallback = result.fallbackCount;
-                    
-                    String blockWord = total == 1 ? "block" : "blocks";
-                    String msg = "Here's what we found:\n\n"
-                            + "✅  " + rec + " native " + (rec == 1 ? "block" : "blocks") + "\n"
-                            + "⚠️  " + fallback + " \"Add Source Directly\" " + (fallback == 1 ? "block" : "blocks") + "\n\n"
-                            + "Ready to add " + total + " " + blockWord + " to your project?";
 
-                    new MaterialAlertDialogBuilder(this)
-                            .setTitle("Ready to Insert?")
-                            .setMessage(msg)
-                            .setNegativeButton("Wait, go back", null)
-                            .setPositiveButton("Yes, insert them", (d2, w2) -> insertConvertedBlocks(result.blocks))
+                    String[] options = new String[pluginConverters.size() + 1];
+                    options[0] = "Built-in converter";
+                    for (int i = 0; i < pluginConverters.size(); i++) {
+                        options[i + 1] = pluginConverters.get(i).getConverterName();
+                    }
+
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                            .setTitle("Choose Converter")
+                            .setItems(options, (d3, chosen) -> {
+                                if (chosen == 0) {
+                                    runConversion(code, () -> BlocksConverter.convert(code));
+                                } else {
+                                    neo.sketchware.plugin.NeoBlockConverter converter = pluginConverters.get(chosen - 1);
+                                    runConversion(code, () -> converter.convertJavaToBlocks(code));
+                                }
+                            })
+                            .setNegativeButton("Cancel", null)
                             .show();
                 })
+                .show();
+    }
+
+
+    private void runConversion(String code, java.util.function.Supplier<BlocksConverter.ConversionResult> converterCall) {
+        BlocksConverter.ConversionResult result;
+        try {
+            result = converterCall.get();
+        } catch (Throwable t) {
+            pro.sketchware.utility.SketchwareUtil.toastError("Converter failed: " + t.getMessage());
+            return;
+        }
+
+        if (result == null || result.error != null) {
+            pro.sketchware.utility.SketchwareUtil.toastError("Couldn't convert the code: " + (result == null ? "no result" : result.error));
+            return;
+        }
+
+        int total    = result.blocks.size();
+        int rec      = result.recognizedCount;
+        int fallback = result.fallbackCount;
+
+        String blockWord = total == 1 ? "block" : "blocks";
+        String msg = "Here's what we found:\n\n"
+                + "✅  " + rec + " native " + (rec == 1 ? "block" : "blocks") + "\n"
+                + "⚠️  " + fallback + " \"Add Source Directly\" " + (fallback == 1 ? "block" : "blocks") + "\n\n"
+                + "Ready to add " + total + " " + blockWord + " to your project?";
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Ready to Insert?")
+                .setMessage(msg)
+                .setNegativeButton("Wait, go back", null)
+                .setPositiveButton("Yes, insert them", (d2, w2) -> insertConvertedBlocks(result.blocks))
                 .show();
     }
 
@@ -2556,8 +2604,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             pro.sketchware.utility.SketchwareUtil.toastError("No blocks to insert.");
             return;
         }
-        // Place blocks at the LEFT side of the block pane so they don't
-        // drift far right when many blocks are generated.
         int[] oLoc = new int[2];
         o.getLocationOnScreen(oLoc);
         int insertX = oLoc[0] + pro.sketchware.utility.SketchwareUtil.dpToPx(16);
@@ -2566,7 +2612,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         java.util.ArrayList<com.besome.sketch.beans.BlockBean> inserted =
                 a(blocks, insertX, insertY, true);
 
-        // Record in undo history
         bC.d(scId).a(s(), inserted,
                 insertX - oLoc[0], insertY - oLoc[1], null, null);
 
@@ -2578,28 +2623,23 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     
     private void exportBlockPatternForAI() {
     try {
-        // 1. Get current visual blocks
         java.util.ArrayList<com.besome.sketch.beans.BlockBean> currentBlocks = o.getBlocks();
         if (currentBlocks == null || currentBlocks.isEmpty()) {
             pro.sketchware.utility.SketchwareUtil.toast("No blocks to export!");
             return;
         }
 
-        // 2. Generate Java Code for these blocks
         yq logicHolder = new yq(this, scId);
         logicHolder.a(a.a.a.jC.c(scId), a.a.a.jC.b(scId), a.a.a.jC.a(scId));
         String generatedJava = new a.a.a.Fx(M.getActivityName(), "preview", logicHolder.N, currentBlocks, isViewBindingEnabled).a();
 
-        // 3. Convert BlockBeans to JSON so AI can see the exact parameters, subStacks, and opCodes
         String blockJson = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(currentBlocks);
 
-        // 4. Format the final output
         String finalOutput = "=== GENERATED JAVA ===\n" 
                 + generatedJava.trim() 
                 + "\n\n=== RAW BLOCK BEANS (JSON PATTERN) ===\n" 
                 + blockJson;
 
-        // 5. Copy to Clipboard
         mod.hey.studios.util.Helper.copyToClipboard(finalOutput);
         pro.sketchware.utility.SketchwareUtil.toast("Pattern copied to clipboard! Paste it to AI.");
 

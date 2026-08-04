@@ -379,7 +379,8 @@ public class ImportLogger {
     /** Collects file-count statistics to be logged via {@link #stats(FileStats)}. */
     public static final class FileStats {
         public int activities, fragments, customViews, javaFiles, kotlinFiles,
-                   layouts, drawables, fonts, assets, jniLibs, libraries;
+                   layouts, drawables, fonts, assets, jniLibs, libraries,
+                   services, receivers, providers, applicationClasses;
     }
 
     // ── ErrorContext holder ───────────────────────────────────────────────────

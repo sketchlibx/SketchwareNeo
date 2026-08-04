@@ -9,6 +9,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.materialswitch.MaterialSwitch;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -21,14 +23,20 @@ public class PluginListAdapter extends RecyclerView.Adapter<PluginListAdapter.Vi
         void onDeleteClick(PluginManager.PluginInfo info);
     }
 
+    public interface OnToggleListener {
+        void onToggle(PluginManager.PluginInfo info, boolean enabled);
+    }
+
     private final List<PluginManager.PluginInfo> allItems = new ArrayList<>();
     private final List<PluginManager.PluginInfo> visibleItems = new ArrayList<>();
     private final OnDeleteClickListener deleteClickListener;
+    private final OnToggleListener toggleListener;
 
-    public PluginListAdapter(List<PluginManager.PluginInfo> items, OnDeleteClickListener deleteClickListener) {
+    public PluginListAdapter(List<PluginManager.PluginInfo> items, OnDeleteClickListener deleteClickListener, OnToggleListener toggleListener) {
         this.allItems.addAll(items);
         this.visibleItems.addAll(items);
         this.deleteClickListener = deleteClickListener;
+        this.toggleListener = toggleListener;
     }
 
     public void update(List<PluginManager.PluginInfo> newItems) {
@@ -70,7 +78,14 @@ public class PluginListAdapter extends RecyclerView.Adapter<PluginListAdapter.Vi
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         PluginManager.PluginInfo info = visibleItems.get(position);
         holder.name.setText(info.pluginId());
-        holder.meta.setText("API v" + info.apiVersion() + " · " + info.fileName());
+        holder.meta.setText((info.enabled() ? "Active" : "Disabled") + " · API v" + info.apiVersion() + " · " + info.fileName());
+
+        holder.enabledSwitch.setOnCheckedChangeListener(null);
+        holder.enabledSwitch.setChecked(info.enabled());
+        holder.enabledSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (toggleListener != null) toggleListener.onToggle(info, isChecked);
+        });
+
         holder.deleteButton.setOnClickListener(v -> {
             if (deleteClickListener != null) deleteClickListener.onDeleteClick(info);
         });
@@ -85,12 +100,14 @@ public class PluginListAdapter extends RecyclerView.Adapter<PluginListAdapter.Vi
         TextView name;
         TextView meta;
         ImageButton deleteButton;
+        MaterialSwitch enabledSwitch;
 
         ViewHolder(View itemView) {
             super(itemView);
             name = itemView.findViewById(pro.sketchware.R.id.text_plugin_name);
             meta = itemView.findViewById(pro.sketchware.R.id.text_plugin_meta);
             deleteButton = itemView.findViewById(pro.sketchware.R.id.btn_delete_plugin);
+            enabledSwitch = itemView.findViewById(pro.sketchware.R.id.switch_plugin_enabled);
         }
     }
 }

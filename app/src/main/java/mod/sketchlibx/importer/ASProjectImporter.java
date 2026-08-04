@@ -380,6 +380,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 case ACTIVITY:    stats.activities++;    break;
                 case FRAGMENT:    stats.fragments++;     break;
                 case CUSTOM_VIEW: stats.customViews++;   break;
+                case SERVICE:     stats.services++;      break;
+                case RECEIVER:    stats.receivers++;     break;
+                case PROVIDER:    stats.providers++;     break;
+                case APPLICATION: stats.applicationClasses++; break;
                 default:                                 break;
             }
             if (cs.file != null) {
@@ -391,12 +395,31 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.info("Activities       : " + stats.activities);
         logger.info("Fragments        : " + stats.fragments);
         logger.info("Custom Views     : " + stats.customViews);
+        logger.info("Services         : " + stats.services);
+        logger.info("Receivers        : " + stats.receivers);
+        logger.info("Providers        : " + stats.providers);
+        logger.info("Application class: " + stats.applicationClasses);
         logger.info("Java files       : " + stats.javaFiles);
         logger.info("Kotlin files     : " + stats.kotlinFiles);
         for (ClassifiedSource cs : sources) {
             logger.info("  " + cs.kind.name().toLowerCase()
                     + "  " + cs.simpleClassName
                     + (cs.associatedLayout != null ? "  [layout: " + cs.associatedLayout + "]" : ""));
+
+            if (cs.kind == ClassifiedSource.Kind.SERVICE || cs.kind == ClassifiedSource.Kind.RECEIVER) {
+                logger.warning(cs.kind.name() + " detected and copied as Java: " + cs.simpleClassName
+                        + " — its <" + (cs.kind == ClassifiedSource.Kind.SERVICE ? "service" : "receiver")
+                        + "> entry (exported flag, permission, intent-filters) is NOT auto-registered yet"
+                        + " and must be added manually in Manifest Manager.");
+            } else if (cs.kind == ClassifiedSource.Kind.PROVIDER) {
+                logger.warning("PROVIDER detected and copied as Java: " + cs.simpleClassName
+                        + " — Sketchware Neo has no dedicated provider-registration list;"
+                        + " its <provider> entry must be added manually.");
+            } else if (cs.kind == ClassifiedSource.Kind.APPLICATION) {
+                logger.warning("Custom Application class detected: " + cs.simpleClassName
+                        + " — copied as Java only. Sketchware Neo's own Application class is fixed and was"
+                        + " NOT replaced; merge any needed logic from this class manually.");
+            }
         }
         logger.stepDone(true);
 
@@ -551,20 +574,52 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             logger.stepSkipped("no assets directory");
         }
 
-        // ── [13] Copy native libs (jniLibs/) ─────────────────────────────────
-        logger.step(13, "Copy Native Libraries (jniLibs)");
+        // ── [13] Copy native libraries + source-level JNI ────────────────────
+        logger.step(13, "Copy Native Libraries and JNI Source");
         if (gradle.hasNativeLibs) {
-            File jniLibs = new File(srcMain, "jniLibs");
-            if (jniLibs.exists()) {
-                progress("Copying native libraries...");
-                copyDirectory(jniLibs, new File(filesPath + "/jniLibs"));
-                stats.jniLibs = countFiles(jniLibs);
-                logger.info("JNI libs copied : " + stats.jniLibs);
-                logger.stepDone(true);
-                Log.d(TAG, "jniLibs copied.");
+            boolean anyNativeContentCopied = false;
+
+            // Prebuilt .so files, preserving ABI folders (arm64-v8a, armeabi-v7a, etc).
+            // NOTE: target folder name follows the spec (files/native_libs/), which
+            // differs from this importer's previous "jniLibs" naming — flagged as a
+            // naming mismatch against Sketchware Neo's own convention; verify before
+            // relying on this if native libs still don't load after import.
+            File jniLibsSrc = new File(srcMain, "jniLibs");
+            if (jniLibsSrc.exists()) {
+                progress("Copying prebuilt native libraries...");
+                copyDirectory(jniLibsSrc, new File(filesPath + "/native_libs"));
+                stats.jniLibs = countFiles(jniLibsSrc);
+                logger.info("Prebuilt native libs copied : " + stats.jniLibs);
+                anyNativeContentCopied = true;
             } else {
-                logger.warning("hasNativeLibs=true but jniLibs/ directory not found.");
-                logger.stepSkipped("jniLibs/ directory not found");
+                logger.info("No prebuilt jniLibs/ directory (expected if this module builds from source).");
+            }
+
+            // Source-level JNI: only copy actual source, never build/.cxx/intermediates output.
+            File jniSourceDir = locateJniSourceDir(srcMain);
+            if (jniSourceDir != null) {
+                progress("Copying JNI source (" + gradle.nativeBuildSystem + ")...");
+                File jniDest = new File(filesPath + "/jni");
+                copyJniSourceOnly(jniSourceDir, jniDest);
+                int jniSourceFileCount = countJniSourceFiles(jniSourceDir);
+                logger.info("JNI source files copied : " + jniSourceFileCount
+                        + " (" + gradle.nativeBuildSystem + ") from " + jniSourceDir.getAbsolutePath());
+                anyNativeContentCopied = true;
+
+                if (gradle.nativeBuildSystem == ParsedGradle.NativeBuildSystem.NDK_BUILD) {
+                    logger.warning("This module uses Android.mk/ndk-build. Sketchware Neo's C/C++ Manager"
+                            + " is CMake-based — Android.mk was copied as reference but will need to be"
+                            + " ported to a CMakeLists.txt manually before it will compile.");
+                }
+            } else {
+                logger.info("No JNI source directory found (expected if this module only ships prebuilt .so files).");
+            }
+
+            if (anyNativeContentCopied) {
+                logger.stepDone(true);
+            } else {
+                logger.warning("hasNativeLibs=true but neither jniLibs/ nor a JNI source directory was found.");
+                logger.stepSkipped("no native content found");
             }
         } else {
             logger.stepSkipped("no native libraries declared");
@@ -642,6 +697,57 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 sources.add(placeholder);
             }
         }
+
+        reconcileComponents(sources, manifest.services, ClassifiedSource.Kind.SERVICE, "service");
+        reconcileComponents(sources, manifest.receivers, ClassifiedSource.Kind.RECEIVER, "receiver");
+        reconcileComponents(sources, manifest.providers, ClassifiedSource.Kind.PROVIDER, "provider");
+
+        if (!manifest.permissions.isEmpty()) {
+            logger.info("Permissions declared in manifest: " + manifest.permissions.size());
+            for (String permission : manifest.permissions) {
+                logger.info("  uses-permission: " + permission);
+            }
+            logger.warning(manifest.permissions.size() + " permission(s) found in manifest — "
+                    + "must be added manually in Manifest Manager (no auto-registration path yet).");
+        }
+
+        if (manifest.applicationClassName != null) {
+            logger.info("Custom Application class in manifest: " + manifest.applicationClassName);
+        }
+    }
+
+    /**
+     * Cross-checks a manifest component list (service/receiver/provider) against
+     * classified sources, attaching real exported/permission/authorities data
+     * where the Java class was found, and warning when a manifest entry has no
+     * matching source (can't be copied — only reported).
+     */
+    private void reconcileComponents(List<ClassifiedSource> sources,
+                                      List<ParsedManifest.ComponentEntry> manifestEntries,
+                                      ClassifiedSource.Kind expectedKind,
+                                      String tagLabel) {
+        for (ParsedManifest.ComponentEntry entry : manifestEntries) {
+            boolean found = false;
+            for (ClassifiedSource cs : sources) {
+                if (cs.simpleClassName.equals(entry.simpleClassName)) {
+                    found = true;
+                    if (cs.kind != expectedKind) {
+                        Log.d(TAG, "Note: " + cs.simpleClassName + " is declared as <" + tagLabel
+                                + "> in manifest but classified as " + cs.kind
+                                + " by superclass scan — keeping superclass-based classification.");
+                    }
+                    logger.info("  <" + tagLabel + "> " + entry.simpleClassName
+                            + "  exported=" + entry.exported
+                            + (entry.permission.isEmpty() ? "" : "  permission=" + entry.permission)
+                            + (entry.authorities.isEmpty() ? "" : "  authorities=" + entry.authorities));
+                    break;
+                }
+            }
+            if (!found) {
+                logger.warning("<" + tagLabel + "> in manifest but no matching source found: "
+                        + entry.simpleClassName);
+            }
+        }
     }
 
     // ── Source file copy ──────────────────────────────────────────────────────
@@ -683,6 +789,92 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                         dest.getAbsolutePath() + "/" + f.getName());
             }
         }
+    }
+
+    // ── JNI source import (source-level, not prebuilt .so) ────────────────────
+
+    private static final String[] JNI_SOURCE_EXTENSIONS = {
+            ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp", ".hxx"
+    };
+    private static final String[] JNI_BUILD_FILE_NAMES = {
+            "CMakeLists.txt", "Android.mk", "Application.mk"
+    };
+
+    /**
+     * Finds the module's JNI source root. Checks the CMake-conventional
+     * src/main/cpp first, then the classic ndk-build src/main/jni, then a
+     * bare jni/ at the module root (some older/migrated projects use this).
+     * Returns null if neither exists — a project can validly ship only
+     * prebuilt .so files with no source at all.
+     */
+    private File locateJniSourceDir(File srcMain) {
+        File cpp = new File(srcMain, "cpp");
+        if (cpp.exists() && cpp.isDirectory()) return cpp;
+
+        File jniUnderSrcMain = new File(srcMain, "jni");
+        if (jniUnderSrcMain.exists() && jniUnderSrcMain.isDirectory()) return jniUnderSrcMain;
+
+        // Classic ndk-build convention: <module>/jni/, i.e. a sibling of src/,
+        // not nested under src/main/ — srcMain is .../<module>/src/main.
+        File moduleRoot = srcMain.getParentFile() != null ? srcMain.getParentFile().getParentFile() : null;
+        if (moduleRoot != null) {
+            File jniAtModuleRoot = new File(moduleRoot, "jni");
+            if (jniAtModuleRoot.exists() && jniAtModuleRoot.isDirectory()) return jniAtModuleRoot;
+        }
+
+        return null;
+    }
+
+    /**
+     * Copies only real JNI source + build-script files (never build/.cxx/
+     * intermediates output, since those are computed from this same source
+     * and would just be dead weight — or worse, stale/wrong once re-built
+     * inside Sketchware Neo).
+     */
+    private void copyJniSourceOnly(File src, File dest) {
+        FileUtil.makeDir(dest.getAbsolutePath());
+        File[] files = src.listFiles();
+        if (files == null) return;
+
+        for (File f : files) {
+            if (f.isDirectory()) {
+                String name = f.getName();
+                if (name.equals("build") || name.equals(".cxx") || name.equals("intermediates")) {
+                    continue; // generated output — never a real source directory under cpp/jni
+                }
+                copyJniSourceOnly(f, new File(dest, name));
+            } else if (isJniSourceFile(f)) {
+                FileUtil.copyFile(f.getAbsolutePath(), dest.getAbsolutePath() + "/" + f.getName());
+            }
+        }
+    }
+
+    private boolean isJniSourceFile(File f) {
+        String name = f.getName();
+        for (String buildFile : JNI_BUILD_FILE_NAMES) {
+            if (name.equals(buildFile)) return true;
+        }
+        String lower = name.toLowerCase();
+        for (String ext : JNI_SOURCE_EXTENSIONS) {
+            if (lower.endsWith(ext)) return true;
+        }
+        return false;
+    }
+
+    private int countJniSourceFiles(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) return 0;
+        int count = 0;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                String name = f.getName();
+                if (name.equals("build") || name.equals(".cxx") || name.equals("intermediates")) continue;
+                count += countJniSourceFiles(f);
+            } else if (isJniSourceFile(f)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     // ── ZIP extraction ────────────────────────────────────────────────────────

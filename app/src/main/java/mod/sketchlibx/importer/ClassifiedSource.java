@@ -9,29 +9,23 @@ import java.io.File;
 public class ClassifiedSource {
 
     public enum Kind {
-        /**
-         * Extends AppCompatActivity / Activity / FragmentActivity / ComponentActivity.
-         * → Becomes ProjectFileBean fileType=0 in Sketchware.
-         */
         ACTIVITY,
-
-        /**
-         * Extends Fragment / DialogFragment / BottomSheetDialogFragment.
-         * → Becomes ProjectFileBean fileType=3 (or 4 for BottomSheet) in Sketchware.
-         */
         FRAGMENT,
-
-        /**
-         * Extends View / LinearLayout / RelativeLayout / FrameLayout / ConstraintLayout
-         * (i.e. a fully custom widget class).
-         * → Becomes ProjectFileBean fileType=1 in Sketchware.
-         */
         CUSTOM_VIEW,
 
-        /**
-         * RecyclerView.Adapter / BaseAdapter / Service / BroadcastReceiver / etc.
-         * → Copied as raw Java only.  No ProjectFileBean entry.
-         */
+        /** Extends Service / IntentService / JobIntentService / JobService. */
+        SERVICE,
+
+        /** Extends BroadcastReceiver. */
+        RECEIVER,
+
+        /** Extends ContentProvider. */
+        PROVIDER,
+
+        /** Extends android.app.Application. */
+        APPLICATION,
+
+        /** RecyclerView.Adapter / BaseAdapter / models / utility classes / etc. */
         OTHER
     }
 

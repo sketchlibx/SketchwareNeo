@@ -37,6 +37,18 @@ public class GradleParser {
             "minSdk(?:Version)?\\s*=?\\s*(\\d+)");
     private static final Pattern P_TARGET_SDK = Pattern.compile(
             "targetSdk(?:Version)?\\s*=?\\s*(\\d+)");
+    private static final Pattern P_COMPILE_SDK = Pattern.compile(
+            "compileSdk(?:Version)?\\s*=?\\s*(\\d+)");
+    private static final Pattern P_NAMESPACE = Pattern.compile(
+            "namespace\\s*=?\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern P_JAVA_VERSION = Pattern.compile(
+            "sourceCompatibility\\s*=?\\s*(?:JavaVersion\\.VERSION_)?[\"']?([0-9._]+)[\"']?");
+    private static final Pattern P_PROGUARD_FILE = Pattern.compile(
+            "proguardFiles?\\s*\\(?[^)]*getDefaultProguardFile\\([\"']([^\"']+)[\"']\\)");
+    private static final Pattern P_CONSUMER_RULES = Pattern.compile(
+            "consumerProguardFiles?\\s*\\(?\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern P_FLAVOR_NAME = Pattern.compile(
+            "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\{", Pattern.MULTILINE);
 
     // ── Entry point ───────────────────────────────────────────────────────────
 
@@ -64,6 +76,49 @@ public class GradleParser {
         result.versionCode   = extractInt(content,    P_VER_CODE,   result.versionCode);
         result.minSdk        = extractInt(content,    P_MIN_SDK,    result.minSdk);
         result.targetSdk     = extractInt(content,    P_TARGET_SDK, result.targetSdk);
+        result.compileSdk    = extractInt(content,    P_COMPILE_SDK, result.compileSdk);
+        result.namespace     = extractStringOrNull(content, P_NAMESPACE);
+        result.javaVersion   = extractString(content, P_JAVA_VERSION, result.javaVersion);
+
+        // ── viewBinding / dataBinding / multiDex ───────────────────────────────
+        String buildFeatures = extractNamedBlock(content, "buildFeatures");
+        if (buildFeatures != null) {
+            result.viewBindingEnabled = buildFeatures.contains("viewBinding") && !buildFeatures.matches("(?s).*viewBinding\\s*=?\\s*false.*");
+            result.dataBindingEnabled = buildFeatures.contains("dataBinding") && !buildFeatures.matches("(?s).*dataBinding\\s*=?\\s*false.*");
+        }
+        result.multiDexEnabled = content.contains("multiDexEnabled true")
+                || content.contains("multiDexEnabled = true")
+                || content.contains("androidx.multidex:multidex");
+
+        // ── Proguard / consumer rules ──────────────────────────────────────────
+        result.proguardRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_PROGUARD_FILE));
+        if (result.proguardRulesPath == null) {
+            File defaultProguard = new File(appModuleDir, "proguard-rules.pro");
+            if (defaultProguard.exists()) result.proguardRulesPath = defaultProguard.getAbsolutePath();
+        }
+        result.consumerRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_CONSUMER_RULES));
+
+        String releaseBlock = extractNamedBlock(content, "buildTypes");
+        result.minifyEnabledInRelease = releaseBlock != null
+                && (releaseBlock.contains("minifyEnabled true") || releaseBlock.contains("minifyEnabled = true")
+                    || releaseBlock.contains("isMinifyEnabled = true"));
+
+        // ── Flavors / build types (names only, best effort) ────────────────────
+        String flavorsBlock = extractNamedBlock(content, "productFlavors");
+        if (flavorsBlock != null) {
+            Matcher fm = P_FLAVOR_NAME.matcher(flavorsBlock);
+            while (fm.find()) result.productFlavors.add(fm.group(1));
+        }
+        if (releaseBlock != null) {
+            Matcher bm = P_FLAVOR_NAME.matcher(releaseBlock);
+            while (bm.find()) result.buildTypes.add(bm.group(1));
+        }
+
+        // ── Signing config — detected only, never imported ─────────────────────
+        result.hasSigningConfig = content.contains("signingConfigs");
+        if (result.hasSigningConfig) {
+            Log.w(TAG, "signingConfigs block found — NOT imported. Signing must be set up manually.");
+        }
 
         // ── Language detection ─────────────────────────────────────────────────
         result.hasKotlin = content.contains("kotlin-android")
@@ -81,12 +136,18 @@ public class GradleParser {
         }
 
         // ── Native lib detection ───────────────────────────────────────────────
-        result.hasNativeLibs = content.contains("externalNativeBuild")
-                || content.contains("cmake {")
-                || content.contains("ndkBuild {")
-                || new File(appModuleDir, "src/main/jniLibs").exists()
-                || new File(appModuleDir, "CMakeLists.txt").exists()
-                || new File(appModuleDir, "Android.mk").exists();
+        boolean hasCMake = content.contains("cmake {") || new File(appModuleDir, "CMakeLists.txt").exists()
+                || new File(appModuleDir, "src/main/cpp/CMakeLists.txt").exists();
+        boolean hasNdkBuild = content.contains("ndkBuild {") || new File(appModuleDir, "src/main/jni/Android.mk").exists()
+                || new File(appModuleDir, "jni/Android.mk").exists();
+
+        result.hasNativeLibs = hasCMake || hasNdkBuild
+                || content.contains("externalNativeBuild")
+                || new File(appModuleDir, "src/main/jniLibs").exists();
+
+        result.nativeBuildSystem = hasCMake ? ParsedGradle.NativeBuildSystem.CMAKE
+                : hasNdkBuild ? ParsedGradle.NativeBuildSystem.NDK_BUILD
+                : ParsedGradle.NativeBuildSystem.NONE;
 
         // ── Local .aar / .jar detection ───────────────────────────────────────
         File libsDir = new File(appModuleDir, "libs");
@@ -116,7 +177,16 @@ public class GradleParser {
      * Returns null if not found.
      */
     private String extractDependenciesBlock(String content) {
-        int start = content.indexOf("dependencies");
+        return extractNamedBlock(content, "dependencies");
+    }
+
+    /**
+     * Extracts the content of the first `name { ... }` block, using brace-depth
+     * counting so it correctly handles nested blocks (e.g. buildTypes { release { ... } }).
+     * Returns null if not found.
+     */
+    private String extractNamedBlock(String content, String name) {
+        int start = content.indexOf(name);
         if (start < 0) return null;
 
         int braceStart = content.indexOf('{', start);
@@ -177,6 +247,23 @@ public class GradleParser {
             return val;
         }
         return fallback;
+    }
+
+    private String extractStringOrNull(String content, Pattern p) {
+        Matcher m = p.matcher(content);
+        if (m.find()) {
+            String val = m.group(1);
+            if (val.startsWith("$")) return null;
+            return val;
+        }
+        return null;
+    }
+
+    /** Resolves a path from build.gradle relative to the module dir; null-safe. */
+    private String resolveRelativePath(File appModuleDir, String relativePath) {
+        if (relativePath == null) return null;
+        File file = new File(appModuleDir, relativePath);
+        return file.exists() ? file.getAbsolutePath() : null;
     }
 
     private int extractInt(String content, Pattern p, int fallback) {

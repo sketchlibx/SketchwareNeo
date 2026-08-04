@@ -14,7 +14,32 @@ public class ParsedManifest {
     public String iconResName = "ic_launcher";   // raw name, no @drawable/ prefix
     public String appTheme    = "";               // raw value, e.g. "@style/AppTheme"
 
+    /** Simple class name of android:name on <application>, null if none declared. */
+    public String applicationClassName = null;
+
     public final List<ActivityEntry> activities = new ArrayList<>();
+    public final List<String> permissions = new ArrayList<>();
+    public final List<ComponentEntry> services = new ArrayList<>();
+    public final List<ComponentEntry> receivers = new ArrayList<>();
+    public final List<ComponentEntry> providers = new ArrayList<>();
+
+    // ── Shared data for <service> / <receiver> / <provider> ──────────────────
+
+    public static class ComponentEntry {
+
+        public String rawClassName;
+        public String simpleClassName;
+        public boolean exported = false;
+        public String permission = "";
+
+        /** Only populated for <provider> entries. */
+        public String authorities = "";
+
+        public ComponentEntry(String rawClassName, String simpleClassName) {
+            this.rawClassName    = rawClassName;
+            this.simpleClassName = simpleClassName;
+        }
+    }
 
     // ── Per-activity data ─────────────────────────────────────────────────────
 

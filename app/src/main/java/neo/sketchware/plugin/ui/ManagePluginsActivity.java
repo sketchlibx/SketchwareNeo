@@ -44,7 +44,7 @@ public class ManagePluginsActivity extends AppCompatActivity {
 
         recyclerView = findViewById(pro.sketchware.R.id.recycler_plugins);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new PluginListAdapter(PluginManager.getLoadedPluginInfos(), this::confirmDelete);
+        adapter = new PluginListAdapter(PluginManager.getInstalledPluginInfos(this), this::confirmDelete, this::onToggle);
         recyclerView.setAdapter(adapter);
 
         emptyStateContainer = findViewById(pro.sketchware.R.id.empty_state_container);
@@ -92,7 +92,7 @@ public class ManagePluginsActivity extends AppCompatActivity {
     }
 
     private void refresh() {
-        List<PluginManager.PluginInfo> infos = PluginManager.getLoadedPluginInfos();
+        List<PluginManager.PluginInfo> infos = PluginManager.getInstalledPluginInfos(this);
         adapter.update(infos);
 
         boolean empty = infos.isEmpty();
@@ -102,6 +102,12 @@ public class ManagePluginsActivity extends AppCompatActivity {
                     ? "No plugins installed yet"
                     : "No plugins loaded - tap to see why");
         }
+    }
+
+    private void onToggle(PluginManager.PluginInfo info, boolean enabled) {
+        PluginManager.setEnabled(this, info.pluginId(), enabled);
+        refresh();
+        Snackbar.make(recyclerView, info.pluginId() + (enabled ? " enabled" : " disabled"), Snackbar.LENGTH_SHORT).show();
     }
 
     private void showDiagnostics() {
@@ -153,7 +159,7 @@ public class ManagePluginsActivity extends AppCompatActivity {
                 .setTitle("Remove Plugin")
                 .setMessage("Remove \"" + info.pluginId() + "\"? This will unload it immediately and delete its file. This cannot be undone.")
                 .setPositiveButton("Remove", (d, w) -> {
-                    boolean deleted = PluginManager.deletePlugin(info.pluginId());
+                    boolean deleted = PluginManager.deletePlugin(this, info.pluginId());
                     refresh();
                     Snackbar.make(recyclerView, deleted ? "Plugin removed" : "Plugin unloaded, but its file could not be deleted", Snackbar.LENGTH_LONG).show();
                 })

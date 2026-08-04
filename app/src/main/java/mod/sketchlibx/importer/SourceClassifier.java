@@ -44,6 +44,22 @@ public class SourceClassifier {
             "RecyclerView", "ViewGroup", "AbsoluteLayout"
     };
 
+    private static final String[] SERVICE_SUPERS = {
+            "Service", "IntentService", "JobIntentService", "JobService"
+    };
+
+    private static final String[] RECEIVER_SUPERS = {
+            "BroadcastReceiver"
+    };
+
+    private static final String[] PROVIDER_SUPERS = {
+            "ContentProvider"
+    };
+
+    private static final String[] APPLICATION_SUPERS = {
+            "Application", "MultiDexApplication"
+    };
+
     // ── Java class declaration pattern ────────────────────────────────────────
     // Handles: "public class Foo extends Bar" and "class Foo : Bar()"
     private static final Pattern JAVA_CLASS = Pattern.compile(
@@ -194,6 +210,10 @@ public class SourceClassifier {
         for (String s : ACTIVITY_SUPERS)    if (superClass.equals(s)) return ClassifiedSource.Kind.ACTIVITY;
         for (String s : FRAGMENT_SUPERS)    if (superClass.equals(s)) return ClassifiedSource.Kind.FRAGMENT;
         for (String s : CUSTOM_VIEW_SUPERS) if (superClass.equals(s)) return ClassifiedSource.Kind.CUSTOM_VIEW;
+        for (String s : SERVICE_SUPERS)     if (superClass.equals(s)) return ClassifiedSource.Kind.SERVICE;
+        for (String s : RECEIVER_SUPERS)    if (superClass.equals(s)) return ClassifiedSource.Kind.RECEIVER;
+        for (String s : PROVIDER_SUPERS)    if (superClass.equals(s)) return ClassifiedSource.Kind.PROVIDER;
+        for (String s : APPLICATION_SUPERS) if (superClass.equals(s)) return ClassifiedSource.Kind.APPLICATION;
         return ClassifiedSource.Kind.OTHER;
     }
 

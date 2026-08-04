@@ -118,7 +118,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     private String activityName;
     private String currentTitle;
 
-    // IDE UI Elements
     private DrawerLayout drawerLayout;
     private BottomSheetBehavior<LinearLayout> diagnosticsBehavior;
     private TextView tvCursorPos;
@@ -126,13 +125,11 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     private TabLayout editorTabs;
     private RecyclerView rvExplorer;
 
-    // Search UI Elements
     private MaterialCardView searchCard;
     private LinearLayout searchPanel;
     private ImageView prevBtn, nextBtn, replaceBtn, replaceAllBtn;
     private EditText findEdit, replaceEdit;
 
-    // Diagnostics Engine
     private final Handler diagHandler = new Handler(Looper.getMainLooper());
     private Runnable diagRunnable;
 
@@ -353,7 +350,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             }
         }
 
-        // Realtime Diagnostics & State Tracking + LIVE SNIPPETS
         binding.editor.getText().addContentListener(new ContentListener() {
             @Override public void beforeReplace(Content content) {}
             @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) {
@@ -364,7 +360,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 runOnUiThread(() -> invalidateOptionsMenu());
                 triggerRealtimeDiagnostics();
                 
-                // --- LIVE SNIPPETS ENGINE ---
                 checkAndApplySnippets(startLine, startColumn, endLine, endColumn, insertedContent);
             }
         });
@@ -377,11 +372,9 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         if(navView != null) UI.addSystemWindowInsetToPadding(navView, true, true, true, true);
     }
     
-    // --- LIVE SNIPPETS LOGIC STARTS HERE ---
     private void checkAndApplySnippets(int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
         if (insertedContent == null || insertedContent.length() != 1) return;
         char trigger = insertedContent.charAt(0);
-        // Only trigger snippet replacement when user hits Space or Enter
         if (trigger != ' ' && trigger != '\n') return;
 
         try {
@@ -436,7 +429,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
         if (isJava) {
             switch (word) {
-            // Java Snippets
                 case "toast": return "Toast.makeText(getApplicationContext(), \"|\", Toast.LENGTH_SHORT).show();";
                 case "logd": return "Log.d(\"TAG\", \"|\");";
                 case "loge": return "Log.e(\"TAG\", \"|\", e);";
@@ -521,7 +513,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             }
         } else if (isXml) {
             switch (word) {
-            // XML Snippets
                 case "ll": return "<LinearLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\"\n    android:orientation=\"vertical\">\n    |\n</LinearLayout>";
                 case "rl": return "<RelativeLayout\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n    |\n</RelativeLayout>";
                 case "tv": return "<TextView\n    android:layout_width=\"wrap_content\"\n    android:layout_height=\"wrap_content\"\n    android:text=\"|\" />";
@@ -573,7 +564,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         }
         return null;
     }
-    // --- LIVE SNIPPETS LOGIC ENDS HERE ---
     
     private boolean isLayoutFile() {
         return currentTitle != null && currentTitle.endsWith(".xml") && isFileInLayoutFolder();
@@ -665,7 +655,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             navView.removeAllViews();
             navView.addView(rvExplorer, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             
-            // Restrict recursion to layout folder for maximum performance
             File layoutFolder = new File(FileUtil.getExternalStorageDir() + "/.sketchware/data/" + scId + "/files/resource/layout/");
             if (layoutFolder.exists()) {
                 FileTreeAdapter adapter = new FileTreeAdapter(layoutFolder, file -> {
@@ -689,7 +678,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         }
     }
 
-    // Inner class for File Tree
     private class FileTreeAdapter extends RecyclerView.Adapter<FileTreeAdapter.FileViewHolder> {
         private final List<FileNode> nodes = new ArrayList<>();
         private final OnFileClickListener listener;
@@ -989,7 +977,6 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     public void onStart() {
         super.onStart();
         IntentFilter filter = new IntentFilter(ProjectBuilder.ACTION_BUILD_DIAGNOSTICS);
-        // Android 13+ support with correct parameters
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED); 
         } else {
@@ -1071,8 +1058,44 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         
         MenuItem acspItem = menu.add(Menu.NONE, 11, Menu.NONE, "Auto complete symbol pair");
         acspItem.setCheckable(true).setChecked(pref.getBoolean("act_acsp", true)).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
-        
+
+        if (!neo.sketchware.plugin.PluginManager.getAllEditorActions().isEmpty()) {
+            menu.add(Menu.NONE, 13, Menu.NONE, "Plugin Actions").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        }
+
         return true;
+    }
+
+    private void showPluginActionsDialog() {
+        java.util.List<neo.sketchware.plugin.NeoEditorAction> actions = neo.sketchware.plugin.PluginManager.getAllEditorActions();
+        if (actions.isEmpty()) return;
+
+        String[] labels = new String[actions.size()];
+        for (int i = 0; i < actions.size(); i++) labels[i] = actions.get(i).label();
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Plugin Actions")
+                .setItems(labels, (dialog, which) -> runPluginAction(actions.get(which)))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void runPluginAction(neo.sketchware.plugin.NeoEditorAction action) {
+        String fullText = binding.editor.getText().toString();
+        neo.sketchware.plugin.NeoEditorContext context =
+                new neo.sketchware.plugin.NeoEditorContext(currentTitle, fullText, 0, fullText.length());
+
+        String replacement;
+        try {
+            replacement = action.callback().onInvoke(context);
+        } catch (Throwable t) {
+            SketchwareUtil.toastError("Plugin action failed: " + t.getMessage());
+            return;
+        }
+
+        if (replacement != null) {
+            binding.editor.setText(replacement);
+        }
     }
 
     @Override
@@ -1099,6 +1122,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             case 0 -> { binding.editor.undo(); return true; }
             case 1 -> { binding.editor.redo(); return true; }
             case 2 -> { save(); return true; }
+            case 13 -> { showPluginActionsDialog(); return true; }
             case 12 -> { 
                 if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START); 
                 return true; 

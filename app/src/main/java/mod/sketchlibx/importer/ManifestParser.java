@@ -71,6 +71,9 @@ public class ManifestParser {
         boolean hasLauncherCategory = false;
         ParsedManifest.ActivityEntry currentActivity = null;
 
+        ParsedManifest.ComponentEntry currentComponent = null;
+        java.util.List<ParsedManifest.ComponentEntry> pendingComponentList = null;
+
         int eventType = p.getEventType();
         while (eventType != XmlPullParser.END_DOCUMENT) {
 
@@ -80,11 +83,33 @@ public class ManifestParser {
                 if ("manifest".equals(tag)) {
                     out.packageName = attr(p, null, "package", out.packageName);
 
+                } else if ("uses-permission".equals(tag)) {
+                    String permName = attr(p, NS, "name", "");
+                    if (!permName.isEmpty()) out.permissions.add(permName);
+
                 } else if ("application".equals(tag)) {
                     String rawLabel = attr(p, NS, "label", "");
                     if (!rawLabel.isEmpty()) out.appName = rawLabel; // may be @string/xxx
                     out.appTheme    = attr(p, NS, "theme", "");
                     out.iconResName = stripResPrefix(attr(p, NS, "icon", "@mipmap/ic_launcher"));
+
+                    String appClassRaw = attr(p, NS, "name", "");
+                    if (!appClassRaw.isEmpty()) {
+                        out.applicationClassName = resolveClassName(appClassRaw, out.packageName);
+                    }
+
+                } else if ("service".equals(tag)) {
+                    currentComponent = newComponentEntry(p, out.packageName);
+                    pendingComponentList = out.services;
+
+                } else if ("receiver".equals(tag)) {
+                    currentComponent = newComponentEntry(p, out.packageName);
+                    pendingComponentList = out.receivers;
+
+                } else if ("provider".equals(tag)) {
+                    currentComponent = newComponentEntry(p, out.packageName);
+                    currentComponent.authorities = attr(p, NS, "authorities", "");
+                    pendingComponentList = out.providers;
 
                 } else if ("activity".equals(tag)) {
                     inActivity      = true;
@@ -124,11 +149,28 @@ public class ManifestParser {
                     }
                     inActivity      = false;
                     currentActivity = null;
+
+                } else if (("service".equals(tag) || "receiver".equals(tag) || "provider".equals(tag))
+                        && currentComponent != null && pendingComponentList != null) {
+                    pendingComponentList.add(currentComponent);
+                    currentComponent = null;
+                    pendingComponentList = null;
                 }
             }
 
             eventType = p.next();
         }
+    }
+
+    // ── Helper: build a service/receiver/provider entry ───────────────────────
+
+    private ParsedManifest.ComponentEntry newComponentEntry(XmlPullParser p, String pkg) {
+        String rawName = attr(p, NS, "name", "");
+        String simpleName = resolveClassName(rawName, pkg);
+        ParsedManifest.ComponentEntry entry = new ParsedManifest.ComponentEntry(rawName, simpleName);
+        entry.exported = Boolean.parseBoolean(attr(p, NS, "exported", "false"));
+        entry.permission = attr(p, NS, "permission", "");
+        return entry;
     }
 
     // ── Helper: read attribute safely ─────────────────────────────────────────

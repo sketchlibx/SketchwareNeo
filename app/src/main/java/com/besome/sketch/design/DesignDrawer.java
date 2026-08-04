@@ -164,6 +164,14 @@ public class DesignDrawer extends LinearLayout {
     }
 
     private void addPluginDrawerEntries(ViewGroup content) {
+        addDrawerDivider(content);
+        addDrawerSubheaderItem(R.string.design_drawer_menu_title_plugins, content);
+
+        addDrawerItemDirect(android.R.drawable.ic_menu_manage, "Manage Plugins", "View, enable/disable, or install plugins", content, v -> {
+            android.content.Intent intent = new android.content.Intent(getContext(), neo.sketchware.plugin.ui.ManagePluginsActivity.class);
+            getContext().startActivity(intent);
+        });
+
         List<neo.sketchware.plugin.NeoDrawerEntry> entries;
         try {
             entries = neo.sketchware.plugin.PluginManager.getDrawerEntries();
@@ -172,14 +180,11 @@ public class DesignDrawer extends LinearLayout {
         }
         if (entries == null || entries.isEmpty()) return;
 
-        addDrawerDivider(content);
-        addDrawerSubheaderItem(R.string.design_drawer_menu_title_plugins, content);
-
         for (neo.sketchware.plugin.NeoDrawerEntry entry : entries) {
             try {
                 addDrawerItemDirect(entry.iconResId(), entry.title(), entry.description(), content, v -> {
                     try {
-                        entry.onClick().run();
+                        entry.onClick().onClick(getContext());
                     } catch (Throwable t) {
                         SketchwareUtil.toastError("Plugin action failed: " + t.getMessage());
                     }

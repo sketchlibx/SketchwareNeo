@@ -20,4 +20,17 @@ public interface NeoPluginInterface {
     default List<NeoDrawerEntry> getDrawerEntries() {
         return Collections.emptyList();
     }
+
+    default void onBuildError(String scId, String errorText) {
+    }
+
+    default void onBuildError(String scId, NeoBuildErrorInfo errorInfo) {
+    }
+
+    default void onBuildSuccess(String scId) {
+    }
+
+    default NeoBlockConverter getBlockConverter() {
+        return null;
+    }
 }

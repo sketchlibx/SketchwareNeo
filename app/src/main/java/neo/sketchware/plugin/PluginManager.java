@@ -11,6 +11,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +31,9 @@ public final class PluginManager {
     private static final int CURRENT_API_VERSION = 1;
 
     private static final Map<String, NeoPluginInterface> loadedPlugins = new ConcurrentHashMap<>();
+    private static final Map<String, NeoPluginContext> pluginContexts = new ConcurrentHashMap<>();
     private static final Map<String, File> pluginFiles = new ConcurrentHashMap<>();
+    private static final Map<String, String> disabledPluginIds = new ConcurrentHashMap<>();
     private static final List<String> lastLoadErrors = new ArrayList<>();
     private static boolean initialized = false;
 
@@ -39,6 +42,7 @@ public final class PluginManager {
     public static synchronized void init(Context appContext) {
         if (initialized) return;
         initialized = true;
+        loadDisabledState(appContext);
         scan(appContext);
     }
 
@@ -61,8 +65,19 @@ public final class PluginManager {
             if (!file.getName().endsWith(".jar") && !file.getName().endsWith(".apk")) continue;
             if (pluginFiles.containsValue(file)) continue;
 
+            JSONObject manifest = readPluginManifest(file);
+            if (manifest == null) {
+                lastLoadErrors.add(file.getName() + ": Missing plugin.json");
+                continue;
+            }
+
+            String pluginId = manifest.optString("pluginId", null);
+            if (pluginId != null && disabledPluginIds.containsKey(pluginId)) {
+                continue;
+            }
+
             try {
-                loadPlugin(appContext, file);
+                loadPlugin(appContext, file, manifest);
             } catch (Throwable t) {
                 Log.e(TAG, "Failed to load plugin: " + file.getName(), t);
                 lastLoadErrors.add(file.getName() + ": " + t.getClass().getSimpleName() + " - " + t.getMessage());
@@ -88,8 +103,14 @@ public final class PluginManager {
             return new PluginInstallResult(false, null, "Copy failed: " + e.getMessage());
         }
 
+        JSONObject manifest = readPluginManifest(destination);
+        if (manifest == null) {
+            destination.delete();
+            return new PluginInstallResult(false, null, "Missing plugin.json inside the file");
+        }
+
         try {
-            String pluginId = loadPlugin(appContext, destination);
+            String pluginId = loadPlugin(appContext, destination, manifest);
             return new PluginInstallResult(true, pluginId, null);
         } catch (Throwable t) {
             destination.delete();
@@ -99,8 +120,22 @@ public final class PluginManager {
         }
     }
 
-    public static synchronized boolean deletePlugin(String pluginId) {
+    public static synchronized boolean deletePlugin(Context appContext, String pluginId) {
+        unloadOnly(pluginId);
+
+        File file = pluginFiles.remove(pluginId);
+        boolean deleted = file == null || !file.exists() || file.delete();
+
+        disabledPluginIds.remove(pluginId);
+        persistDisabledState(appContext);
+        deleteBlockContributions(pluginId);
+
+        return deleted;
+    }
+
+    private static void unloadOnly(String pluginId) {
         NeoPluginInterface plugin = loadedPlugins.remove(pluginId);
+        pluginContexts.remove(pluginId);
         if (plugin != null) {
             try {
                 plugin.onUnload();
@@ -108,36 +143,89 @@ public final class PluginManager {
                 Log.e(TAG, "Error unloading plugin " + pluginId, t);
             }
         }
+    }
 
-        File file = pluginFiles.remove(pluginId);
-        boolean deleted = file == null || !file.exists() || file.delete();
+    public static synchronized void setEnabled(Context appContext, String pluginId, boolean enabled) {
+        if (enabled) {
+            disabledPluginIds.remove(pluginId);
+            persistDisabledState(appContext);
 
-        File pluginBlocksDir = new File(ExtraBlockFile.PLUGIN_BLOCKS_DIR, pluginId);
-        if (pluginBlocksDir.exists()) {
-            File[] children = pluginBlocksDir.listFiles();
-            if (children != null) {
-                for (File child : children) child.delete();
+            if (!loadedPlugins.containsKey(pluginId)) {
+                File file = findInstalledFile(appContext, pluginId);
+                if (file != null) {
+                    try {
+                        JSONObject manifest = readPluginManifest(file);
+                        if (manifest != null) loadPlugin(appContext, file, manifest);
+                    } catch (Throwable t) {
+                        lastLoadErrors.add(0, pluginId + ": " + t.getMessage());
+                    }
+                }
             }
-            pluginBlocksDir.delete();
+        } else {
+            disabledPluginIds.put(pluginId, "true");
+            persistDisabledState(appContext);
+            unloadOnly(pluginId);
         }
+    }
 
-        return deleted;
+    public static boolean isEnabled(String pluginId) {
+        return !disabledPluginIds.containsKey(pluginId);
+    }
+
+    private static File findInstalledFile(Context appContext, String pluginId) {
+        File file = pluginFiles.get(pluginId);
+        if (file != null) return file;
+
+        File installDir = getInstallDir(appContext);
+        File[] files = installDir.listFiles();
+        if (files == null) return null;
+
+        for (File candidate : files) {
+            JSONObject manifest = readPluginManifest(candidate);
+            if (manifest != null && pluginId.equals(manifest.optString("pluginId", null))) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     public static File getInstallDir(Context appContext) {
         return new File(Environment.getExternalStorageDirectory(), ".sketchware/plugins");
     }
 
+    private static File getStateFile(Context appContext) {
+        return new File(getInstallDir(appContext), ".state.json");
+    }
+
+    private static void loadDisabledState(Context appContext) {
+        File stateFile = getStateFile(appContext);
+        if (!stateFile.exists()) return;
+
+        try {
+            String content = readFile(stateFile);
+            JSONArray array = new JSONArray(content);
+            for (int i = 0; i < array.length(); i++) {
+                disabledPluginIds.put(array.getString(i), "true");
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void persistDisabledState(Context appContext) {
+        try {
+            JSONArray array = new JSONArray();
+            for (String id : disabledPluginIds.keySet()) array.put(id);
+
+            writeFile(getStateFile(appContext), array.toString());
+        } catch (Exception ignored) {
+        }
+    }
+
     public static List<String> getLastLoadErrors() {
         return new ArrayList<>(lastLoadErrors);
     }
 
-    private static String loadPlugin(Context appContext, File pluginFile) throws Exception {
-        JSONObject manifest = readPluginManifest(pluginFile);
-        if (manifest == null) {
-            throw new IllegalStateException("Missing plugin.json in " + pluginFile.getName());
-        }
-
+    private static String loadPlugin(Context appContext, File pluginFile, JSONObject manifest) throws Exception {
         String pluginId = manifest.getString("pluginId");
         String entryClassName = manifest.getString("entryClass");
         int apiVersion = manifest.optInt("apiVersion", 1);
@@ -172,9 +260,19 @@ public final class PluginManager {
             throw new SecurityException("plugin.json pluginId does not match NeoPluginInterface#getPluginId()");
         }
 
-        plugin.onLoad(new NeoPluginContext(appContext, pluginId));
+        java.util.Set<String> permissions = new java.util.HashSet<>();
+        org.json.JSONArray permissionsArray = manifest.optJSONArray("permissions");
+        if (permissionsArray != null) {
+            for (int i = 0; i < permissionsArray.length(); i++) {
+                permissions.add(permissionsArray.optString(i));
+            }
+        }
+
+        NeoPluginContext pluginContext = new NeoPluginContext(appContext, pluginId, permissions);
+        plugin.onLoad(pluginContext);
 
         loadedPlugins.put(pluginId, plugin);
+        pluginContexts.put(pluginId, pluginContext);
         pluginFiles.put(pluginId, pluginFile);
 
         try {
@@ -224,9 +322,26 @@ public final class PluginManager {
         writeFile(new File(pluginBlocksDir, "block.json"), new Gson().toJson(allBlocks));
     }
 
+    private static void deleteBlockContributions(String pluginId) {
+        File pluginBlocksDir = new File(ExtraBlockFile.PLUGIN_BLOCKS_DIR, pluginId);
+        if (!pluginBlocksDir.exists()) return;
+
+        File[] children = pluginBlocksDir.listFiles();
+        if (children != null) {
+            for (File child : children) child.delete();
+        }
+        pluginBlocksDir.delete();
+    }
+
     private static void writeFile(File file, String content) throws Exception {
         try (FileOutputStream fos = new FileOutputStream(file)) {
             fos.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static String readFile(File file) throws Exception {
+        try (InputStream is = new FileInputStream(file)) {
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
@@ -242,24 +357,94 @@ public final class PluginManager {
         return entries;
     }
 
-    public static List<PluginInfo> getLoadedPluginInfos() {
-        List<PluginInfo> infos = new ArrayList<>();
+    public static void notifyBuildError(String scId, String errorText) {
+        NeoBuildErrorInfo errorInfo = NeoBuildErrorInfo.parse(errorText);
+        for (NeoPluginInterface plugin : loadedPlugins.values()) {
+            try {
+                plugin.onBuildError(scId, errorText);
+            } catch (Throwable ignored) {
+            }
+            try {
+                plugin.onBuildError(scId, errorInfo);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public static List<NeoEditorAction> getAllEditorActions() {
+        List<NeoEditorAction> actions = new ArrayList<>();
+        for (NeoPluginContext context : pluginContexts.values()) {
+            try {
+                actions.addAll(context.getEditorActions());
+            } catch (Throwable ignored) {
+            }
+        }
+        return actions;
+    }
+
+    public static List<NeoBlockConverter> getAllBlockConverters() {
+        List<NeoBlockConverter> converters = new ArrayList<>();
+        for (NeoPluginInterface plugin : loadedPlugins.values()) {
+            try {
+                NeoBlockConverter converter = plugin.getBlockConverter();
+                if (converter != null) converters.add(converter);
+            } catch (Throwable ignored) {
+            }
+        }
+        return converters;
+    }
+
+    public static void notifyBuildSuccess(String scId) {
+        for (NeoPluginInterface plugin : loadedPlugins.values()) {
+            try {
+                plugin.onBuildSuccess(scId);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public static List<PluginInfo> getInstalledPluginInfos(Context appContext) {
+        Map<String, PluginInfo> result = new HashMap<>();
+
         for (Map.Entry<String, NeoPluginInterface> entry : loadedPlugins.entrySet()) {
             File file = pluginFiles.get(entry.getKey());
-            infos.add(new PluginInfo(
+            result.put(entry.getKey(), new PluginInfo(
                     entry.getKey(),
                     entry.getValue().getPluginApiVersion(),
-                    file != null ? file.getName() : ""
+                    file != null ? file.getName() : "",
+                    true
             ));
         }
-        return infos;
+
+        File installDir = getInstallDir(appContext);
+        File[] files = installDir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (!file.getName().endsWith(".jar") && !file.getName().endsWith(".apk")) continue;
+
+                JSONObject manifest = readPluginManifest(file);
+                if (manifest == null) continue;
+
+                String pluginId = manifest.optString("pluginId", null);
+                if (pluginId == null || result.containsKey(pluginId)) continue;
+
+                result.put(pluginId, new PluginInfo(
+                        pluginId,
+                        manifest.optInt("apiVersion", 1),
+                        file.getName(),
+                        false
+                ));
+            }
+        }
+
+        return new ArrayList<>(result.values());
     }
 
     public static List<String> getLoadedPluginIds() {
         return new ArrayList<>(loadedPlugins.keySet());
     }
 
-    public record PluginInfo(String pluginId, int apiVersion, String fileName) {}
+    public record PluginInfo(String pluginId, int apiVersion, String fileName, boolean enabled) {}
 
     public record PluginInstallResult(boolean success, String pluginId, String error) {}
 }
