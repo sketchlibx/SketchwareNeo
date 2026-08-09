@@ -604,7 +604,7 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
 
                             setDownloadState(false);
                             binding.dependencyInput.setText("");
-                            if (onLibraryDownloadedTask != null) onLibraryDownloadedTask.invoke();
+                            if (onLibraryDownloadedTask != null) onLibraryDownloadedTask.invoke(dependencies);
                         });
                     }
                 });
@@ -681,6 +681,6 @@ public class LibraryDownloaderDialogFragment extends BottomSheetDialogFragment {
     }
 
     public interface OnLibraryDownloadedTask {
-        void invoke();
+        void invoke(java.util.List<String> dependencies);
     }
 }

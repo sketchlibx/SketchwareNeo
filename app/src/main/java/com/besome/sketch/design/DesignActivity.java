@@ -122,6 +122,7 @@ import mod.jbk.diagnostic.MissingFileException;
 import mod.jbk.util.LogUtil;
 import mod.khaled.logcat.LogReaderActivity;
 import mod.sketchlibx.search.GlobalSearchDialog;
+import neo.sketchware.plugin.ui.PluginsTabFragment;
 import pro.sketchware.R;
 import pro.sketchware.activities.appcompat.ManageAppCompatActivity;
 import pro.sketchware.activities.editor.command.ManageXMLCommandActivity;
@@ -195,6 +196,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     
     private rs eventTabAdapter;
     private br componentTabAdapter;
+    private PluginsTabFragment pluginsTabAdapter;
+    private boolean pluginsTabEnabled;
+    private Toolbar toolbar;
     
     private final ActivityResultLauncher<Intent> openImageManager = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == RESULT_OK) {
@@ -459,10 +463,12 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         r = new DB(getApplicationContext(), "P1");
         t = new DB(getApplicationContext(), "P12");
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         toolbar.setSubtitle(sc_id);
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
+
+        pluginsTabEnabled = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_SHOW_PLUGINS_TAB);
 
         drawer = findViewById(R.id.drawer_layout);
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
@@ -582,6 +588,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (eventTabAdapter != null) eventTabAdapter.c();
                 } else if (currentTabNumber == 2 && componentTabAdapter != null) {
                     componentTabAdapter.unselectAll();
+                } else if (pluginsTabEnabled && currentTabNumber == 3 && pluginsTabAdapter != null) {
+                    pluginsTabAdapter.closeSearchBar();
                 }
                 
                 boolean isCustomJavaEnabled = new ProjectSettings(sc_id).getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false").equals("true");
@@ -601,7 +609,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                         viewTabAdapter.showHidePropertyView(false);
                         if (eventTabAdapter != null) eventTabAdapter.refreshEvents();
                     }
-                } else {
+                } else if (position == 2) {
                     bottomMenu.findItem(7).setVisible(false);
                     bottomMenu.findItem(9).setVisible(isCustomJavaEnabled); 
                     if (viewTabAdapter != null) {
@@ -609,6 +617,14 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                         viewTabAdapter.showHidePropertyView(false);
                         if (componentTabAdapter != null) componentTabAdapter.refreshData();
                     }
+                } else {
+                    bottomMenu.findItem(7).setVisible(false);
+                    bottomMenu.findItem(9).setVisible(false);
+                    if (viewTabAdapter != null) {
+                        xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
+                        viewTabAdapter.showHidePropertyView(false);
+                    }
+                    if (pluginsTabAdapter != null) pluginsTabAdapter.refreshPlugins();
                 }
                 refresh();
                 currentTabNumber = position;
@@ -716,10 +732,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.design_menu, menu);
-        MenuItem searchItem = menu.findItem(R.id.design_option_menu_search);
-        if (searchItem != null) {
-            searchItem.setVisible(currentTabNumber == 1);
-        }
         return true;
     }
 
@@ -733,14 +745,43 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         } else if (itemId == R.id.design_option_menu_title_save_project) {
             saveProject();
         } else if (itemId == R.id.design_option_menu_search) {
-            if (eventTabAdapter != null) eventTabAdapter.toggleSearchBar();
-            return true;
-        } else if (itemId == R.id.design_option_menu_global_search) {
-            GlobalSearchDialog dialog = new GlobalSearchDialog(sc_id, this);
-            dialog.show(getSupportFragmentManager(), "GlobalSearch");
+            handleSearchIconClick();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void handleSearchIconClick() {
+        if (currentTabNumber == 1) {
+            showEventSearchPopup();
+        } else if (pluginsTabEnabled && currentTabNumber == 3) {
+            if (pluginsTabAdapter != null) pluginsTabAdapter.toggleSearchBar();
+        } else {
+            openGlobalSearch();
+        }
+    }
+
+    private void openGlobalSearch() {
+        GlobalSearchDialog dialog = new GlobalSearchDialog(sc_id, this);
+        dialog.show(getSupportFragmentManager(), "GlobalSearch");
+    }
+
+    private void showEventSearchPopup() {
+        View anchor = toolbar.findViewById(R.id.design_option_menu_search);
+        if (anchor == null) anchor = toolbar;
+
+        PopupMenu searchPopupMenu = new PopupMenu(this, anchor);
+        searchPopupMenu.getMenu().add(Menu.NONE, 1, Menu.NONE, "Global Search");
+        searchPopupMenu.getMenu().add(Menu.NONE, 2, Menu.NONE, Helper.getResString(R.string.logic_search_events));
+        searchPopupMenu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                openGlobalSearch();
+            } else if (item.getItemId() == 2) {
+                if (eventTabAdapter != null) eventTabAdapter.toggleSearchBar();
+            }
+            return true;
+        });
+        searchPopupMenu.show();
     }
 
     @Override
@@ -1493,15 +1534,23 @@ if (canceled) return;
 
         public ViewPagerAdapter(FragmentManager fragmentManager) {
             super(fragmentManager);
-            labels = new String[]{
-                    Helper.getResString(R.string.design_tab_title_view),
-                    Helper.getResString(R.string.design_tab_title_event),
-                    Helper.getResString(R.string.design_tab_title_component)};
+            if (pluginsTabEnabled) {
+                labels = new String[]{
+                        Helper.getResString(R.string.design_tab_title_view),
+                        Helper.getResString(R.string.design_tab_title_event),
+                        Helper.getResString(R.string.design_tab_title_component),
+                        "Plugins"};
+            } else {
+                labels = new String[]{
+                        Helper.getResString(R.string.design_tab_title_view),
+                        Helper.getResString(R.string.design_tab_title_event),
+                        Helper.getResString(R.string.design_tab_title_component)};
+            }
         }
 
         @Override
         public int getCount() {
-            return 3;
+            return labels.length;
         }
 
         @Override
@@ -1517,8 +1566,10 @@ if (canceled) return;
                 viewTabAdapter = (ViewEditorFragment) fragment;
             } else if (position == 1) {
                 eventTabAdapter = (rs) fragment;
-            } else {
+            } else if (position == 2) {
                 componentTabAdapter = (br) fragment;
+            } else if (position == 3) {
+                pluginsTabAdapter = (PluginsTabFragment) fragment;
             }
 
             return fragment;
@@ -1529,8 +1580,12 @@ if (canceled) return;
         public Fragment getItem(int position) {
             if (position == 0) {
                 return new ViewEditorFragment();
+            } else if (position == 1) {
+                return new rs();
+            } else if (position == 2) {
+                return new br();
             } else {
-                return position == 1 ? new rs() : new br();
+                return new PluginsTabFragment();
             }
         }
     }

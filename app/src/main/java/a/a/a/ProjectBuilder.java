@@ -177,6 +177,11 @@ public class ProjectBuilder {
     }
 
     public void compileResources() throws Exception {
+        // NOTE: compileResources() is the earliest build step visible inside ProjectBuilder itself.
+        // If BuildTask (not yet reviewed) has an earlier true "build started" point (e.g. before
+        // ProjectBuilder is even constructed), move this call there instead.
+        neo.sketchware.plugin.PluginManager.notifyBuildStarted(yq.sc_id);
+
         timestampResourceCompilationStarted = System.currentTimeMillis();
         ResourceCompiler compiler = new ResourceCompiler(
                 this,

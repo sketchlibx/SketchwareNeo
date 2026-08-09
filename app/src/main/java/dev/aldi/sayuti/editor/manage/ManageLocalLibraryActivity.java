@@ -237,9 +237,14 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
 
         LibraryDownloaderDialogFragment fragment = new LibraryDownloaderDialogFragment();
         fragment.setArguments(bundle);
-        fragment.setOnLibraryDownloadedTask(() -> {
+        fragment.setOnLibraryDownloadedTask(dependencies -> {
             LocalLibrariesUtil.clearCache(); 
             runLoadLocalLibrariesTask();
+            if (!notAssociatedWithProject) {
+                for (String dependencyName : dependencies) {
+                    neo.sketchware.plugin.PluginManager.notifyLibraryImported(scId, dependencyName);
+                }
+            }
         });
         fragment.show(getSupportFragmentManager(), "library_downloader_dialog");
     }

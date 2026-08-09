@@ -369,6 +369,7 @@ public final class PluginManager {
             } catch (Throwable ignored) {
             }
         }
+        publishEvent(new NeoEvent.CompileError(scId, errorText, errorInfo));
     }
 
     public static List<NeoEditorAction> getAllEditorActions() {
@@ -401,6 +402,51 @@ public final class PluginManager {
             } catch (Throwable ignored) {
             }
         }
+        publishEvent(new NeoEvent.BuildFinished(scId, true));
+        publishEvent(new NeoEvent.ProjectBuilt(scId));
+    }
+
+    /**
+     * Generic event bus entry point. Any IDE module can publish a
+     * {@link NeoEvent} here; every loaded plugin's
+     * {@link NeoPluginInterface#onEvent(NeoEvent)} is invoked. A misbehaving
+     * plugin can never break the publisher or other plugins - exceptions are
+     * caught and logged per plugin.
+     */
+    public static void publishEvent(NeoEvent event) {
+        for (NeoPluginInterface plugin : loadedPlugins.values()) {
+            try {
+                plugin.onEvent(event);
+            } catch (Throwable t) {
+                Log.e(TAG, "Plugin " + plugin.getPluginId() + " threw while handling "
+                        + event.getClass().getSimpleName(), t);
+            }
+        }
+    }
+
+    /** Not yet called from anywhere - wire this up once the project-open flow is reviewed. */
+    public static void notifyProjectOpened(String scId) {
+        publishEvent(new NeoEvent.ProjectOpened(scId));
+    }
+
+    /** Not yet called from anywhere - wire this up once the project-close flow is reviewed. */
+    public static void notifyProjectClosed(String scId) {
+        publishEvent(new NeoEvent.ProjectClosed(scId));
+    }
+
+    /** Not yet called from anywhere - wire this up once the project-save flow is reviewed. */
+    public static void notifyProjectSaved(String scId) {
+        publishEvent(new NeoEvent.ProjectSaved(scId));
+    }
+
+    /** Not yet called from anywhere - wire this up once the build pipeline entry point is reviewed. */
+    public static void notifyBuildStarted(String scId) {
+        publishEvent(new NeoEvent.BuildStarted(scId));
+    }
+
+    /** Not yet called from anywhere - wire this up once the library import flow is reviewed. */
+    public static void notifyLibraryImported(String scId, String libraryName) {
+        publishEvent(new NeoEvent.LibraryImported(scId, libraryName));
     }
 
     public static List<PluginInfo> getInstalledPluginInfos(Context appContext) {

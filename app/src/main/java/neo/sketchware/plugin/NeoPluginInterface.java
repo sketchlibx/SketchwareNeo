@@ -33,4 +33,14 @@ public interface NeoPluginInterface {
     default NeoBlockConverter getBlockConverter() {
         return null;
     }
+
+    /**
+     * Generic event hook — called for every {@link NeoEvent} published via
+     * {@link PluginManager#publishEvent(NeoEvent)}. Override this and use
+     * `instanceof` / pattern matching to react to the event types you care
+     * about. New event types can be added to {@link NeoEvent} in the future
+     * without ever requiring a change to this interface.
+     */
+    default void onEvent(NeoEvent event) {
+    }
 }

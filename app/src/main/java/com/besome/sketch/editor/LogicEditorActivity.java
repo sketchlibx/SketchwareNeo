@@ -503,9 +503,16 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     }
 
     public Rs a(Rs rs, int i, int i2, boolean z) {
+        int addTargetId = o.getAddTargetId();
         Rs a2 = o.a(rs, i, i2, z);
         if (!z) {
             a2.setOnTouchListener(this);
+            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.BlockAdded(scId, a2.getBean().id));
+        } else {
+            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.BlockMoved(scId, a2.getBean().id));
+        }
+        if (addTargetId >= 0) {
+            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.BlockConnected(scId, a2.getBean().id, String.valueOf(addTargetId)));
         }
         return a2;
     }
@@ -1253,6 +1260,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     }
 
     public void b(Rs rs) {
+        neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.BlockRemoved(scId, rs.getBean().id));
         o.b(rs);
     }
 
@@ -2435,6 +2443,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 dummy.a((Rs) currentTouchedView);
                 o.a((Rs) currentTouchedView, 8);
                 o.c((Rs) currentTouchedView);
+                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.BlockDisconnected(scId, ((Rs) currentTouchedView).getBean().id));
                 o.a((Rs) currentTouchedView);
             } else if (((Rs) currentTouchedView).getBlockType() == 2) {
                 f(false);

@@ -69,6 +69,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_CPP_TREE_VIEW    = "cpp_tree_view";
     public static final String SETTING_RESOURCE_TREE_VIEW = "enable-resource-tree-view"; 
     public static final String SETTING_GIT_DIRECT_PUSH = "git-direct-push";
+    public static final String SETTING_SHOW_PLUGINS_TAB = "show-plugins-tab";
 
     private PreferenceActivityNewBinding binding;
 
@@ -131,7 +132,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING, SETTING_SHOW_BUILT_IN_BLOCKS, SETTING_SHOW_EVERY_SINGLE_BLOCK,
                 SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH,
                 SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW,
-                SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, SETTING_GIT_DIRECT_PUSH);
+                SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, SETTING_GIT_DIRECT_PUSH,
+                SETTING_SHOW_PLUGINS_TAB);
 
         for (String key : keys) {
             settings.put(key, getDefaultValue(key));
@@ -144,7 +146,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
             case SETTING_ALWAYS_SHOW_BLOCKS, SETTING_ROOT_AUTO_INSTALL_PROJECTS, SETTING_SHOW_BUILT_IN_BLOCKS,
                  SETTING_SHOW_EVERY_SINGLE_BLOCK, SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, 
                  SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW, SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, 
-                 SETTING_GIT_DIRECT_PUSH -> false;
+                 SETTING_GIT_DIRECT_PUSH, SETTING_SHOW_PLUGINS_TAB -> false;
             case SETTING_BACKUP_DIRECTORY -> "/.sketchware/backups/";
             case SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING -> true;
             case SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH -> "/.sketchware/resources/block/My Block/palette.json";
@@ -204,6 +206,9 @@ public class ConfigActivity extends BaseAppCompatActivity {
         content.addView(createActionPreference(R.drawable.ic_mtrl_palette, "Palette File Path", "Set custom palette.json location", v -> showPathDialog("Palette Path", SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH, palDirDesc[0]), palDirDesc));
         TextView[] blkDirDesc = new TextView[1];
         content.addView(createActionPreference(R.drawable.ic_mtrl_moreblock, "Block File Path", "Set custom block.json location", v -> showPathDialog("Block Path", SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, blkDirDesc[0]), blkDirDesc));
+
+        content.addView(createCategoryHeader("Beta Features"));
+        content.addView(createSwitchPreference(android.R.drawable.ic_menu_manage, "Plugins Tab (Beta)", "Show a dedicated Plugins tab next to View/Event/Component in the project editor. Experimental, off by default.", SETTING_SHOW_PLUGINS_TAB));
     }
 
     private View createCategoryHeader(String titleText) {

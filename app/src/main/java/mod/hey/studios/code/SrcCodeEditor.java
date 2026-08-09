@@ -132,6 +132,15 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
     private final Handler diagHandler = new Handler(Looper.getMainLooper());
     private Runnable diagRunnable;
+    private Runnable pluginChangeRunnable;
+    private Runnable cursorEventRunnable;
+    private io.github.rosemoe.sora.event.SubscriptionReceipt<io.github.rosemoe.sora.event.SelectionChangeEvent> selectionSubscription;
+    // Last position actually published, so CursorChanged/SelectionChanged only
+    // fire when the position genuinely differs from what plugins were last told -
+    // not on every repaint/no-op event.
+    private int lastPublishedCursorLine = Integer.MIN_VALUE, lastPublishedCursorColumn = Integer.MIN_VALUE;
+    private int lastPublishedSelStartLine = Integer.MIN_VALUE, lastPublishedSelStartColumn = Integer.MIN_VALUE;
+    private int lastPublishedSelEndLine = Integer.MIN_VALUE, lastPublishedSelEndColumn = Integer.MIN_VALUE;
 
     private final BroadcastReceiver buildDiagnosticsReceiver = new BroadcastReceiver() {
         @Override
@@ -334,6 +343,19 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         setupTabs();
         setupSearchPanel();
         setupDiagnosticsPanel();
+
+        neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileOpened(
+                scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
+
+        selectionSubscription = binding.editor.subscribeEvent(io.github.rosemoe.sora.event.SelectionChangeEvent.class, (event, unsubscribe) -> {
+            // Debounced (150ms) so rapid cursor movement (e.g. holding an arrow
+            // key, or the cursor advancing on every keystroke while typing)
+            // doesn't flood plugins with an event per repaint. Shorter than the
+            // 800ms content debounce since cursor feedback should feel responsive.
+            if (cursorEventRunnable != null) diagHandler.removeCallbacks(cursorEventRunnable);
+            cursorEventRunnable = () -> publishCursorOrSelectionChange();
+            diagHandler.postDelayed(cursorEventRunnable, 150);
+        });
         
         if (drawerLayout != null) {
             if (isLayoutFile()) {
@@ -355,10 +377,12 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             @Override public void afterDelete(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence deletedContent) {
                 runOnUiThread(() -> invalidateOptionsMenu());
                 triggerRealtimeDiagnostics();
+                notifyPluginsCodeChanged();
             }
             @Override public void afterInsert(Content content, int startLine, int startColumn, int endLine, int endColumn, CharSequence insertedContent) {
                 runOnUiThread(() -> invalidateOptionsMenu());
                 triggerRealtimeDiagnostics();
+                notifyPluginsCodeChanged();
                 
                 checkAndApplySnippets(startLine, startColumn, endLine, endColumn, insertedContent);
             }
@@ -569,8 +593,70 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         return currentTitle != null && currentTitle.endsWith(".xml") && isFileInLayoutFolder();
     }
     
-    private void triggerRealtimeDiagnostics() {
-        if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
+    /**
+     * Reads the current cursor/selection state and publishes CursorChanged or
+     * SelectionChanged - but ONLY if it actually differs from the last
+     * position published. This is what stops the event from firing on
+     * every repaint/no-op SelectionChangeEvent: sora-editor's own event
+     * doesn't distinguish "the cursor genuinely moved" from "the selection
+     * API was touched with no net change" as cleanly as comparing the
+     * actual line/column ourselves does.
+     */
+    private void publishCursorOrSelectionChange() {
+        try {
+            io.github.rosemoe.sora.text.Cursor c = binding.editor.getCursor();
+            if (c == null) return;
+
+            if (c.isSelected()) {
+                int sl = c.getLeftLine(), sc = c.getLeftColumn(), el = c.getRightLine(), ec = c.getRightColumn();
+                if (sl == lastPublishedSelStartLine && sc == lastPublishedSelStartColumn
+                        && el == lastPublishedSelEndLine && ec == lastPublishedSelEndColumn) {
+                    return; // identical to last published selection - skip
+                }
+                lastPublishedSelStartLine = sl;
+                lastPublishedSelStartColumn = sc;
+                lastPublishedSelEndLine = el;
+                lastPublishedSelEndColumn = ec;
+                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.SelectionChanged(
+                        scId, currentTitle, sl, sc, el, ec));
+            } else {
+                int l = c.getRightLine(), col = c.getRightColumn();
+                if (l == lastPublishedCursorLine && col == lastPublishedCursorColumn) {
+                    return; // identical to last published cursor position - skip
+                }
+                lastPublishedCursorLine = l;
+                lastPublishedCursorColumn = col;
+                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.CursorChanged(
+                        scId, currentTitle, l, col));
+            }
+        } catch (Throwable ignored) {
+            // Defensive: never let a plugin-event hookup break the actual editor.
+        }
+    }
+
+    /**
+     * Debounced (~800ms) notification to plugins that the file's content
+     * changed. Fires the generic TextChanged event for every file type
+     * (Java/XML/C-C++), and additionally the older Java-specific
+     * JavaCodeChanged for .java files, unchanged, so existing plugins built
+     * against it keep working. Reuses diagHandler so it's cancelled together
+     * with diagnostics in onStop().
+     */
+    private void notifyPluginsCodeChanged() {
+        boolean isJava = (languageId == 1) || (currentTitle != null && currentTitle.endsWith(".java"));
+
+        if (pluginChangeRunnable != null) diagHandler.removeCallbacks(pluginChangeRunnable);
+        pluginChangeRunnable = () -> {
+            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.TextChanged(
+                    scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
+            if (isJava) {
+                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.JavaCodeChanged(scId, currentTitle));
+            }
+        };
+        diagHandler.postDelayed(pluginChangeRunnable, 800);
+    }
+
+    private void triggerRealtimeDiagnostics() {        if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
         diagRunnable = () -> {
             String text = binding.editor.getText().toString();
             if (currentTitle != null && currentTitle.endsWith(".xml")) {
@@ -599,6 +685,18 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                             diags.add(new Diagnostic(Diagnostic.Severity.ERROR, currentTitle, 1, 0, e.getMessage()));
                         }
                     }
+
+                    List<neo.sketchware.plugin.NeoDiagnostic> neoDiags = new ArrayList<>();
+                    for (Diagnostic d : diags) {
+                        neo.sketchware.plugin.NeoDiagnostic.Severity severity =
+                                d.severity == Diagnostic.Severity.ERROR ? neo.sketchware.plugin.NeoDiagnostic.Severity.ERROR
+                                        : d.severity == Diagnostic.Severity.WARNING ? neo.sketchware.plugin.NeoDiagnostic.Severity.WARNING
+                                        : neo.sketchware.plugin.NeoDiagnostic.Severity.INFO;
+                        neoDiags.add(new neo.sketchware.plugin.NeoDiagnostic(severity, d.fileName, d.line, d.column, d.message, "xml"));
+                    }
+                    neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.DiagnosticsChanged(
+                            scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.XML, neoDiags));
+
                     runOnUiThread(() -> {
                         if (diagnosticsBehavior != null && !diags.isEmpty()) {
                             showDiagnostics(diags);
@@ -968,6 +1066,11 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 }
             }
             FileUtil.writeFile(filePath, beforeContent);
+            if (filePath != null && filePath.endsWith(".java")) {
+                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.JavaCodeSaved(scId, filePath));
+            }
+            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileSaved(
+                    scId, filePath, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(filePath)));
         }
         SketchwareUtil.toast("Saved successfully!");
         invalidateOptionsMenu();
@@ -989,8 +1092,29 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         super.onStop();
         try { unregisterReceiver(buildDiagnosticsReceiver); } catch (Exception ignored){}
         if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
+        if (pluginChangeRunnable != null) diagHandler.removeCallbacks(pluginChangeRunnable);
+        if (cursorEventRunnable != null) diagHandler.removeCallbacks(cursorEventRunnable);
+        neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileClosed(
+                scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
         float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
         pref.edit().putInt("act_ts", (int) (binding.editor.getTextSizePx() / scaledDensity)).apply();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // Only unsubscribe/release here, not in onStop() - onStart() re-registers
+        // buildDiagnosticsReceiver, confirming onStop()/onStart() is a normal
+        // pause/resume cycle the activity can come back from. onDestroy() is the
+        // point where the editor is genuinely never coming back, so it's the
+        // correct place for both:
+        if (selectionSubscription != null) { try { selectionSubscription.unsubscribe(); } catch (Throwable ignored) {} }
+        // Per sora-editor's own docs: release() must be called when a CodeEditor
+        // is no longer used, to free its background analysis thread and other
+        // resources - this wasn't being called anywhere before Phase A's event
+        // work, a pre-existing gap unrelated to the new events but directly
+        // relevant to memory-leak hygiene, so fixed here alongside it.
+        try { binding.editor.release(); } catch (Throwable ignored) {}
     }
 
     @Override
@@ -1119,8 +1243,22 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case 0 -> { binding.editor.undo(); return true; }
-            case 1 -> { binding.editor.redo(); return true; }
+            case 0 -> {
+                boolean hadUndo = binding.editor.canUndo();
+                binding.editor.undo();
+                if (hadUndo) {
+                    neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.EditorUndo(scId, currentTitle));
+                }
+                return true;
+            }
+            case 1 -> {
+                boolean hadRedo = binding.editor.canRedo();
+                binding.editor.redo();
+                if (hadRedo) {
+                    neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.EditorRedo(scId, currentTitle));
+                }
+                return true;
+            }
             case 2 -> { save(); return true; }
             case 13 -> { showPluginActionsDialog(); return true; }
             case 12 -> { 

@@ -19,7 +19,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
-import java.util.List;
 
 import com.google.android.material.divider.MaterialDivider;
 import com.google.android.material.shape.MaterialShapeDrawable;
@@ -159,46 +158,6 @@ public class DesignDrawer extends LinearLayout {
 
         addDrawerDivider(this);
         addDrawerItem(R.id.item_collection_manager, R.drawable.ic_mtrl_bookmark, R.string.design_drawer_menu_title_collection, R.string.design_drawer_menu_description_collection, this);
-
-        addPluginDrawerEntries(content);
-    }
-
-    private void addPluginDrawerEntries(ViewGroup content) {
-        addDrawerDivider(content);
-        addDrawerSubheaderItem(R.string.design_drawer_menu_title_plugins, content);
-
-        addDrawerItemDirect(android.R.drawable.ic_menu_manage, "Manage Plugins", "View, enable/disable, or install plugins", content, v -> {
-            android.content.Intent intent = new android.content.Intent(getContext(), neo.sketchware.plugin.ui.ManagePluginsActivity.class);
-            getContext().startActivity(intent);
-        });
-
-        List<neo.sketchware.plugin.NeoDrawerEntry> entries;
-        try {
-            entries = neo.sketchware.plugin.PluginManager.getDrawerEntries();
-        } catch (Throwable t) {
-            return;
-        }
-        if (entries == null || entries.isEmpty()) return;
-
-        for (neo.sketchware.plugin.NeoDrawerEntry entry : entries) {
-            try {
-                addDrawerItemDirect(entry.iconResId(), entry.title(), entry.description(), content, v -> {
-                    try {
-                        entry.onClick().onClick(getContext());
-                    } catch (Throwable t) {
-                        SketchwareUtil.toastError("Plugin action failed: " + t.getMessage());
-                    }
-                });
-            } catch (Throwable ignored) {
-            }
-        }
-    }
-
-    private void addDrawerItemDirect(int iconResId, String title, String description, ViewGroup view, OnClickListener listener) {
-        DrawerItem drawerItem = new DrawerItem(getContext());
-        drawerItem.setContent(iconResId, title, description);
-        drawerItem.setOnClickListener(View.NO_ID, listener);
-        view.addView(drawerItem, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     @Override
