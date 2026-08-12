@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
 import android.widget.PopupMenu;
@@ -22,6 +23,8 @@ import mod.hey.studios.util.CompileLogHelper;
 import mod.hey.studios.util.Helper;
 import mod.jbk.diagnostic.CompileErrorSaver;
 import mod.jbk.util.AddMarginOnApplyWindowInsetsListener;
+import neo.sketchware.ai.ErrorFixResult;
+import neo.sketchware.ai.ErrorFixTask;
 import pro.sketchware.databinding.CompileLogBinding;
 import pro.sketchware.utility.SketchwareUtil;
 
@@ -34,6 +37,9 @@ public class CompileLogActivity extends BaseAppCompatActivity {
     private SharedPreferences logViewerPreferences;
 
     private CompileLogBinding binding;
+    private String currentErrorText;
+    private androidx.appcompat.app.AlertDialog aiLoadingDialog;
+    private Button analyzeButton;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -108,6 +114,11 @@ public class CompileLogActivity extends BaseAppCompatActivity {
 
         binding.formatButton.setOnClickListener(v -> options.show());
 
+        analyzeButton = new Button(this);
+        analyzeButton.setText("Analyze with AI");
+        analyzeButton.setOnClickListener(v -> analyzeErrorWithAi());
+        binding.optionsLayout.addView(analyzeButton);
+
         applyLogViewerPreferences();
 
         setErrorText();
@@ -116,6 +127,7 @@ public class CompileLogActivity extends BaseAppCompatActivity {
     private void setErrorText() {
         String error = getIntent().getStringExtra("error");
         if (error == null) error = compileErrorSaver.getLogsFromFile();
+        currentErrorText = error;
         if (error == null) {
             binding.noContentLayout.setVisibility(View.VISIBLE);
             binding.optionsLayout.setVisibility(View.GONE);
@@ -127,6 +139,59 @@ public class CompileLogActivity extends BaseAppCompatActivity {
 
         binding.tvCompileLog.setText(CompileLogHelper.getColoredLogs(this, error));
         binding.tvCompileLog.setTextIsSelectable(true);
+    }
+
+    private void analyzeErrorWithAi() {
+        if (currentErrorText == null) {
+            SketchwareUtil.toast("No error to analyze.");
+            return;
+        }
+
+        aiLoadingDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Analyzing error")
+                .setMessage("Asking AI to analyze the build error...")
+                .setCancelable(false)
+                .show();
+
+        ErrorFixTask.analyze(this, currentErrorText, new neo.sketchware.ai.ErrorFixCallback() {
+            @Override
+            public void onResult(ErrorFixResult result) {
+                aiLoadingDialog.dismiss();
+                showFixResultDialog(result);
+            }
+
+            @Override
+            public void onError(String message) {
+                aiLoadingDialog.dismiss();
+                new MaterialAlertDialogBuilder(CompileLogActivity.this)
+                        .setTitle("AI analysis failed")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
+    }
+
+    private void showFixResultDialog(ErrorFixResult result) {
+        String message = result.summary + "\n\n" + result.explanation;
+
+        MaterialAlertDialogBuilder dialogBuilder = new MaterialAlertDialogBuilder(this)
+                .setTitle("AI analysis")
+                .setMessage(message)
+                .setNegativeButton("Close", null);
+
+        if (result.patchable) {
+            dialogBuilder.setPositiveButton("Apply Fix", (dialog, which) -> {
+                boolean applied = ErrorFixTask.applyFix(result);
+                if (applied) {
+                    SketchwareUtil.toast("Fix applied. Rebuild the project to check.");
+                } else {
+                    SketchwareUtil.toast("Could not apply the fix automatically. The file may have changed.");
+                }
+            });
+        }
+
+        dialogBuilder.show();
     }
 
     private void applyLogViewerPreferences() {

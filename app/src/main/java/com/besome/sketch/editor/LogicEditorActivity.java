@@ -1996,10 +1996,12 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     .setTitle("Source Code")
                     .setItems(new CharSequence[]{
                             "View Source Code",
-                            "Code to Blocks"
+                            "Code to Blocks",
+                            "Generate with AI"
                     }, (dialog, which) -> {
-                        if (which == 0) showSourceCode();
-                        else            showCodeToBlocksDialog();
+                        if (which == 0)      showSourceCode();
+                        else if (which == 1) showCodeToBlocksDialog();
+                        else                  showGenerateWithAiDialog();
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
@@ -2575,6 +2577,90 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 .show();
     }
 
+
+    private void showGenerateWithAiDialog() {
+        int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
+        int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
+        int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp24, dp24, dp24, dp8);
+
+        TextView title = new TextView(this);
+        title.setText("Generate with AI");
+        title.setTextSize(20);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        root.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Describe what this \"" + eventName + "\" event should do. AI will write the logic and convert it to blocks.");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+        subParams.setMargins(0, dp8, 0, dp16);
+        subtitle.setLayoutParams(subParams);
+        root.addView(subtitle);
+
+        com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+        card.setCardElevation(0);
+        card.setRadius(dp8);
+        card.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
+        card.setStrokeColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+
+        EditText editText = new EditText(this);
+        editText.setHint("e.g. show a toast saying Hello when this runs");
+        editText.setBackground(null);
+        editText.setPadding(dp16, dp16, dp16, dp16);
+        editText.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        editText.setMinLines(4);
+        editText.setMaxLines(10);
+        editText.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        editText.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        editText.setHintTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
+
+        card.addView(editText, new ViewGroup.LayoutParams(-1, -2));
+        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setView(root)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Generate", (dialog, which) -> {
+                    String prompt = editText.getText() == null ? "" : editText.getText().toString().trim();
+                    if (prompt.isEmpty()) {
+                        pro.sketchware.utility.SketchwareUtil.toastError("Describe what this event should do first.");
+                        return;
+                    }
+                    runAiLogicGeneration(prompt);
+                })
+                .show();
+    }
+
+    private void runAiLogicGeneration(String prompt) {
+        androidx.appcompat.app.AlertDialog loadingDialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Generating logic")
+                .setMessage("Asking AI to write the code...")
+                .setCancelable(false)
+                .show();
+
+        neo.sketchware.ai.LogicGenTask.generate(this, M.getActivityName(), eventName, prompt, new neo.sketchware.ai.AiResponseCallback() {
+            @Override
+            public void onSuccess(String generatedCode) {
+                loadingDialog.dismiss();
+                runConversion(generatedCode, () -> BlocksConverter.convert(generatedCode));
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                loadingDialog.dismiss();
+                pro.sketchware.utility.SketchwareUtil.toastError("AI generation failed: " + errorMessage);
+            }
+        });
+    }
 
     private void runConversion(String code, java.util.function.Supplier<BlocksConverter.ConversionResult> converterCall) {
         BlocksConverter.ConversionResult result;
