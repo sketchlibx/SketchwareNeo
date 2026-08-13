@@ -30,7 +30,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
     private AiModelAdapter adapter;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ai_settings);
 
