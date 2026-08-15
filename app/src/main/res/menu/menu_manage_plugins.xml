@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+      xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_sort"
+        android:title="Sort by Name"
+        android:icon="@drawable/ic_mtrl_sort"
+        app:showAsAction="always" />
+
     <item
         android:id="@+id/action_view_diagnostics"
         android:title="View load log"
-        android:showAsAction="never" />
+        app:showAsAction="never" />
+
 </menu>

@@ -107,6 +107,24 @@
             android:src="@drawable/ic_mtrl_formattext"/>
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/analyzeAiButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="5dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="20dp"
+            android:src="@drawable/ic_mtrl_analyse" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/copyLogButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="5dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="20dp"
+            android:src="@drawable/ic_mtrl_copy" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/clearButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

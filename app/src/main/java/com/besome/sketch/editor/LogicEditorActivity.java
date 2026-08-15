@@ -2647,7 +2647,10 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 .setCancelable(false)
                 .show();
 
-        neo.sketchware.ai.LogicGenTask.generate(this, M.getActivityName(), eventName, prompt, new neo.sketchware.ai.AiResponseCallback() {
+        String viewContext = buildViewContext();
+        String existingCode = buildExistingEventCode();
+
+        neo.sketchware.ai.LogicGenTask.generate(this, M.getActivityName(), eventName, viewContext, existingCode, prompt, new neo.sketchware.ai.AiResponseCallback() {
             @Override
             public void onSuccess(String generatedCode) {
                 loadingDialog.dismiss();
@@ -2660,6 +2663,31 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 pro.sketchware.utility.SketchwareUtil.toastError("AI generation failed: " + errorMessage);
             }
         });
+    }
+
+    private String buildViewContext() {
+        StringBuilder sb = new StringBuilder();
+        java.util.ArrayList<com.besome.sketch.beans.ViewBean> views = jC.a(scId).d(M.getXmlName());
+        if (views == null) return "";
+        for (com.besome.sketch.beans.ViewBean view : views) {
+            if (view.id == null || view.id.isEmpty()) continue;
+            sb.append(view.id)
+                    .append(": ")
+                    .append(com.besome.sketch.beans.ViewBean.getViewTypeName(view.type))
+                    .append("\n");
+        }
+        return sb.toString();
+    }
+
+    private String buildExistingEventCode() {
+        try {
+            yq yqExporter = new yq(this, scId);
+            yqExporter.a(jC.c(scId), jC.b(scId), jC.a(scId));
+            String code = new Fx(M.getActivityName(), "preview", yqExporter.N, o.getBlocks(), isViewBindingEnabled).a();
+            return code == null ? "" : code.trim();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private void runConversion(String code, java.util.function.Supplier<BlocksConverter.ConversionResult> converterCall) {

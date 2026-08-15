@@ -697,7 +697,6 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 				runOnUiThread(() -> updateMenuState());
 				triggerRealtimeDiagnostics();
 				
-				// Keep the old XML closing logic safe
 				if (insertedContent != null && insertedContent.toString().equals(">")) {
 					try {
 						String lineText = content.getLineString(endLine);
@@ -714,7 +713,6 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 					} catch (Exception ignored) {}
 				}
 				
-				// Add the snippet parsing logic
 				checkAndApplySnippets(startLine, startColumn, endLine, endColumn, insertedContent);
 			}
 		};
@@ -880,6 +878,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 		
 		if (filename != null && filename.endsWith(".xml")) {
 			menu.add(Menu.NONE, 6, Menu.NONE, "Layout Preview").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+			menu.add(Menu.NONE, 13, Menu.NONE, "Quick Layout").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 		}
 		
 		MenuItem wrapItem = menu.add(Menu.NONE, 9, Menu.NONE, "Word wrap");
@@ -972,6 +971,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 				return true; 
 			}
 			case 7 -> { SrcCodeEditor.showSwitchLanguageDialog(this, editor, (dialog, which) -> { SrcCodeEditor.selectLanguage(this, editor, which); dialog.dismiss(); }); return true; }
+			case 13 -> { showGenerateLayoutWithAiDialog(); return true; }
 			case 8 -> {
 				SrcCodeEditor.showSwitchThemeDialog(this, editor, (dialog, which) -> {
 					SrcCodeEditor.selectTheme(editor, which);
@@ -1025,6 +1025,96 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 		}
 	}
 	
+	private void showGenerateLayoutWithAiDialog() {
+		int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
+		int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
+		int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
+
+		LinearLayout root = new LinearLayout(this);
+		root.setOrientation(LinearLayout.VERTICAL);
+		root.setPadding(dp24, dp24, dp24, dp8);
+
+		TextView title = new TextView(this);
+		title.setText("Generate Layout with AI");
+		title.setTextSize(20);
+		title.setTypeface(null, android.graphics.Typeface.BOLD);
+		title.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+		root.addView(title);
+
+		TextView subtitle = new TextView(this);
+		subtitle.setText("Describe what this layout should look like or how it should change. AI will rewrite the XML.");
+		subtitle.setTextSize(14);
+		subtitle.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+		LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+		subParams.setMargins(0, dp8, 0, dp16);
+		subtitle.setLayoutParams(subParams);
+		root.addView(subtitle);
+
+		com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+		card.setCardElevation(0);
+		card.setRadius(dp8);
+		card.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
+		card.setStrokeColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+		card.setCardBackgroundColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+
+		EditText promptInput = new EditText(this);
+		promptInput.setHint("e.g. add a button below the title that says Submit");
+		promptInput.setBackground(null);
+		promptInput.setPadding(dp16, dp16, dp16, dp16);
+		promptInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+				| android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+				| android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+		promptInput.setMinLines(4);
+		promptInput.setMaxLines(10);
+		promptInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+		promptInput.setVerticalScrollBarEnabled(true);
+		promptInput.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+		promptInput.setHintTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
+
+		card.addView(promptInput, new ViewGroup.LayoutParams(-1, -2));
+		root.addView(card, new LinearLayout.LayoutParams(-1, -2));
+
+		new MaterialAlertDialogBuilder(this)
+				.setView(root)
+				.setNegativeButton("Cancel", null)
+				.setPositiveButton("Generate", (dialog, which) -> {
+					String prompt = promptInput.getText() == null ? "" : promptInput.getText().toString().trim();
+					if (prompt.isEmpty()) {
+						SketchwareUtil.toastError("Describe the layout change first.");
+						return;
+					}
+					runAiLayoutGeneration(prompt);
+				})
+				.show();
+	}
+
+	private void runAiLayoutGeneration(String prompt) {
+		k();
+		String currentXml = editor.getText().toString();
+
+		neo.sketchware.ai.LayoutGenTask.generate(this, currentXml, prompt, new neo.sketchware.ai.AiResponseCallback() {
+			@Override
+			public void onSuccess(String generatedXml) {
+				editor.setText(generatedXml);
+				if (applyXmlChanges()) {
+					beforeContent = editor.getText().toString();
+					invalidateOptionsMenu();
+					updateMenuState();
+					SketchwareUtil.toast("Layout updated by AI");
+				} else {
+					editor.setText(currentXml);
+				}
+				h();
+			}
+
+			@Override
+			public void onFailure(String errorMessage) {
+				h();
+				SketchwareUtil.toastError("AI generation failed: " + errorMessage);
+			}
+		});
+	}
+
 	private boolean applyXmlChanges() {
 		try {
 			ArrayList<ViewBean> oldLayout = jC.a(sc_id).d(filename);

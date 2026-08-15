@@ -4,6 +4,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -54,6 +55,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
                 (provider != null ? provider.getProviderName() : config.providerId) + " · " + config.modelName
         );
         holder.textActiveBadge.setVisibility(config.id.equals(activeId) ? View.VISIBLE : View.GONE);
+        holder.imageProviderIcon.setImageResource(getProviderIcon(config.providerId));
 
         holder.buttonEditModel.setOnClickListener(v -> listener.onEditClicked(config));
         holder.buttonDeleteModel.setOnClickListener(v -> listener.onDeleteClicked(config));
@@ -65,10 +67,31 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         return items.size();
     }
 
+    private int getProviderIcon(String providerId) {
+        if (providerId == null) return R.drawable.ic_mtrl_ai;
+        switch (providerId) {
+            case "openai":
+                return R.drawable.ic_mtrl_openai;
+            case "gemini":
+                return R.drawable.ic_mtrl_gemini;
+            case "claude":
+                return R.drawable.ic_mtrl_claude;
+            case "nvidia":
+                return R.drawable.ic_mtrl_customai;
+            case "deepseek":
+                return R.drawable.ic_mtrl_deepseek;
+            case "custom":
+                return R.drawable.ic_mtrl_customai;
+            default:
+                return R.drawable.ic_mtrl_ai;
+        }
+    }
+
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView textModelName;
         TextView textModelProvider;
         TextView textActiveBadge;
+        ImageView imageProviderIcon;
         ImageButton buttonEditModel;
         ImageButton buttonDeleteModel;
 
@@ -77,6 +100,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
             textModelName = itemView.findViewById(R.id.textModelName);
             textModelProvider = itemView.findViewById(R.id.textModelProvider);
             textActiveBadge = itemView.findViewById(R.id.textActiveBadge);
+            imageProviderIcon = itemView.findViewById(R.id.imageProviderIcon);
             buttonEditModel = itemView.findViewById(R.id.buttonEditModel);
             buttonDeleteModel = itemView.findViewById(R.id.buttonDeleteModel);
         }

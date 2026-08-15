@@ -18,6 +18,8 @@ import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import dev.pranav.filepicker.FilePickerCallback;
@@ -32,6 +34,8 @@ public class ManagePluginsActivity extends AppCompatActivity {
     private PluginListAdapter adapter;
     private android.view.View emptyStateContainer;
     private TextView emptyStateText;
+
+    private boolean isAscending = true; // For Sort by System
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,8 +83,14 @@ public class ManagePluginsActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == pro.sketchware.R.id.action_view_diagnostics) {
+        int id = item.getItemId();
+        if (id == pro.sketchware.R.id.action_view_diagnostics) {
             showDiagnostics();
+            return true;
+        } else if (id == pro.sketchware.R.id.action_sort) {
+            isAscending = !isAscending;
+            refresh();
+            Snackbar.make(recyclerView, isAscending ? "Sorted A-Z" : "Sorted Z-A", Snackbar.LENGTH_SHORT).show();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -93,6 +103,18 @@ public class ManagePluginsActivity extends AppCompatActivity {
 
     private void refresh() {
         List<PluginManager.PluginInfo> infos = PluginManager.getInstalledPluginInfos(this);
+        
+        Collections.sort(infos, new Comparator<PluginManager.PluginInfo>() {
+            @Override
+            public int compare(PluginManager.PluginInfo p1, PluginManager.PluginInfo p2) {
+                if (isAscending) {
+                    return p1.pluginId().compareToIgnoreCase(p2.pluginId());
+                } else {
+                    return p2.pluginId().compareToIgnoreCase(p1.pluginId());
+                }
+            }
+        });
+
         adapter.update(infos);
 
         boolean empty = infos.isEmpty();

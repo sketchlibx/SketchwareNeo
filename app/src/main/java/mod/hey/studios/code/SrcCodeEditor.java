@@ -1103,17 +1103,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Only unsubscribe/release here, not in onStop() - onStart() re-registers
-        // buildDiagnosticsReceiver, confirming onStop()/onStart() is a normal
-        // pause/resume cycle the activity can come back from. onDestroy() is the
-        // point where the editor is genuinely never coming back, so it's the
-        // correct place for both:
         if (selectionSubscription != null) { try { selectionSubscription.unsubscribe(); } catch (Throwable ignored) {} }
-        // Per sora-editor's own docs: release() must be called when a CodeEditor
-        // is no longer used, to free its background analysis thread and other
-        // resources - this wasn't being called anywhere before Phase A's event
-        // work, a pre-existing gap unrelated to the new events but directly
-        // relevant to memory-leak hygiene, so fixed here alongside it.
         try { binding.editor.release(); } catch (Throwable ignored) {}
     }
 

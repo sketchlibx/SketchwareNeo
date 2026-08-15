@@ -40,7 +40,6 @@ swiperefreshlayout = "1.1.0"
 viewpager = "1.1.0"
 woodstoxCore = "7.1.1"
 zipalignJava = "1.2.2"
-securityCrypto = "1.1.0-alpha06"
 
 # Google Drive API & Auth Versions
 playServicesAuth = "21.1.1"
@@ -116,8 +115,6 @@ stax-api = { module = "javax.xml.stream:stax-api", version.ref = "staxApi" }
 woodstox-core = { module = "com.fasterxml.woodstox:woodstox-core", version.ref = "woodstoxCore" }
 
 zipalign-java = { module = "com.github.Iyxan23:zipalign-java", version.ref = "zipalignJava" }
-
-security-crypto = { module = "androidx.security:security-crypto", version.ref ="securityCrypto" }
 
 # Google Drive API Libraries
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }

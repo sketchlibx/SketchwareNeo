@@ -8,7 +8,6 @@
     android:fitsSystemWindows="true"
     tools:ignore="ContentDescription">
 
-    <!-- ── AppBar ──────────────────────────────────────────────────────────── -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -25,7 +24,6 @@
             app:title="Resource Manager"
             app:menu="@menu/menu_resource_manager" />
 
-        <!-- Search field — toggled visible/gone by search icon click -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/searchLayout"
             android:layout_width="match_parent"
@@ -50,7 +48,6 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ── File list ──────────────────────────────────────────────────────── -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/filesListRecyclerView"
         android:layout_width="match_parent"
@@ -64,7 +61,6 @@
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:listitem="@layout/item_resource_tree" />
 
-    <!-- ── Empty state ───────────────────────────────────────────────────── -->
     <LinearLayout
         android:id="@+id/noContentLayout"
         android:layout_width="match_parent"
@@ -76,7 +72,6 @@
         android:visibility="gone"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- Folder illustration -->
         <FrameLayout
             android:layout_width="96dp"
             android:layout_height="96dp">
@@ -129,7 +124,6 @@
 
     </LinearLayout>
 
-    <!-- ── FAB: "Options" primary button ─────────────────────────────────── -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/showOptionsButton"
         android:layout_width="wrap_content"
@@ -139,7 +133,6 @@
         android:text="@string/assets_manager_options"
         app:icon="@drawable/ic_mtrl_add" />
 
-    <!-- ── FAB row: Create / Close / Import ──────────────────────────────── -->
     <LinearLayout
         android:id="@+id/optionsLayout"
         android:layout_width="wrap_content"
@@ -151,7 +144,6 @@
         android:orientation="horizontal"
         android:translationY="120dp">
 
-        <!-- Create new -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/createNewButton"
             android:layout_width="wrap_content"
@@ -160,7 +152,6 @@
             android:text="@string/assets_manager_add_new"
             app:icon="@drawable/ic_mtrl_file" />
 
-        <!-- Close -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/closeButton"
             android:layout_width="wrap_content"
@@ -169,7 +160,6 @@
             android:contentDescription="Close options"
             android:src="@drawable/close_gray_48dp" />
 
-        <!-- Import -->
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/importNewButton"
             android:layout_width="wrap_content"

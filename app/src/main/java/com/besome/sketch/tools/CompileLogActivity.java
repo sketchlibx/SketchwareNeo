@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.NumberPicker;
 import android.widget.PopupMenu;
@@ -39,7 +38,6 @@ public class CompileLogActivity extends BaseAppCompatActivity {
     private CompileLogBinding binding;
     private String currentErrorText;
     private androidx.appcompat.app.AlertDialog aiLoadingDialog;
-    private Button analyzeButton;
 
     @SuppressLint("SetTextI18n")
     @Override
@@ -114,10 +112,8 @@ public class CompileLogActivity extends BaseAppCompatActivity {
 
         binding.formatButton.setOnClickListener(v -> options.show());
 
-        analyzeButton = new Button(this);
-        analyzeButton.setText("Analyze with AI");
-        analyzeButton.setOnClickListener(v -> analyzeErrorWithAi());
-        binding.optionsLayout.addView(analyzeButton);
+        binding.analyzeAiButton.setOnClickListener(v -> analyzeErrorWithAi());
+        binding.copyLogButton.setOnClickListener(v -> copyLogToClipboard());
 
         applyLogViewerPreferences();
 
@@ -139,6 +135,15 @@ public class CompileLogActivity extends BaseAppCompatActivity {
 
         binding.tvCompileLog.setText(CompileLogHelper.getColoredLogs(this, error));
         binding.tvCompileLog.setTextIsSelectable(true);
+    }
+
+    private void copyLogToClipboard() {
+        if (currentErrorText == null) {
+            SketchwareUtil.toast("No log to copy.");
+            return;
+        }
+        Helper.copyToClipboard(currentErrorText);
+        SketchwareUtil.toast("Log copied to clipboard.");
     }
 
     private void analyzeErrorWithAi() {

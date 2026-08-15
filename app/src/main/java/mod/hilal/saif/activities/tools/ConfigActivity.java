@@ -15,7 +15,6 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -23,7 +22,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.snackbar.BaseTransientBottomBar;
 import com.google.android.material.snackbar.Snackbar;
@@ -60,6 +59,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_USE_NEW_VERSION_CONTROL = "use-new-version-control";
     public static final String SETTING_USE_ASD_HIGHLIGHTER = "use-asd-highlighter";
     public static final String SETTING_CRITICAL_UPDATE_REMINDER = "critical-update-reminder";
+    
+    // Variables kept intact as requested
     public static final String SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH = "palletteDir";
     public static final String SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH = "blockDir";
     
@@ -179,36 +180,42 @@ public class ConfigActivity extends BaseAppCompatActivity {
         content.removeAllViews();
 
         content.addView(createCategoryHeader("General"));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_block, "Always Show Blocks", "Keep code blocks visible even in invalid states", SETTING_ALWAYS_SHOW_BLOCKS));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_puzzle, "Show Built-in Blocks", "Display standard blocks in custom palettes", SETTING_SHOW_BUILT_IN_BLOCKS));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_view_module, "Show Every Single Block", "Unhide experimental and deprecated blocks", SETTING_SHOW_EVERY_SINGLE_BLOCK));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER));
+        content.addView(createPreferenceCard(
+                createSwitchPreference(R.drawable.ic_mtrl_block, "Always Show Blocks", "Keep code blocks visible even in invalid states", SETTING_ALWAYS_SHOW_BLOCKS),
+                createSwitchPreference(R.drawable.ic_mtrl_puzzle, "Show Built-in Blocks", "Display standard blocks in custom palettes", SETTING_SHOW_BUILT_IN_BLOCKS),
+                createSwitchPreference(R.drawable.ic_mtrl_view_module, "Show Every Single Block", "Unhide experimental and deprecated blocks", SETTING_SHOW_EVERY_SINGLE_BLOCK),
+                createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER)
+        ));
 
         content.addView(createCategoryHeader("Project Explorer"));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_folder_open, "Enable Tree View", "Display project files in a hierarchical tree structure", SETTING_TREE_VIEW));
+        content.addView(createPreferenceCard(
+                createSwitchPreference(R.drawable.ic_mtrl_tree_view, "Enable Tree View", "Display project files in a hierarchical tree structure", SETTING_TREE_VIEW)
+        ));
 
         content.addView(createCategoryHeader("Backup & Restore"));
         TextView[] backupDirDesc = new TextView[1];
-        content.addView(createActionPreference(R.drawable.ic_mtrl_folder, "Backup Directory", getBackupPath(), v -> showBackupDirDialog(backupDirDesc[0]), backupDirDesc));
         TextView[] backupNameDesc = new TextView[1];
-        content.addView(createActionPreference(R.drawable.ic_mtrl_file, "Backup Filename Format", "Configure SWB naming syntax", v -> showBackupNameDialog(), backupNameDesc));
+        content.addView(createPreferenceCard(
+                createActionPreference(R.drawable.ic_mtrl_folder, "Backup Directory", getBackupPath(), v -> showBackupDirDialog(backupDirDesc[0]), backupDirDesc),
+                createActionPreference(R.drawable.ic_mtrl_file, "Backup Filename Format", "Configure SWB naming syntax", v -> showBackupNameDialog(), backupNameDesc)
+        ));
 
         content.addView(createCategoryHeader("Version Control"));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_version_control, "New Version Control", "Use optimized Git-based system for project history", SETTING_USE_NEW_VERSION_CONTROL));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_upload, "Git Direct Commit & Push", "Single action to commit and push changes", SETTING_GIT_DIRECT_PUSH));
+        content.addView(createPreferenceCard(
+                createSwitchPreference(R.drawable.ic_mtrl_version_control, "New Version Control", "Use optimized Git-based system for project history", SETTING_USE_NEW_VERSION_CONTROL),
+                createSwitchPreference(R.drawable.ic_mtrl_upload, "Git Direct Commit & Push", "Single action to commit and push changes", SETTING_GIT_DIRECT_PUSH)
+        ));
 
         content.addView(createCategoryHeader("Root Features"));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_code, "Auto Install Projects (Root)", "Silently install compiled APKs using root access", SETTING_ROOT_AUTO_INSTALL_PROJECTS));
-        content.addView(createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING));
-
-        content.addView(createCategoryHeader("Block Manager"));
-        TextView[] palDirDesc = new TextView[1];
-        content.addView(createActionPreference(R.drawable.ic_mtrl_palette, "Palette File Path", "Set custom palette.json location", v -> showPathDialog("Palette Path", SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH, palDirDesc[0]), palDirDesc));
-        TextView[] blkDirDesc = new TextView[1];
-        content.addView(createActionPreference(R.drawable.ic_mtrl_moreblock, "Block File Path", "Set custom block.json location", v -> showPathDialog("Block Path", SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, blkDirDesc[0]), blkDirDesc));
+        content.addView(createPreferenceCard(
+                createSwitchPreference(R.drawable.ic_mtrl_code, "Auto Install Projects (Root)", "Silently install compiled APKs using root access", SETTING_ROOT_AUTO_INSTALL_PROJECTS),
+                createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING)
+        ));
 
         content.addView(createCategoryHeader("Beta Features"));
-        content.addView(createSwitchPreference(android.R.drawable.ic_menu_manage, "Plugins Tab (Beta)", "Show a dedicated Plugins tab next to View/Event/Component in the project editor. Experimental, off by default.", SETTING_SHOW_PLUGINS_TAB));
+        content.addView(createPreferenceCard(
+                createSwitchPreference(android.R.drawable.ic_menu_manage, "Plugins Tab (Beta)", "Show a dedicated Plugins tab next to View/Event/Component in the project editor. Experimental, off by default.", SETTING_SHOW_PLUGINS_TAB)
+        ));
     }
 
     private View createCategoryHeader(String titleText) {
@@ -217,9 +224,41 @@ public class ConfigActivity extends BaseAppCompatActivity {
         tv.setTextSize(14f);
         tv.setTypeface(null, Typeface.BOLD);
         tv.setTextColor(ThemeUtils.getColor(this, R.attr.colorPrimary));
-        int padH = SketchwareUtil.dpToPx(24);
-        tv.setPadding(padH, SketchwareUtil.dpToPx(24), padH, SketchwareUtil.dpToPx(8));
+        int padLeft = SketchwareUtil.dpToPx(32);
+        tv.setPadding(padLeft, SketchwareUtil.dpToPx(16), padLeft, SketchwareUtil.dpToPx(8));
         return tv;
+    }
+
+    private MaterialCardView createPreferenceCard(View... items) {
+        MaterialCardView card = new MaterialCardView(this);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(SketchwareUtil.dpToPx(16), 0, SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(8));
+        card.setLayoutParams(cardParams);
+        
+        card.setRadius(SketchwareUtil.dpToPx(16));
+        card.setCardElevation(0); // Flat look for modern M3
+        card.setStrokeWidth(SketchwareUtil.dpToPx(1));
+        card.setStrokeColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerLow)); // Distinct surface
+        card.setClipChildren(true);
+
+        LinearLayout cardContent = new LinearLayout(this);
+        cardContent.setOrientation(LinearLayout.VERTICAL);
+        cardContent.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        for (int i = 0; i < items.length; i++) {
+            cardContent.addView(items[i]);
+            if (i < items.length - 1) {
+                View divider = new View(this);
+                LinearLayout.LayoutParams divParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, SketchwareUtil.dpToPx(1));
+                divParams.setMargins(SketchwareUtil.dpToPx(56), 0, SketchwareUtil.dpToPx(16), 0);
+                divider.setLayoutParams(divParams);
+                divider.setBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+                cardContent.addView(divider);
+            }
+        }
+        card.addView(cardContent);
+        return card;
     }
 
     private View createSwitchPreference(int iconRes, String title, String desc, String prefKey) {
@@ -233,8 +272,9 @@ public class ConfigActivity extends BaseAppCompatActivity {
         getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
         row.setBackgroundResource(outValue.resourceId);
         
-        int pad = SketchwareUtil.dpToPx(16);
-        row.setPadding(SketchwareUtil.dpToPx(24), pad, SketchwareUtil.dpToPx(24), pad);
+        int padH = SketchwareUtil.dpToPx(16);
+        int padV = SketchwareUtil.dpToPx(16);
+        row.setPadding(padH, padV, padH, padV);
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
@@ -296,8 +336,9 @@ public class ConfigActivity extends BaseAppCompatActivity {
         getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
         row.setBackgroundResource(outValue.resourceId);
         
-        int pad = SketchwareUtil.dpToPx(16);
-        row.setPadding(SketchwareUtil.dpToPx(24), pad, SketchwareUtil.dpToPx(24), pad);
+        int padH = SketchwareUtil.dpToPx(16);
+        int padV = SketchwareUtil.dpToPx(16);
+        row.setPadding(padH, padV, padH, padV);
         row.setOnClickListener(listener);
 
         ImageView icon = new ImageView(this);

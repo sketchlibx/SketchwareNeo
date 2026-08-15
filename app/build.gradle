@@ -104,7 +104,6 @@ dependencies {
 
     implementation libs.bundles.shrinker
     implementation libs.zipalign.java
-    implementation libs.security.crypto
 
     implementation libs.gson
     implementation libs.scpkix.jdk15on

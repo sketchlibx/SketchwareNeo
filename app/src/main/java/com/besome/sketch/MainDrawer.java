@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -20,6 +21,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.besome.sketch.help.ProgramInfoActivity;
 import com.besome.sketch.tools.NewKeyStoreActivity;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.shape.MaterialShapeDrawable;
+import com.google.android.material.shape.ShapeAppearanceModel;
 
 import a.a.a.mB;
 import dev.chrisbanes.insetter.Insetter;
@@ -27,6 +30,8 @@ import dev.chrisbanes.insetter.Side;
 import mod.hilal.saif.activities.tools.AppSettings;
 import pro.sketchware.R;
 import pro.sketchware.activities.about.AboutActivity;
+import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.UI;
 
 public class MainDrawer extends NavigationView {
@@ -51,6 +56,16 @@ public class MainDrawer extends NavigationView {
                                 false, layoutDirection == LAYOUT_DIRECTION_RTL, false))
                 .applyToView(this);
 
+        ShapeAppearanceModel shapeModel = ShapeAppearanceModel.builder()
+                .setTopRightCornerSize(SketchwareUtil.dpToPx(16))
+                .setBottomRightCornerSize(SketchwareUtil.dpToPx(16))
+                .build();
+
+        MaterialShapeDrawable background = new MaterialShapeDrawable(shapeModel);
+        background.setFillColor(ColorStateList.valueOf(ThemeUtils.getColor(context, R.attr.colorSurfaceContainerLow)));
+        setBackground(background);
+        setElevation(SketchwareUtil.dpToPx(2));
+
         ViewGroup headerView = (ViewGroup) LayoutInflater.from(context).inflate(R.layout.main_drawer_header, null);
         headerView.findViewById(R.id.status_bar_overlapper).setMinimumHeight(UI.getStatusBarHeight(context));
 
@@ -60,7 +75,6 @@ public class MainDrawer extends NavigationView {
             initializeSocialLinks(item.getItemId());
             initializeDrawerItems(item.getItemId());
 
-            // Return false to prevent selection
             return false;
         });
     }
@@ -68,14 +82,10 @@ public class MainDrawer extends NavigationView {
     private void initializeSocialLinks(@IdRes int id) {
         if (!mB.a()) {
             @StringRes int url = -1;
-            if (id == R.id.social_discord) {
-                url = R.string.link_discord_invite;
-            } else if (id == R.id.social_telegram) {
+            if (id == R.id.social_telegram) {
                 url = R.string.link_telegram_invite;
             } else if (id == R.id.social_github) {
                 url = R.string.link_github_url;
-            } else if (id == R.id.app_sw_assist) {
-                url = R.string.link_sw_assist;
             }
 
             if (url != -1) {

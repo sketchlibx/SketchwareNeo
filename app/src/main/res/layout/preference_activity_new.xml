@@ -13,14 +13,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
-        app:elevation="0dp">
+        app:elevation="0dp"
+        app:liftOnScroll="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/topAppBar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_mtrl_arrow_back"
-            app:title="Mod Settings"
+            app:title="App Settings"
             app:titleTextAppearance="?attr/textAppearanceTitleLarge" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -36,8 +37,7 @@
             android:id="@+id/content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:paddingBottom="24dp"
+            android:paddingBottom="32dp"
             android:orientation="vertical" />
             
     </androidx.core.widget.NestedScrollView>

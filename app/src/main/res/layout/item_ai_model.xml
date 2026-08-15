@@ -4,20 +4,34 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="1dp">
+    android:layout_marginVertical="6dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="14dp">
+
+        <FrameLayout
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_ai_provider_icon">
+
+            <ImageView
+                android:id="@+id/imageProviderIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_mtrl_ai"
+                app:tint="?attr/colorPrimary" />
+
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -25,45 +39,54 @@
                 android:id="@+id/textModelName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:textSize="15sp"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorOnSurface"
                 tools:text="My GPT-4 Model" />
 
             <TextView
                 android:id="@+id/textModelProvider"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:alpha="0.7"
+                android:layout_marginTop="1dp"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 tools:text="OpenAI · gpt-4o" />
 
             <TextView
                 android:id="@+id/textActiveBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_ai_active_badge"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
                 android:text="ACTIVE"
-                android:textSize="11sp"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                android:layout_marginTop="4dp"
                 android:visibility="gone" />
 
         </LinearLayout>
 
         <ImageButton
             android:id="@+id/buttonEditModel"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_edit"
-            android:contentDescription="Edit" />
+            android:contentDescription="Edit"
+            android:padding="8dp"
+            android:src="@drawable/ic_mtrl_edit"
+            app:tint="?attr/colorOnSurfaceVariant" />
 
         <ImageButton
             android:id="@+id/buttonDeleteModel"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_menu_delete"
-            android:contentDescription="Delete" />
+            android:contentDescription="Delete"
+            android:padding="8dp"
+            android:src="@drawable/ic_mtrl_delete"
+            app:tint="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
 

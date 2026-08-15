@@ -38,7 +38,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
         toolbar.setNavigationOnClickListener(v -> finish());
 
         recyclerView = findViewById(R.id.recyclerViewAiModels);
-        emptyState = findViewById(R.id.textEmptyState);
+        emptyState = findViewById(R.id.emptyStateLayout);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         adapter = new AiModelAdapter(this);
