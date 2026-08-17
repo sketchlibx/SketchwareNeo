@@ -11,9 +11,12 @@ import android.text.TextUtils;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
 import android.view.Gravity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -79,6 +82,21 @@ public class BlocksManagerCreatorActivity extends BaseAppCompatActivity {
     public void onDestroy() {
         super.onDestroy();
         binding = null;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        menu.add(Menu.NONE, 1, Menu.NONE, "Generate with AI").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == 1) {
+            showGenerateBlockWithAiDialog();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -431,6 +449,130 @@ public class BlocksManagerCreatorActivity extends BaseAppCompatActivity {
         } else {
             binding.code.setHint("(Invalid code block data)");
         }
+    }
+
+    private void showGenerateBlockWithAiDialog() {
+        int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
+        int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
+        int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp24, dp24, dp24, dp8);
+
+        TextView title = new TextView(this);
+        title.setText("Generate Block with AI");
+        title.setTextSize(20);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        root.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Describe the block you want. AI will fill in the name, spec, color, and code below for you to review before saving.");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+        subParams.setMargins(0, dp8, 0, dp16);
+        subtitle.setLayoutParams(subParams);
+        root.addView(subtitle);
+
+        com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+        card.setCardElevation(0);
+        card.setRadius(dp8);
+        card.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
+        card.setStrokeColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+
+        EditText promptInput = new EditText(this);
+        promptInput.setHint("e.g. a block that vibrates the phone for a given number of milliseconds");
+        promptInput.setBackground(null);
+        promptInput.setPadding(dp16, dp16, dp16, dp16);
+        promptInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        promptInput.setMinLines(4);
+        promptInput.setMaxLines(10);
+        promptInput.setGravity(Gravity.TOP | Gravity.START);
+        promptInput.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        promptInput.setHintTextColor(pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
+
+        card.addView(promptInput, new ViewGroup.LayoutParams(-1, -2));
+        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
+
+        new MaterialAlertDialogBuilder(this)
+                .setView(root)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Generate", (dialog, which) -> {
+                    String prompt = promptInput.getText() == null ? "" : promptInput.getText().toString().trim();
+                    if (prompt.isEmpty()) {
+                        SketchwareUtil.toastError("Describe the block first.");
+                        return;
+                    }
+                    runAiBlockGeneration(prompt);
+                })
+                .show();
+    }
+
+    private void runAiBlockGeneration(String prompt) {
+        androidx.appcompat.app.AlertDialog loadingDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Generating block")
+                .setMessage("Asking AI to design the block...")
+                .setCancelable(false)
+                .show();
+
+        String existingNames = TextUtils.join(", ", id_detector);
+
+        neo.sketchware.ai.CustomBlockGenTask.generate(this, existingNames, prompt, new neo.sketchware.ai.AiResponseCallback() {
+            @Override
+            public void onSuccess(String responseText) {
+                loadingDialog.dismiss();
+                try {
+                    applyGeneratedBlock(responseText);
+                } catch (Exception e) {
+                    SketchwareUtil.toastError("Couldn't apply the generated block: " + e.getMessage());
+                }
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                loadingDialog.dismiss();
+                SketchwareUtil.toastError("AI generation failed: " + errorMessage);
+            }
+        });
+    }
+
+    private void applyGeneratedBlock(String responseText) {
+        String jsonText = responseText.trim();
+        int start = jsonText.indexOf('{');
+        int end = jsonText.lastIndexOf('}');
+        if (start == -1 || end == -1 || end < start) {
+            SketchwareUtil.toastError("AI response wasn't valid JSON.");
+            return;
+        }
+        jsonText = jsonText.substring(start, end + 1);
+
+        org.json.JSONObject json;
+        try {
+            json = new org.json.JSONObject(jsonText);
+        } catch (org.json.JSONException e) {
+            SketchwareUtil.toastError("Couldn't parse the generated block.");
+            return;
+        }
+
+        String type = json.optString("type", "regular");
+        binding.name.setText(json.optString("name", ""));
+        binding.type.setText(type.isEmpty() ? "regular" : type);
+        binding.typename.setText(json.optString("typeName", ""));
+        binding.spec.setText(json.optString("spec", ""));
+        if ("e".equals(type)) {
+            binding.spec2.setText(json.optString("spec2", ""));
+        }
+        String color = json.optString("color", "");
+        binding.colour.setText(PropertiesUtil.isHexColor(color) ? color : palletColour);
+        binding.customImport.setText(json.optString("imports", ""));
+        binding.code.setText(json.optString("code", ""));
+
+        SketchwareUtil.toast("Block filled in - review it below and tap Save.");
     }
 
     private void getBlockList() {

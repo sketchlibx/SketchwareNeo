@@ -53,7 +53,6 @@ import pro.sketchware.widgets.IconCustomWidget;
 public class PaletteWidget extends LinearLayout {
 
     public MaterialCardView cardView;
-    public MaterialCardView cardViewAiLayout;
     private LinearLayout layoutContainer;
     private LinearLayout widgetsContainer;
     private TextView titleLayouts;
@@ -161,7 +160,6 @@ public class PaletteWidget extends LinearLayout {
         titleWidgets.setText(Helper.getResString(R.string.view_panel_title_widgets));
         scrollView = findViewById(R.id.scv);
         cardView = findViewById(R.id.cardView);
-        cardViewAiLayout = findViewById(R.id.cardViewAiLayout);
     }
 
     public void removeWidgets() {

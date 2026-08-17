@@ -2,6 +2,7 @@ package neo.sketchware.ai;
 
 import android.content.Context;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.regex.Matcher;
@@ -22,14 +23,43 @@ public final class ErrorFixTask {
             "Reply with ONLY a single JSON object, no markdown fences, no extra text, in exactly this shape: " +
             "{\"summary\":\"one short plain-language sentence describing what broke\"," +
             "\"explanation\":\"1-3 short sentences on why it happened, no jargon dump\"," +
-            "\"originalSnippet\":\"the exact original lines copied verbatim from the provided file content that need to change, or empty string if no file content was provided or you cannot pinpoint it\"," +
-            "\"fixedSnippet\":\"the corrected replacement for originalSnippet only, same surrounding style, or empty string if originalSnippet is empty\"}" +
-            " originalSnippet must be copied character-for-character from the file content given to you, so it can be located with an exact text match. " +
-            "Keep originalSnippet as small as possible while still being uniquely identifiable in the file.";
+            "\"patches\":[{\"originalSnippet\":\"...\",\"fixedSnippet\":\"...\"}]," +
+            "\"needsManualEvent\":false," +
+            "\"manualEventHint\":\"\"," +
+            "\"createActivityEventName\":\"\"," +
+            "\"createViewEventTargetId\":\"\"," +
+            "\"createViewEventName\":\"\"}" +
+            " Rules for patches: each entry describes ONE change. " +
+            "For a REPLACE, originalSnippet is the exact text to find (copied verbatim from the provided file " +
+            "content) and fixedSnippet is its replacement. " +
+            "For a pure REMOVAL, fixedSnippet is an empty string. " +
+            "For a pure ADDITION with no specific anchor point (e.g. adding a new line/method at the end of the " +
+            "file), leave originalSnippet as an empty string and put only the new code in fixedSnippet. " +
+            "You can include multiple patches in the array if the fix needs changes in more than one place. " +
+            "originalSnippet must always be copied character-for-character from the file content given to you " +
+            "so it can be located with an exact text match, and should be as small as possible while still being " +
+            "uniquely identifiable in the file. " +
+            "If the real fix requires creating a NEW EVENT (like an onClick handler for a button) or a new " +
+            "custom/more block that does not exist yet in this project - something that can't be done by editing " +
+            "this file's text alone - set needsManualEvent to true, leave patches as an empty array (or include " +
+            "only unrelated text patches if there genuinely are any), and put a short, clear instruction in " +
+            "manualEventHint telling the user exactly which event to create (event type, target view/activity, " +
+            "event name) and what code to put inside it once created. " +
+            "Additionally, if - and only if - the missing event is a plain ACTIVITY lifecycle event (like " +
+            "onCreate, onResume, onStart, onPause, onStop, onDestroy, onBackPressed, onActivityResult, " +
+            "onRequestPermissionsResult - NOT a view click/event or a custom/more block), set " +
+            "createActivityEventName to that exact event name (e.g. \"onCreate\") so it can be created " +
+            "automatically. For any other kind of missing event (view events, more blocks), leave " +
+            "createActivityEventName as an empty string even though needsManualEvent is true. " +
+            "If the missing event is instead a VIEW event (like onClick) and the view list below contains an " +
+            "id you're confident this event belongs to, set createViewEventTargetId to that EXACT id from the " +
+            "list (never invent one) and createViewEventName to the event name (e.g. \"onClick\"). " +
+            "If you can't confidently match it to a real id from the list, leave createViewEventTargetId and " +
+            "createViewEventName empty and rely on manualEventHint instead.";
 
     private ErrorFixTask() {}
 
-    public static void analyze(Context context, String rawError, ErrorFixCallback callback) {
+    public static void analyze(Context context, String scId, String rawError, ErrorFixCallback callback) {
         String cleanedError = ErrorCleaner.clean(rawError);
 
         String filePath = extractFilePath(rawError);
@@ -38,10 +68,15 @@ public final class ErrorFixTask {
             fileContent = FileUtil.readFile(filePath);
         }
 
+        String viewContext = buildViewContext(scId, javaNameFromFilePath(filePath));
+
         StringBuilder userPrompt = new StringBuilder();
         userPrompt.append("Build error log:\n").append(cleanedError);
         if (fileContent != null) {
             userPrompt.append("\n\nFull content of ").append(filePath).append(":\n").append(fileContent);
+        }
+        if (!viewContext.isEmpty()) {
+            userPrompt.append("\n\nThe current layout has exactly these views (id: type) - use ONLY these ids for createViewEventTargetId:\n").append(viewContext);
         }
 
         String resolvedFilePath = filePath;
@@ -56,14 +91,41 @@ public final class ErrorFixTask {
                     ErrorFixResult result = new ErrorFixResult();
                     result.summary = json.optString("summary", "").trim();
                     result.explanation = json.optString("explanation", "").trim();
-                    result.originalSnippet = json.optString("originalSnippet", "").trim();
-                    result.fixedSnippet = json.optString("fixedSnippet", "").trim();
                     result.filePath = resolvedFilePath;
+                    result.needsManualEvent = json.optBoolean("needsManualEvent", false);
+                    result.manualEventHint = json.optString("manualEventHint", "").trim();
+                    result.createActivityEventName = json.optString("createActivityEventName", "").trim();
+                    result.createViewEventTargetId = json.optString("createViewEventTargetId", "").trim();
+                    result.createViewEventName = json.optString("createViewEventName", "").trim();
 
-                    result.patchable = resolvedFilePath != null
-                            && !result.originalSnippet.isEmpty()
-                            && FileUtil.isExistFile(resolvedFilePath)
-                            && countOccurrences(FileUtil.readFile(resolvedFilePath), result.originalSnippet) == 1;
+                    String liveContent = (resolvedFilePath != null && FileUtil.isExistFile(resolvedFilePath))
+                            ? FileUtil.readFile(resolvedFilePath)
+                            : null;
+
+                    JSONArray patchesJson = json.optJSONArray("patches");
+                    boolean allApplicable = liveContent != null && patchesJson != null && patchesJson.length() > 0;
+
+                    if (patchesJson != null) {
+                        for (int i = 0; i < patchesJson.length(); i++) {
+                            JSONObject patchJson = patchesJson.getJSONObject(i);
+                            ErrorFixResult.Patch patch = new ErrorFixResult.Patch();
+                            patch.originalSnippet = patchJson.optString("originalSnippet", "");
+                            patch.fixedSnippet = patchJson.optString("fixedSnippet", "");
+
+                            if (liveContent == null) {
+                                patch.applicable = false;
+                            } else if (patch.originalSnippet.isEmpty()) {
+                                patch.applicable = !patch.fixedSnippet.isEmpty();
+                            } else {
+                                patch.applicable = countOccurrences(liveContent, patch.originalSnippet) == 1;
+                            }
+
+                            if (!patch.applicable) allApplicable = false;
+                            result.patches.add(patch);
+                        }
+                    }
+
+                    result.patchable = allApplicable;
 
                     callback.onResult(result);
                 } catch (Exception e) {
@@ -79,14 +141,47 @@ public final class ErrorFixTask {
     }
 
     public static boolean applyFix(ErrorFixResult result) {
-        if (result == null || !result.patchable) return false;
+        if (result == null || !result.patchable || result.filePath == null) return false;
 
         String content = FileUtil.readFile(result.filePath);
-        if (countOccurrences(content, result.originalSnippet) != 1) return false;
+        if (content == null) return false;
 
-        String patched = content.replace(result.originalSnippet, result.fixedSnippet);
-        FileUtil.writeFile(result.filePath, patched);
+        for (ErrorFixResult.Patch patch : result.patches) {
+            if (patch.originalSnippet == null || patch.originalSnippet.isEmpty()) {
+                if (!content.endsWith("\n")) content = content + "\n";
+                content = content + patch.fixedSnippet;
+            } else {
+                if (countOccurrences(content, patch.originalSnippet) != 1) return false;
+                content = content.replace(patch.originalSnippet, patch.fixedSnippet == null ? "" : patch.fixedSnippet);
+            }
+        }
+
+        FileUtil.writeFile(result.filePath, content);
         return true;
+    }
+
+    public static String javaNameFromFilePath(String filePath) {
+        if (filePath == null) return null;
+        String fileName = filePath.substring(Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1);
+        return fileName.endsWith(".java") ? fileName.substring(0, fileName.length() - 5) : fileName;
+    }
+
+    private static String buildViewContext(String scId, String javaName) {
+        if (scId == null || javaName == null) return "";
+        try {
+            com.besome.sketch.beans.ProjectFileBean projectFile = a.a.a.jC.b(scId).a(javaName);
+            if (projectFile == null) return "";
+            java.util.ArrayList<com.besome.sketch.beans.ViewBean> views = a.a.a.jC.a(scId).d(projectFile.getXmlName());
+            if (views == null) return "";
+            StringBuilder sb = new StringBuilder();
+            for (com.besome.sketch.beans.ViewBean view : views) {
+                if (view.id == null || view.id.isEmpty()) continue;
+                sb.append(view.id).append(": ").append(com.besome.sketch.beans.ViewBean.getViewTypeName(view.type)).append("\n");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private static String extractFilePath(String rawError) {
