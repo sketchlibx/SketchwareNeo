@@ -159,6 +159,20 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     private DB r;
     private DB t;
     private Menu bottomMenu;
+    private final androidx.activity.result.ActivityResultLauncher<Intent> versionHistoryLauncher =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    // A restore happened - reload the project from scratch rather than
+                    // asking the user to manually restart (this used to just show a
+                    // toast telling them to restart, which didn't actually reflect the
+                    // restored state until they did so themselves).
+                    String restoredScId = DesignActivity.sc_id;
+                    finish();
+                    Intent intent = new Intent(DesignActivity.this, DesignActivity.class);
+                    intent.putExtra("sc_id", restoredScId);
+                    startActivity(intent);
+                }
+            });
     private PopupMenu bottomPopupMenu;
     private MaterialButton btnRun;
     private MaterialButton btnOptions;
@@ -558,9 +572,10 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         bottomMenu.add(Menu.NONE, 8, Menu.NONE, "Version History")
             .setVisible(isVersionHistoryEnabled)
             .setOnMenuItemClickListener(item -> {
-                mod.sketchlibx.project.history.TimeTravelBottomSheet sheet = new mod.sketchlibx.project.history.TimeTravelBottomSheet(sc_id, this);
-                sheet.show(getSupportFragmentManager(), "TimeTravel");
-                return true;
+                Intent intent = new Intent(DesignActivity.this, mod.sketchlibx.project.history.LocalHistoryActivity.class);
+        intent.putExtra("sc_id", sc_id);
+        versionHistoryLauncher.launch(intent);
+        return true;
         });
         
         bottomMenu.add(Menu.NONE, 10, Menu.NONE, "Git Client").setOnMenuItemClickListener(item -> {

@@ -268,6 +268,9 @@ public class ManageAppCompatActivity extends BaseAppCompatActivity {
                             injectionValue.indexOf("\"") + 1, injectionValue.length() - 1));
         }
 
+        AttributeInputHelper.wire(this, sc_id, attributeBinding.inputAttr,
+                attributeBinding.inputLayoutValue, attributeBinding.inputValue);
+
         dialog.setPositiveButton(
                 R.string.common_word_save,
                 (dialog1, which) -> {

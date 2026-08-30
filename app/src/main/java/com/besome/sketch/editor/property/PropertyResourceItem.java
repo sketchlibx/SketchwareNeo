@@ -2,8 +2,10 @@ package com.besome.sketch.editor.property;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.text.Editable;
+import android.util.Xml;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -23,10 +25,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.besome.sketch.beans.ProjectResourceBean;
 import com.besome.sketch.design.DesignActivity;
 import com.bumptech.glide.Glide;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -171,13 +176,33 @@ public class PropertyResourceItem extends RelativeLayout implements View.OnClick
     }
 
     public final void a() {
+        showPickerDialog(Helper.getText(e), m, c, selected -> {
+            setValue(selected);
+            if (n != null) {
+                n.a(b, selected);
+            }
+        });
+    }
+
+    public interface ResourcePickCallback {
+        void onSelected(String resourceName);
+    }
+
+    public void showPickerDialog(String title, int iconRes, String currentValue, ResourcePickCallback callback) {
         SearchWithRecyclerViewBinding binding = SearchWithRecyclerViewBinding.inflate(LayoutInflater.from(getContext()));
+        imageCache.clear();
 
         ArrayList<String> images = jC.d(a).m();
         images.addAll(new VectorDrawableLoader().getVectorDrawables(DesignActivity.sc_id));
+
+        ArrayList<String> shapeNames = findShapeDrawables(images);
+        if (!shapeNames.isEmpty()) {
+            shapeNames.add(0, d ? "default_image" : "NONE");
+        }
+
         images.add(0, d ? "default_image" : "NONE");
 
-        ImagePickerAdapter adapter = new ImagePickerAdapter(images, c);
+        ImagePickerAdapter adapter = new ImagePickerAdapter(images, currentValue);
         binding.recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         binding.recyclerView.setAdapter(adapter);
 
@@ -189,21 +214,128 @@ public class PropertyResourceItem extends RelativeLayout implements View.OnClick
             }
         });
 
+        LinearLayout dialogRoot = new LinearLayout(getContext());
+        dialogRoot.setOrientation(LinearLayout.VERTICAL);
+
+        if (!shapeNames.isEmpty()) {
+            int dp8 = (int) (8 * wB.a(getContext(), 1f));
+            MaterialButtonToggleGroup toggleGroup = new MaterialButtonToggleGroup(getContext());
+            toggleGroup.setSingleSelection(true);
+            toggleGroup.setSelectionRequired(true);
+            LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            toggleParams.gravity = Gravity.CENTER_HORIZONTAL;
+            toggleParams.setMargins(dp8, dp8, dp8, dp8);
+            toggleGroup.setLayoutParams(toggleParams);
+
+            MaterialButton imagesButton = new MaterialButton(getContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            imagesButton.setText("Images");
+            imagesButton.setId(View.generateViewId());
+            imagesButton.setCheckable(true);
+            imagesButton.setChecked(true);
+
+            MaterialButton shapesButton = new MaterialButton(getContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            shapesButton.setText("Shapes");
+            shapesButton.setId(View.generateViewId());
+            shapesButton.setCheckable(true);
+
+            toggleGroup.addView(imagesButton);
+            toggleGroup.addView(shapesButton);
+
+            imagesButton.setOnClickListener(v -> {
+                imagesButton.setChecked(true);
+                adapter.setSource(new ArrayList<>(images));
+            });
+            shapesButton.setOnClickListener(v -> {
+                shapesButton.setChecked(true);
+                adapter.setSource(new ArrayList<>(shapeNames));
+            });
+
+            dialogRoot.addView(toggleGroup);
+        }
+
+        dialogRoot.addView(binding.getRoot(), new LinearLayout.LayoutParams(-1, -1));
+
         new MaterialAlertDialogBuilder(getContext())
-                .setTitle(Helper.getText(e))
-                .setIcon(m)
-                .setView(binding.getRoot())
+                .setTitle(title)
+                .setIcon(iconRes)
+                .setView(dialogRoot)
                 .setPositiveButton(R.string.common_word_select, (v, which) -> {
                     String selected = adapter.getSelected();
-                    if (!selected.isEmpty()) {
-                        setValue(selected);
-                        if (n != null) {
-                            n.a(b, selected);
-                        }
+                    if (selected != null && !selected.isEmpty()) {
+                        callback.onSelected(selected);
                     }
                 })
                 .setNegativeButton(R.string.common_word_cancel, null)
                 .show();
+    }
+
+    private static final java.util.Set<String> KNOWN_SHAPE_ROOT_TAGS = new java.util.HashSet<>(Arrays.asList(
+            "shape", "selector", "layer-list", "ripple", "inset", "clip",
+            "animated-selector", "level-list", "rotate", "scale", "animated-rotate"
+    ));
+
+    private ArrayList<String> findShapeDrawables(ArrayList<String> alreadyListed) {
+        ArrayList<String> shapeNames = new ArrayList<>();
+        try {
+            File drawableDir = new File(pro.sketchware.utility.FileUtil.getExternalStorageDir()
+                    + "/.sketchware/data/" + a + "/files/resource/drawable/");
+            File[] files = drawableDir.listFiles();
+            if (files == null) return shapeNames;
+
+            for (File file : files) {
+                String name = file.getName();
+                if (!name.endsWith(".xml")) continue;
+                if (file.length() == 0) continue;
+
+                String nameWithoutExt = name.substring(0, name.length() - 4);
+                if (alreadyListed.contains(nameWithoutExt) || alreadyListed.contains(name)) continue;
+
+                String rootTag = readRootTag(file);
+                if (rootTag == null) continue;
+                if ("vector".equals(rootTag)) continue;
+                if (!KNOWN_SHAPE_ROOT_TAGS.contains(rootTag)) continue;
+
+                shapeNames.add(nameWithoutExt);
+            }
+        } catch (Exception ignored) {
+        }
+        return shapeNames;
+    }
+
+    private Drawable inflateShapeDrawable(File file) {
+        if (file == null || !file.exists() || file.length() == 0) return null;
+        try (java.io.FileInputStream inputStream = new java.io.FileInputStream(file)) {
+            org.xmlpull.v1.XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(inputStream, null);
+            int eventType = parser.getEventType();
+            while (eventType != org.xmlpull.v1.XmlPullParser.START_TAG) {
+                eventType = parser.next();
+            }
+            return Drawable.createFromXml(getResources(), parser);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isVectorXml(File file) {
+        return "vector".equals(readRootTag(file));
+    }
+
+    private String readRootTag(File file) {
+        if (file == null || !file.exists() || file.length() == 0) return null;
+        try (java.io.FileInputStream inputStream = new java.io.FileInputStream(file)) {
+            org.xmlpull.v1.XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(inputStream, null);
+            int eventType = parser.getEventType();
+            while (eventType != org.xmlpull.v1.XmlPullParser.START_TAG) {
+                if (eventType == org.xmlpull.v1.XmlPullParser.END_DOCUMENT) return null;
+                eventType = parser.next();
+            }
+            return parser.getName();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private class ImagePickerAdapter extends RecyclerView.Adapter<ImagePickerAdapter.ViewHolder> {
@@ -264,6 +396,14 @@ public class PropertyResourceItem extends RelativeLayout implements View.OnClick
             notifyDataSetChanged();
         }
 
+        public void setSource(ArrayList<String> newSource) {
+            allImages.clear();
+            allImages.addAll(newSource);
+            filteredImages.clear();
+            filteredImages.addAll(newSource);
+            notifyDataSetChanged();
+        }
+
         public String getSelected() {
             return selectedImage;
         }
@@ -277,6 +417,23 @@ public class PropertyResourceItem extends RelativeLayout implements View.OnClick
         }
     }
 
+    private File resolveDrawableFile(String image) {
+        try {
+            String kcPath = jC.d(a).f(image);
+            if (kcPath != null) {
+                File file = new File(kcPath);
+                if (file.exists() && file.length() > 0) return file;
+            }
+        } catch (Exception ignored) {
+        }
+
+        File direct = new File(pro.sketchware.utility.FileUtil.getExternalStorageDir()
+                + "/.sketchware/data/" + a + "/files/resource/drawable/" + image + ".xml");
+        if (direct.exists() && direct.length() > 0) return direct;
+
+        return null;
+    }
+
     private View setImageViewContent(String image) {
         ImageView imageView = new ImageView(getContext());
         int size = (int) (48 * wB.a(getContext(), 1f));
@@ -288,11 +445,20 @@ public class PropertyResourceItem extends RelativeLayout implements View.OnClick
             if ("default_image".equals(image)) {
                 imageView.setImageResource(getResources().getIdentifier(image, "drawable", getContext().getPackageName()));
             } else {
-                File file = new File(jC.d(a).f(image));
-                if (file.exists()) {
+                File file = resolveDrawableFile(image);
+                if (file != null && file.exists()) {
                     Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".provider", file);
                     if (file.getAbsolutePath().endsWith(".xml")) {
-                        svgUtils.loadImage(imageView, fpu.getSvgFullPath(a, image));
+                        if (isVectorXml(file)) {
+                            svgUtils.loadImage(imageView, fpu.getSvgFullPath(a, image));
+                        } else {
+                            Drawable shapeDrawable = inflateShapeDrawable(file);
+                            if (shapeDrawable != null) {
+                                imageView.setImageDrawable(shapeDrawable);
+                            } else {
+                                imageView.setImageResource(R.drawable.ic_remove_grey600_24dp);
+                            }
+                        }
                     } else {
                         Glide.with(getContext())
                                 .load(uri)

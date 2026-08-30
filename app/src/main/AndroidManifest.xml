@@ -307,6 +307,14 @@
         
         <activity
             android:name="mod.sketchlibx.settings.ResourceTrackerActivity" />
+            
+        <activity
+            android:name="mod.sketchlibx.project.history.LocalHistoryActivity"
+            android:configChanges="orientation|screenSize" />
+            
+        <activity
+            android:name="mod.sketchlibx.project.history.CodeComparisonActivity"
+            android:configChanges="orientation|screenSize" />
 
         <activity
             android:name="pro.sketchware.analysis.ui.ProjectInspectorActivity" />

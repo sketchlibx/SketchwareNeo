@@ -1,8 +1,14 @@
 package com.besome.sketch.help;
 
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.View;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -12,6 +18,14 @@ import com.besome.sketch.lib.ui.PropertyOneLineItem;
 import com.besome.sketch.lib.ui.PropertyTwoLineItem;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 import a.a.a.GB;
 import a.a.a.bB;
 import a.a.a.mB;
@@ -19,6 +33,7 @@ import a.a.a.wB;
 import mod.hey.studios.util.Helper;
 import pro.sketchware.R;
 import pro.sketchware.databinding.ProgramInfoBinding;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class ProgramInfoActivity extends BaseAppCompatActivity {
 
@@ -31,6 +46,30 @@ public class ProgramInfoActivity extends BaseAppCompatActivity {
     private static final int ITEM_SUGGEST_IDEAS = 17;
 
     private ProgramInfoBinding binding;
+    
+    private long downloadID = -1;
+
+    // Broadcast receiver to Auto-Install APK after Download completes
+    private final BroadcastReceiver onDownloadComplete = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+            if (downloadID == id) {
+                DownloadManager downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+                Uri apkUri = downloadManager.getUriForDownloadedFile(downloadID);
+                if (apkUri != null) {
+                    Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                    installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                    installIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try {
+                        startActivity(installIntent);
+                    } catch (Exception e) {
+                        SketchwareUtil.toastError("Failed to start installation: " + e.getMessage());
+                    }
+                }
+            }
+        }
+    };
 
     private void addTwoLineItem(int key, int name, int description) {
         addTwoLineItem(key, Helper.getResString(name), Helper.getResString(description));
@@ -136,22 +175,142 @@ public class ProgramInfoActivity extends BaseAppCompatActivity {
 
         binding = ProgramInfoBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(onDownloadComplete, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(onDownloadComplete, filter);
+        }
 
         binding.toolbar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
         binding.appVersion.setText(GB.e(getApplicationContext()));
         binding.btnReset.setOnClickListener(this::resetDialog);
-        binding.btnUpgrade.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(Helper.getResString(R.string.link_github_release)));
-            startActivity(intent);
-        });
+        
+        binding.btnUpgrade.setOnClickListener(v -> checkForUpdates());
 
         addTwoLineItem(ITEM_DOCS_LOG, R.string.program_information_title_docs, R.string.link_docs_url);
         addTwoLineItem(ITEM_SUGGEST_IDEAS, R.string.program_information_title_suggest_ideas, R.string.link_ideas_url);
         addSingleLineItem(ITEM_SOCIAL_NETWORK, R.string.title_community);
-        addTwoLineItem(ITEM_DISCORD, R.string.title_discord_community, R.string.link_discord_invite);
         addTwoLineItem(ITEM_TELEGRAM, R.string.title_telegram_community, R.string.link_telegram_invite);
         addSingleLineItem(ITEM_SYSTEM_INFORMATION, R.string.program_information_title_system_information);
         addSingleLineItem(ITEM_OPEN_SOURCE_LICENSES, R.string.program_information_title_open_source_license, true);
+    }
+    
+    // Core Update Checking Logic using GitHub API
+    private void checkForUpdates() {
+        if (!GB.h(getApplicationContext())) {
+            bB.a(getApplicationContext(), Helper.getResString(R.string.common_message_check_network), bB.TOAST_NORMAL).show();
+            return;
+        }
+
+        androidx.appcompat.app.AlertDialog loadingDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Checking for updates")
+                .setMessage("Please wait...")
+                .setCancelable(false)
+                .show();
+
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://api.github.com/repos/sketchlibx/SketchwareNeo/releases/latest");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(response.toString());
+                    String latestVersion = json.getString("tag_name");
+                    JSONArray assets = json.getJSONArray("assets");
+                    
+                    String tempDownloadUrl = null;
+                    String tempFileName = "SketchwareNeo_Update.apk";
+                    
+                    if (assets.length() > 0) {
+                        JSONObject asset = assets.getJSONObject(0);
+                        tempDownloadUrl = asset.getString("browser_download_url");
+                        tempFileName = asset.getString("name");
+                    }
+
+                    String currentVersion = GB.e(getApplicationContext());
+                    
+                    String curVerClean = currentVersion.replaceAll("[^0-9.]", "");
+                    String latestVerClean = latestVersion.replaceAll("[^0-9.]", "");
+
+                    final String finalDownloadUrl = tempDownloadUrl;
+                    final String finalFileName = tempFileName;
+
+                    runOnUiThread(() -> {
+                        loadingDialog.dismiss();
+                        if (!curVerClean.equals(latestVerClean) && finalDownloadUrl != null) {
+                            showUpdateDialog(latestVersion, finalDownloadUrl, finalFileName);
+                        } else {
+                            bB.a(getApplicationContext(), "You are using the latest version", bB.TOAST_NORMAL).show();
+                        }
+                    });
+                } else {
+                
+                final int responseCode = conn.getResponseCode();
+                
+                    runOnUiThread(() -> {
+                        loadingDialog.dismiss();
+                        SketchwareUtil.toastError("Failed to check updates. Error code: " + responseCode);
+                    });
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    loadingDialog.dismiss();
+                    SketchwareUtil.toastError("Error checking updates: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+
+    private void showUpdateDialog(String latestVersion, String downloadUrl, String fileName) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Update Available!")
+                .setMessage("A new version (" + latestVersion + ") is available. Do you want to download and install it?")
+                .setPositiveButton("Download", (dialog, which) -> startDownload(downloadUrl, fileName))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // Handles the actual Download to the Downloads directory
+    private void startDownload(String downloadUrl, String fileName) {
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
+            request.setTitle("Downloading " + fileName);
+            request.setDescription("Downloading latest Sketchware Neo update...");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            
+            //  Auto-Install
+            request.setMimeType("application/vnd.android.package-archive");
+
+            DownloadManager downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            downloadID = downloadManager.enqueue(request);
+            
+            bB.a(getApplicationContext(), "Downloading update. Check your notification panel.", bB.TOAST_NORMAL).show();
+        } catch (Exception e) {
+            SketchwareUtil.toastError("Failed to start download: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        try {
+            unregisterReceiver(onDownloadComplete);
+        } catch (IllegalArgumentException e) {
+            // Ignored if receiver wasn't fully registered
+        }
     }
 
     private void toLicenseActivity() {

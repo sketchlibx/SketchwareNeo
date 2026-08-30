@@ -8,8 +8,11 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.view.LayoutInflater;
+import android.view.View;
 
 import com.besome.sketch.beans.BlockBean;
 import com.besome.sketch.beans.EventBean;
@@ -17,12 +20,21 @@ import com.besome.sketch.beans.LayoutBean;
 import com.besome.sketch.beans.ProjectFileBean;
 import com.besome.sketch.beans.ViewBean;
 import com.besome.sketch.editor.manage.image.ManageImageActivity;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+import org.xmlpull.v1.XmlPullParserFactory;
+
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import a.a.a.Cx;
 import a.a.a.Gx;
@@ -33,8 +45,10 @@ import a.a.a.jC;
 import a.a.a.mB;
 import a.a.a.oq;
 import mod.hey.studios.project.ProjectSettings;
+import mod.hey.studios.util.Helper;
 import mod.pranav.viewbinding.ViewBindingBuilder;
 import pro.sketchware.R;
+import pro.sketchware.utility.ThemeUtils;
 
 public class ViewPropertyItems extends LinearLayout implements Kw, View.OnClickListener {
     private final boolean b = false;
@@ -117,6 +131,11 @@ public class ViewPropertyItems extends LinearLayout implements Kw, View.OnClickL
             case "property_background_color" ->
                     r(property, bean.layout.backgroundResColor, bean.layout.backgroundColor);
             case "property_enabled" -> e(property, bean.enabled);
+            case "property_elevation" -> {
+                String el = getInjectedAttr(bean, "android:elevation").replaceAll("[^0-9.]", "");
+                b(property, el);
+            }
+            case "property_visibility" -> b(property, getInjectedAttr(bean, "android:visibility"));
             case "property_rotate" -> b(property, String.valueOf(bean.image.rotate));
             case "property_alpha" -> b(property, String.valueOf(bean.alpha));
             case "property_translation_x" -> b(property, String.valueOf(bean.translationX));
@@ -363,12 +382,56 @@ public class ViewPropertyItems extends LinearLayout implements Kw, View.OnClickL
         }
 
         a(bean, "property_image");
+        a(bean, "property_elevation");
+        a(bean, "property_visibility");
         a(bean, "property_rotate");
         a(bean, "property_alpha");
         a(bean, "property_translation_x");
         a(bean, "property_translation_y");
         a(bean, "property_scale_x");
         a(bean, "property_scale_y");
+    }
+
+    private String getInjectedAttr(ViewBean bean, String attrName) {
+        LinkedHashMap<String, String> attributes = parseInjectString(bean.inject);
+        String value = attributes.get(attrName);
+        return value == null ? "" : value;
+    }
+
+    private String setInjectedAttr(ViewBean bean, String attrName, String newValue) {
+        LinkedHashMap<String, String> attributes = parseInjectString(bean.inject);
+        if (newValue == null || newValue.isEmpty()) {
+            attributes.remove(attrName);
+        } else {
+            attributes.put(attrName, newValue);
+        }
+        return attributes.entrySet().stream()
+                .map(entry -> entry.getKey() + "=\"" + entry.getValue() + "\"")
+                .collect(Collectors.joining("\n"));
+    }
+
+    private LinkedHashMap<String, String> parseInjectString(String inject) {
+        LinkedHashMap<String, String> attributes = new LinkedHashMap<>();
+        if (inject == null || inject.trim().isEmpty()) return attributes;
+
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(new StringReader("<tag " + inject + "></tag>"));
+
+            int eventType = parser.getEventType();
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    for (int i = 0; i < parser.getAttributeCount(); i++) {
+                        attributes.put(parser.getAttributeName(i), parser.getAttributeValue(i));
+                    }
+                }
+                eventType = parser.next();
+            }
+        } catch (XmlPullParserException | IOException | RuntimeException ignored) {
+        }
+
+        return attributes;
     }
 
     private void c(String key, int value) {
@@ -681,6 +744,9 @@ public class ViewPropertyItems extends LinearLayout implements Kw, View.OnClickL
             a(bean, "property_enabled");
         }
 
+        a(bean, "property_elevation");
+        a(bean, "property_visibility");
+
         a(bean, "property_rotate");
         a(bean, "property_alpha");
         a(bean, "property_translation_x");
@@ -712,6 +778,15 @@ public class ViewPropertyItems extends LinearLayout implements Kw, View.OnClickL
                             bean.layout.weight = Integer.parseInt(inputItem.getValue());
                     case "property_weight_sum" ->
                             bean.layout.weightSum = Integer.parseInt(inputItem.getValue());
+                    case "property_elevation" -> {
+                        String val = inputItem.getValue();
+                        if (!val.isEmpty() && !val.contains("dp")) {
+                            val += "dp";
+                        }
+                        bean.inject = setInjectedAttr(bean, "android:elevation", val);
+                    }
+                    case "property_visibility" ->
+                            bean.inject = setInjectedAttr(bean, "android:visibility", inputItem.getValue());
                     case "property_rotate" ->
                             bean.image.rotate = Integer.parseInt(inputItem.getValue());
                     case "property_alpha" -> bean.alpha = Float.parseFloat(inputItem.getValue());

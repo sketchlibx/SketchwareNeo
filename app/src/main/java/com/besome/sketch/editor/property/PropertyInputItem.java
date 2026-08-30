@@ -2,6 +2,7 @@ package com.besome.sketch.editor.property;
 
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.text.Editable;
@@ -116,6 +117,8 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
             case "property_inject" -> icon = R.drawable.ic_mtrl_code;
             case "property_convert" -> icon = R.drawable.ic_mtrl_switch;
             case "property_text_size" -> icon = R.drawable.ic_mtrl_font;
+            case "property_elevation" -> icon = R.drawable.ic_mtrl_elevation;
+            case "property_visibility" -> icon = R.drawable.ic_mtrl_visibility;
         }
         imageView.setImageResource(icon);
     }
@@ -131,15 +134,20 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
     public void setKey(String key) {
         this.key = key;
         int identifier = getResources().getIdentifier(key, "string", getContext().getPackageName());
+        
         if (identifier > 0) {
             tvName.setText(Helper.getResString(identifier));
-            if (propertyMenuItem.getVisibility() == VISIBLE) {
-                setIcon(findViewById(R.id.img_icon));
-                ((TextView) findViewById(R.id.tv_title)).setText(Helper.getResString(identifier));
-                return;
-            }
-            setIcon(imgLeftIcon);
+        } else {
+            String fallback = key.replace("property_", "");
+            tvName.setText(fallback.substring(0, 1).toUpperCase() + fallback.substring(1));
         }
+        
+        if (propertyMenuItem.getVisibility() == VISIBLE) {
+            setIcon(findViewById(R.id.img_icon));
+            ((TextView) findViewById(R.id.tv_title)).setText(tvName.getText());
+            return;
+        }
+        setIcon(imgLeftIcon);
     }
 
     public String getValue() {
@@ -219,10 +227,51 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
                         Helper.getText(tvName),
                         Float.parseFloat(value.isEmpty() ? "1" : value),
                         0f, 50f, 1f, true);
+                case "property_elevation" -> showHybridSliderDialog(
+                        Helper.getText(tvName),
+                        Float.parseFloat(value.isEmpty() ? "0" : value.replaceAll("[^0-9.]", "")),
+                        0f, 50f, 1f, true);
+                case "property_visibility" -> showVisibilityDialog();
                 case "property_convert" -> showAutoCompleteDialog();
                 case "property_inject" -> showInjectDialog();
             }
         }
+    }
+
+    private void showVisibilityDialog() {
+        MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(getContext());
+        dialog.setTitle(Helper.getText(tvName));
+        dialog.setIcon(icon);
+
+        String[] options = {"visible", "invisible", "gone"};
+        int checkedItem = -1;
+        
+        for (int i = 0; i < options.length; i++) {
+            if (options[i].equals(value)) {
+                checkedItem = i;
+                break;
+            }
+        }
+
+        dialog.setSingleChoiceItems(options, checkedItem, (d, which) -> {
+            setValue(options[which]);
+            if (valueChangeListener != null) {
+                valueChangeListener.a(key, value);
+            }
+            d.dismiss();
+        });
+
+        // Add a Reset button to clear XML injection
+        dialog.setNeutralButton(Helper.getResString(R.string.common_word_reset), (d, which) -> {
+            setValue("");
+            if (valueChangeListener != null) {
+                valueChangeListener.a(key, "");
+            }
+            d.dismiss();
+        });
+
+        dialog.setNegativeButton(Helper.getResString(R.string.common_word_cancel), null);
+        dialog.show();
     }
 
     private void showHybridSliderDialog(String propertyName, float currentValue, float minValue, float maxValue, float stepSize, boolean isInteger) {
@@ -345,7 +394,15 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
             v.dismiss();
         });
 
-        dialog.setNegativeButton(Helper.getResString(R.string.common_word_reset), null);
+        // Negative button explicitly clears the XML attribute entirely
+        dialog.setNegativeButton(Helper.getResString(R.string.common_word_reset), (v, which) -> {
+            setValue("");
+            if (valueChangeListener != null) {
+                valueChangeListener.a(key, "");
+            }
+            v.dismiss();
+        });
+        
         dialog.setNeutralButton("Custom", null);
 
         AlertDialog alertDialog = dialog.create();
@@ -373,7 +430,6 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
             sliderAnimator.start();
 
             Button customButton = alertDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
-            Button resetButton = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
 
             customButton.setOnClickListener(v -> {
                 if (binding.sliderSection.getVisibility() == View.VISIBLE) {
@@ -386,27 +442,6 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
                     binding.tiInput.setVisibility(View.GONE);
                     customButton.setText("Custom");
                 }
-            });
-
-            resetButton.setOnClickListener(v -> {
-                float defaultValue = getDefaultValue(key);
-
-                ValueAnimator resetAnimator = ValueAnimator.ofFloat(binding.slider.getValue(), defaultValue);
-                resetAnimator.setDuration(400);
-                resetAnimator.setInterpolator(new DecelerateInterpolator());
-
-                resetAnimator.addUpdateListener(animation -> {
-                    float animatedValue = (float) animation.getAnimatedValue();
-                    float validAnimatedValue = Math.round(animatedValue / stepSize) * stepSize;
-                    validAnimatedValue = Math.max(minValue, Math.min(maxValue, validAnimatedValue));
-                    binding.slider.setValue(validAnimatedValue);
-                    updateValueDisplay(binding.tvCurrentValue, validAnimatedValue, isInteger);
-                    binding.edInput.setText(isInteger ? String.valueOf((int) validAnimatedValue) :
-                            String.format(Locale.US, "%.1f", validAnimatedValue));
-                });
-
-                resetAnimator.start();
-                binding.tiInput.setError(null);
             });
         });
 
@@ -817,11 +852,6 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
     private List<String> populateAttributes() {
         List<String> attrs = new ArrayList<>();
         
-        attrs.add("android:elevation");
-        attrs.add("android:visibility");
-        attrs.add("android:alpha");
-        attrs.add("android:layout_weight");
-        
         if (bean != null) {
             var simpleName = getSimpleName(bean);
             var classInfo = bean.getClassInfo();
@@ -1012,6 +1042,10 @@ public class PropertyInputItem extends RelativeLayout implements View.OnClickLis
 
         binding.tiInput.setHint(
                 String.format(Helper.getResString(R.string.property_enter_value), attr));
+
+        if (getContext() instanceof Activity) {
+            AttributeInputHelper.wireFixed((Activity) getContext(), sc_id, attr, binding.tiInput, input);
+        }
 
         builder.setView(binding.getRoot());
         builder.setPositiveButton(

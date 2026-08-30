@@ -536,7 +536,7 @@ public class ManageResourceActivity extends BaseAppCompatActivity {
         } else {
             layout.addView(createSheetItem("Edit", R.drawable.ic_mtrl_edit, () -> { bottomSheet.dismiss(); goEdit(node.path); }));
         }
-        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_edit, () -> { bottomSheet.dismiss(); showRenameDialog(node.path); }));
+        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_rename, () -> { bottomSheet.dismiss(); showRenameDialog(node.path); }));
         layout.addView(createSheetItem("Delete", R.drawable.ic_delete_white_24dp, () -> { bottomSheet.dismiss(); showDeleteDialog(node.path); }));
 
         bottomSheet.setContentView(layout);
