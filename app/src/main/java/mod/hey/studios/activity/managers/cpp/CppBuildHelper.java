@@ -19,19 +19,18 @@ public final class CppBuildHelper {
     private static final String CMAKE_TEMPLATE =
             "cmake_minimum_required(VERSION 3.22.1)\n\n" +
             "project(\"%s\")\n\n" +
-            "# Collect all C/C++ sources recursively\n" +
             "file(GLOB_RECURSE CPP_SOURCES\n" +
-            "        \"src/main/jni/*.c\"\n" +
-            "        \"src/main/jni/*.cpp\")\n\n" +
+            "        \"src/main/cpp/*.c\"\n" +
+            "        \"src/main/cpp/*.cpp\")\n\n" +
             "add_library(\n" +
             "        %s\n" +
             "        SHARED\n" +
             "        ${CPP_SOURCES})\n\n" +
-            "# Link against the Android log library\n" +
             "find_library(log-lib log)\n\n" +
             "target_link_libraries(\n" +
             "        %s\n" +
-            "        ${log-lib})\n";
+            "        ${log-lib}\n" +
+            "        c++_shared)\n";
 
     // ── Gradle externalNativeBuild block ─────────────────────────────────────
     private static final String GRADLE_CMAKE_BLOCK =
@@ -101,8 +100,8 @@ public final class CppBuildHelper {
     }
 
     /**
-     * Copies the user's cpp source directory into the Android Studio export build path
-     * ({projectMyscPath}/app/src/main/jni/), creating it if it does not exist.
+     * Copies the user's cpp source directory into the build tree
+     * ({projectMyscPath}/app/src/main/cpp/), creating it if it does not exist.
      *
      * @param sc_id       project identifier
      * @param cppBuildPath  yq.cppFilesPath — the target path inside the build tree

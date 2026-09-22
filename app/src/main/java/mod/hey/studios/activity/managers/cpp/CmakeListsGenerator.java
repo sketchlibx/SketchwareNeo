@@ -3,6 +3,7 @@ package mod.hey.studios.activity.managers.cpp;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Generates CMakeLists.txt content and injects the matching Gradle cmake blocks for AS export. */
 public final class CmakeListsGenerator {
 
     private CmakeListsGenerator() {}
@@ -20,15 +21,26 @@ public final class CmakeListsGenerator {
             "add_library(\n" +
             "        %s\n" +
             "        SHARED\n" +
-            "        ${CPP_SOURCES})\n";
+            "        ${CPP_SOURCES})\n\n" +
+            "find_library(log-lib log)\n\n" +
+            "target_link_libraries(\n" +
+            "        %s\n" +
+            "        ${log-lib})\n";
 
     public static String generate(String projectName) {
         String libName = sanitizeLibName(projectName);
-        return String.format(CMAKE_TEMPLATE, projectName, libName);
+        return String.format(CMAKE_TEMPLATE, projectName, libName, libName);
     }
 
     public static String sanitizeLibName(String raw) {
-        return raw.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
+        String sanitized = raw.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
+        if (!sanitized.isEmpty() && Character.isDigit(sanitized.charAt(0))) {
+            sanitized = "lib_" + sanitized;
+        }
+        if (sanitized.isEmpty()) {
+            sanitized = "native_lib";
+        }
+        return sanitized;
     }
 
     public static List<String> extractHeaderNames(List<String> allPaths) {
@@ -49,17 +61,19 @@ public final class CmakeListsGenerator {
     }
 
     // =========================================================================
-    // Gradle Injection Helpers (Required by CppExporter.java)
+    // Gradle Injection Helpers (used by CppExporter for the Android Studio export path)
     // =========================================================================
 
     public static String injectDefaultConfigCmakeBlock(String gradleContent, String abiFilters) {
+        if (gradleContent.contains("externalNativeBuild")) return gradleContent; // idempotent
+
         String block = "\n        externalNativeBuild {\n" +
                        "            cmake {\n" +
                        "                cppFlags \"-std=c++17\"\n" +
                        (abiFilters != null && !abiFilters.isEmpty() ? "                abiFilters " + abiFilters + "\n" : "") +
                        "            }\n" +
                        "        }\n    ";
-        
+
         int idx = gradleContent.indexOf("defaultConfig {");
         if (idx != -1) {
             int openBraces = 0;
@@ -78,12 +92,17 @@ public final class CmakeListsGenerator {
     }
 
     public static String injectAndroidLevelCmakeBlock(String gradleContent) {
+        if (gradleContent.contains("externalNativeBuild") && gradleContent.contains("path \"CMakeLists.txt\"")) {
+            return gradleContent; // idempotent
+        }
+
         String block = "\n    externalNativeBuild {\n" +
                        "        cmake {\n" +
                        "            path \"CMakeLists.txt\"\n" +
+                       "            version \"" + CMAKE_MIN_VERSION + "\"\n" +
                        "        }\n" +
                        "    }\n";
-        
+
         int idx = gradleContent.indexOf("android {");
         if (idx != -1) {
             int openBraces = 0;

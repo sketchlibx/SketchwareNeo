@@ -1,12 +1,15 @@
 package mod.sketchlibx.project.history;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.view.ViewGroup;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -19,6 +22,9 @@ import pro.sketchware.R;
 import pro.sketchware.utility.ThemeUtils;
 
 public class CodeComparisonActivity extends BaseAppCompatActivity {
+
+    private static final int MENU_COPY_RAW = 1;
+    private String rawOldCode, rawNewCode, rawType;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -36,12 +42,83 @@ public class CodeComparisonActivity extends BaseAppCompatActivity {
         String type = getIntent().getStringExtra("type");
         String oldCode = getIntent().getStringExtra("oldCode");
         String newCode = getIntent().getStringExtra("newCode");
+        rawType = type;
+        rawOldCode = oldCode;
+        rawNewCode = newCode;
 
         if ("BLOCKS".equals(type)) {
             renderBlocks(containerOld, oldCode);
             renderBlocks(containerNew, newCode);
+        } else if ("XML".equals(type)) {
+            renderTextDiff(containerOld, containerNew, renderViewSections(oldCode), renderViewSections(newCode), "XML");
+        } else if ("JAVA".equals(type)) {
+            // "file" data is the activity/custom-view registry, not Java source -
+            // rendered as plain readable text, not Java-syntax-highlighted, since
+            // treating it as Java was the actual bug being reported.
+            renderTextDiff(containerOld, containerNew, ProjectFileRenderer.render(oldCode), ProjectFileRenderer.render(newCode), "TEXT");
         } else {
             renderTextDiff(containerOld, containerNew, oldCode, newCode, type);
+        }
+    }
+
+    /**
+     * Renders every section of a "view" file (each layout's widget tree, and
+     * each layout's separate "_fab" section) as real XML text, labeled by
+     * which file/section it came from.
+     */
+    private String renderViewSections(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        SketchwareDataFile file = SketchwareDataFile.parse(raw);
+        if (file.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, List<String>> section : file.sections.entrySet()) {
+            String key = section.getKey();
+            sb.append("<!-- ").append(key).append(" -->\n");
+            if (key.endsWith("_fab")) {
+                sb.append(section.getValue().isEmpty() ? "" : ViewXmlRenderer.renderSingle(section.getValue().get(0)));
+            } else {
+                sb.append(ViewXmlRenderer.render(section.getValue()));
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Plain menu.add() - no XML menu resource needed, so nothing here needs
+        // guessing at unfamiliar resource conventions.
+        menu.add(Menu.NONE, MENU_COPY_RAW, Menu.NONE, "Copy raw content")
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == MENU_COPY_RAW) {
+            copyRawToClipboard(null);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * Copies the exact raw content this screen is working with to the
+     * clipboard - always available from the toolbar, and also called
+     * automatically when block parsing fails, so the exact failing content
+     * can be shared for debugging instead of a screenshot.
+     */
+    private void copyRawToClipboard(String reasonPrefix) {
+        String label = "Local History raw content (" + rawType + ")";
+        String text = (reasonPrefix != null ? reasonPrefix + "\n\n" : "")
+                + "=== OLD ===\n" + (rawOldCode != null ? rawOldCode : "")
+                + "\n\n=== NEW ===\n" + (rawNewCode != null ? rawNewCode : "");
+
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText(label, text));
+            Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -85,12 +162,13 @@ public class CodeComparisonActivity extends BaseAppCompatActivity {
             return;
         }
 
-        Map<String, List<BlockBean>> blocksMap;
+        Map<String, Map<String, List<BlockBean>>> blocksMap;
         try {
             blocksMap = BlocksJsonParser.parse(json);
         } catch (Exception e) {
             e.printStackTrace();
-            container.addView(createInfoLabel("(could not parse blocks: " + e.getMessage() + ")"));
+            copyRawToClipboard("Block parsing failed: " + e.getMessage());
+            container.addView(createInfoLabel("(could not parse blocks - raw content copied to clipboard, error: " + e.getMessage() + ")"));
             return;
         }
 
@@ -99,37 +177,40 @@ public class CodeComparisonActivity extends BaseAppCompatActivity {
             return;
         }
 
-        for (Map.Entry<String, List<BlockBean>> entry : blocksMap.entrySet()) {
-            TextView header = new TextView(this);
-            header.setText(entry.getKey());
-            header.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-            header.setTextSize(12f);
-            header.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
-            header.setPadding(0, 16, 0, 4);
-            container.addView(header);
+        for (Map.Entry<String, Map<String, List<BlockBean>>> activityEntry : blocksMap.entrySet()) {
+            TextView activityHeader = new TextView(this);
+            activityHeader.setText(activityEntry.getKey());
+            activityHeader.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            activityHeader.setTextSize(13f);
+            activityHeader.setTextColor(ThemeUtils.getColor(this, android.R.attr.colorPrimary));
+            activityHeader.setPadding(0, 20, 0, 6);
+            container.addView(activityHeader);
 
-            List<BlockBean> blocks = entry.getValue();
-            if (blocks == null) continue;
+            Map<String, List<BlockBean>> eventsMap = activityEntry.getValue();
+            if (eventsMap == null) continue;
 
-            for (BlockBean block : blocks) {
-                if (block == null) continue;
+            for (Map.Entry<String, List<BlockBean>> eventEntry : eventsMap.entrySet()) {
+                TextView eventHeader = new TextView(this);
+                eventHeader.setText("  // " + eventEntry.getKey());
+                eventHeader.setTypeface(Typeface.MONOSPACE);
+                eventHeader.setTextSize(12f);
+                eventHeader.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+                eventHeader.setPadding(0, 12, 0, 2);
+                container.addView(eventHeader);
+
+                List<BlockBean> blocks = eventEntry.getValue();
+                String code;
+                try {
+                    code = BlocksToJavaConverter.convertEvent(blocks);
+                } catch (Exception e) {
+                    code = "/* failed to render: " + e.getMessage() + " */";
+                }
 
                 TextView tv = new TextView(this);
-                tv.setText(BlockSpecFormatter.format(block));
-                tv.setTextColor(Color.WHITE);
+                tv.setText(SimpleSyntaxHighlighter.highlight(code, "JAVA"));
+                tv.setTypeface(Typeface.MONOSPACE);
                 tv.setTextSize(12f);
-                tv.setPadding(24, 16, 24, 16);
-
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                params.setMargins(0, 0, 0, 4);
-                tv.setLayoutParams(params);
-
-                String opCode = block.opCode != null ? block.opCode : "";
-                GradientDrawable gd = new GradientDrawable();
-                gd.setCornerRadius(8f);
-                gd.setColor(opCode.equals("getArg") ? Color.parseColor("#4CAF50") : Color.parseColor("#2196F3"));
-                tv.setBackground(gd);
-
+                tv.setPadding(24, 4, 24, 12);
                 container.addView(tv);
             }
         }

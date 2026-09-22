@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.besome.sketch.beans.BlockBean;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -222,40 +221,14 @@ public class LocalHistoryActivity extends BaseAppCompatActivity {
     }
 
     /**
-     * Converts the raw "logic" JSON (a Map<eventName, List<BlockBean>>) into
-     * one readable line per block (spec with parameters substituted in),
-     * instead of diffing the raw JSON text - fixes Bug 1 (Difference Summary
-     * showing undecoded block JSON instead of something resembling actual
-     * block/code content).
-     */
-    private List<String> logicJsonToReadableLines(String json) {
-        List<String> lines = new ArrayList<>();
-        if (json == null || json.trim().isEmpty()) return lines;
-        try {
-            Map<String, List<BlockBean>> blocksMap = BlocksJsonParser.parse(json);
-            if (blocksMap == null) return lines;
-            for (Map.Entry<String, List<BlockBean>> entry : blocksMap.entrySet()) {
-                lines.add("// " + entry.getKey());
-                List<BlockBean> blocks = entry.getValue();
-                if (blocks != null) {
-                    for (BlockBean b : blocks) {
-                        if (b != null) lines.add(BlockSpecFormatter.format(b));
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Malformed/unparseable - fall through with whatever lines were gathered so far.
-        }
-        return lines;
-    }
-
     /**
      * Routes the Diff button: for BLOCKS, a flat +/- text diff of raw block
      * JSON isn't meaningful the way it is for actual text files (ids,
      * nextBlock pointers etc. change even when nothing user-visible did), so
      * it goes straight to the side-by-side CodeComparisonActivity, which
-     * renders each block's readable spec instead. XML/JAVA keep the
-     * Difference Summary dialog first, with "Details" available from there.
+     * renders real Java-like code per block via BlocksToJavaConverter. XML/JAVA
+     * keep the Difference Summary dialog first, with "Details" available
+     * from there.
      */
     private void openDiff(ChangedFile item) {
         if ("BLOCKS".equals(item.type)) {
@@ -276,10 +249,6 @@ public class LocalHistoryActivity extends BaseAppCompatActivity {
         new Thread(() -> {
             String oldForDiff = item.oldContent;
             String newForDiff = item.newContent;
-            if ("BLOCKS".equals(item.type)) {
-                oldForDiff = String.join("\n", logicJsonToReadableLines(item.oldContent));
-                newForDiff = String.join("\n", logicJsonToReadableLines(item.newContent));
-            }
 
             List<DiffUtils.DiffLine> diffs = DiffUtils.getDiff(oldForDiff, newForDiff);
 
@@ -441,11 +410,16 @@ public class LocalHistoryActivity extends BaseAppCompatActivity {
                 View btnDiff = childView.findViewById(R.id.btn_diff);
                 View btnRestore = childView.findViewById(R.id.btn_restore);
 
-                tvTypeLabel.setText(cf.type);
+                // "JAVA" is the internal type constant (kept as-is so
+                // CodeComparisonActivity's routing doesn't need touching too),
+                // but it's actually the activity/custom-view file registry, not
+                // Java source - shown with an accurate label here.
+                String displayLabel = "JAVA".equals(cf.type) ? "PROJECT FILES" : cf.type;
+                tvTypeLabel.setText(displayLabel);
                 tvDesc.setText(cf.fileName + " \u00b7 " + cf.newContent.length() + " chars");
 
                 int iconRes = R.drawable.ic_mtrl_code;
-                int accentColor = Color.parseColor("#2196F3"); // JAVA - blue
+                int accentColor = Color.parseColor("#FF9800"); // PROJECT FILES - orange
                 if ("BLOCKS".equals(cf.type)) {
                     iconRes = R.drawable.ic_mtrl_block;
                     accentColor = Color.parseColor("#9C27B0"); // purple
@@ -453,7 +427,7 @@ public class LocalHistoryActivity extends BaseAppCompatActivity {
                     iconRes = R.drawable.ic_mtrl_devices;
                     accentColor = Color.parseColor("#4CAF50"); // green
                 } else if ("JAVA".equals(cf.type)) {
-                    iconRes = R.drawable.ic_mtrl_java;
+                    iconRes = R.drawable.ic_mtrl_moreblock;
                 }
                 imgType.setImageResource(iconRes);
                 imgType.setImageTintList(android.content.res.ColorStateList.valueOf(accentColor));

@@ -24,6 +24,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -66,6 +67,7 @@ import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.topjohnwu.superuser.Shell;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import org.eclipse.jgit.api.Git;
 
@@ -122,6 +124,9 @@ import mod.jbk.diagnostic.MissingFileException;
 import mod.jbk.util.LogUtil;
 import mod.khaled.logcat.LogReaderActivity;
 import mod.sketchlibx.search.GlobalSearchDialog;
+import mod.sketchlibx.terminal.NeoTerminalView;
+import mod.sketchlibx.terminal.TerminalFragment;
+import mod.hilal.saif.activities.tools.ConfigActivity;
 import neo.sketchware.plugin.ui.PluginsTabFragment;
 import pro.sketchware.R;
 import pro.sketchware.activities.appcompat.ManageAppCompatActivity;
@@ -134,10 +139,12 @@ import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.apk.ApkSignatures;
-import mod.hey.studios.activity.managers.cpp.TermuxTest;
 
 public class DesignActivity extends BaseAppCompatActivity implements View.OnClickListener {
     public static String sc_id;
+    
+    private String terminalPlacement; // 0=Tab, 1=BottomSheet, 2=Drawer
+    
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
     
@@ -213,6 +220,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     private PluginsTabFragment pluginsTabAdapter;
     private boolean pluginsTabEnabled;
     private Toolbar toolbar;
+    private android.widget.FrameLayout terminalSlidePanel;
+    private mod.sketchlibx.terminal.NeoTerminalView terminalSlidePanelView;
+    private boolean terminalPanelOpen = false;
     
     private final ActivityResultLauncher<Intent> openImageManager = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == RESULT_OK) {
@@ -428,6 +438,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     public void onBackPressed() {
         if (drawer.isDrawerOpen(GravityCompat.END)) {
             drawer.closeDrawer(GravityCompat.END);
+        } else if (terminalPanelOpen) {
+            setTerminalPanelOpen(false);
         } else if (viewTabAdapter != null && viewTabAdapter.isPropertyViewVisible()) {
             hideViewPropertyView();
         } else {
@@ -476,18 +488,26 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         r = new DB(getApplicationContext(), "P1");
         t = new DB(getApplicationContext(), "P12");
+        
+        terminalPlacement = ConfigActivity.getStringSettingValueOrSetAndGet(ConfigActivity.SETTING_TERMINAL_PLACEMENT, "0");
 
         toolbar = findViewById(R.id.toolbar);
         toolbar.setSubtitle(sc_id);
         setSupportActionBar(toolbar);
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-        pluginsTabEnabled = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_SHOW_PLUGINS_TAB);
-
         drawer = findViewById(R.id.drawer_layout);
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
 
         Insetter.builder().margin(WindowInsetsCompat.Type.navigationBars()).applyToView(findViewById(R.id.container));
+
+        if (terminalPlacement.equals("1")) {
+            setupTerminalSlidePanel();
+        }
+
+        if (terminalPlacement.equals("1")) {
+            setupTerminalSlidePanel();
+        }
 
         coordinatorLayout = findViewById(R.id.layout_coordinator);
         fileName = findViewById(R.id.file_name);
@@ -583,28 +603,26 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             return true;
         });
         
+        if (terminalPlacement.equals("1")) {
+            bottomMenu.add(Menu.NONE, 88, Menu.NONE, "Open Terminal").setOnMenuItemClickListener(item -> {
+                showTerminalBottomSheet();
+                return true;
+            });
+        }
+        
         bottomPopupMenu.setOnDismissListener(menu -> btnOptions.setChecked(false));
 
         xmlLayoutOrientation = findViewById(R.id.img_orientation);
         viewPager = findViewById(R.id.viewpager);
         viewPager.setAdapter(new ViewPagerAdapter(getSupportFragmentManager()));
         viewPager.setOffscreenPageLimit(3);
-        viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-
+        viewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override
-            public void onPageScrollStateChanged(int state) {}
-
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
-
-            @Override
-            public void onPageSelected(int position) {
+            public void onPageSelected(int position) {  
                 if (currentTabNumber == 1) {
                     if (eventTabAdapter != null) eventTabAdapter.c();
                 } else if (currentTabNumber == 2 && componentTabAdapter != null) {
                     componentTabAdapter.unselectAll();
-                } else if (pluginsTabEnabled && currentTabNumber == 3 && pluginsTabAdapter != null) {
-                    pluginsTabAdapter.closeSearchBar();
                 }
                 
                 boolean isCustomJavaEnabled = new ProjectSettings(sc_id).getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false").equals("true");
@@ -622,7 +640,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (viewTabAdapter != null) {
                         xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
                         viewTabAdapter.showHidePropertyView(false);
-                        if (eventTabAdapter != null) eventTabAdapter.refreshEvents();
                     }
                 } else if (position == 2) {
                     bottomMenu.findItem(7).setVisible(false);
@@ -630,7 +647,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (viewTabAdapter != null) {
                         xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
                         viewTabAdapter.showHidePropertyView(false);
-                        if (componentTabAdapter != null) componentTabAdapter.refreshData();
                     }
                 } else {
                     bottomMenu.findItem(7).setVisible(false);
@@ -639,7 +655,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                         xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
                         viewTabAdapter.showHidePropertyView(false);
                     }
-                    if (pluginsTabAdapter != null) pluginsTabAdapter.refreshPlugins();
                 }
                 refresh();
                 currentTabNumber = position;
@@ -662,6 +677,203 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             SketchwareUtil.toast("Please allow overlay permission");
         }
         fProgress = new FloatingProgressWindow();
+    }
+    
+    /**
+     * Builds the full-screen terminal panel as a sibling of the main content inside
+     * {@code R.id.container} (same RelativeLayout that already hosts {@code view_property} using
+     * this exact translationY-slide idiom — following the established pattern in this file rather
+     * than introducing a new mechanism). Parked off-screen above via a negative translationY
+     * until opened.
+     * <p>
+     * NOTE: this replaces the BottomSheetDialog-based popup from the previous round, which slid
+     * up from the BOTTOM and required a menu tap to appear at all. Root layout (design.xml) is
+     * already a DrawerLayout, but DrawerLayout only supports LEFT/START/RIGHT/END drawers — there
+     * is no TOP/BOTTOM gravity option in the framework — so a real top-edge sliding panel has to
+     * be a plain view + manual drag handling, not DrawerLayout.
+     */
+    private void setupTerminalSlidePanel() {
+        android.widget.RelativeLayout container = findViewById(R.id.container);
+
+        terminalSlidePanel = new android.widget.FrameLayout(this);
+        android.widget.RelativeLayout.LayoutParams panelParams = new android.widget.RelativeLayout.LayoutParams(
+                android.widget.RelativeLayout.LayoutParams.MATCH_PARENT, android.widget.RelativeLayout.LayoutParams.MATCH_PARENT);
+        terminalSlidePanel.setLayoutParams(panelParams);
+        terminalSlidePanel.setElevation(getResources().getDisplayMetrics().density * 24);
+        terminalSlidePanel.setBackgroundColor(android.graphics.Color.parseColor("#121212"));
+
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        terminalSlidePanelView = new NeoTerminalView(this, sc_id);
+        terminalSlidePanelView.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        column.addView(terminalSlidePanelView);
+
+        // Grab handle at the BOTTOM of the panel — "hold from below, push up to hide" per spec.
+        android.widget.FrameLayout handleRow = new android.widget.FrameLayout(this);
+        int handleHeight = (int) (getResources().getDisplayMetrics().density * 28);
+        handleRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, handleHeight));
+        handleRow.setBackgroundColor(android.graphics.Color.parseColor("#1E1E1E"));
+        View handle = new View(this);
+        int density = (int) getResources().getDisplayMetrics().density;
+        android.widget.FrameLayout.LayoutParams handleParams = new android.widget.FrameLayout.LayoutParams(density * 36, density * 4);
+        handleParams.gravity = android.view.Gravity.CENTER;
+        handle.setLayoutParams(handleParams);
+        android.graphics.drawable.GradientDrawable handleBg = new android.graphics.drawable.GradientDrawable();
+        handleBg.setColor(android.graphics.Color.parseColor("#4D4D4D"));
+        handleBg.setCornerRadius(density * 2);
+        handle.setBackground(handleBg);
+        handleRow.addView(handle);
+        column.addView(handleRow);
+
+        terminalSlidePanel.addView(column);
+        terminalSlidePanel.setVisibility(View.INVISIBLE); // see class-level note below
+        container.addView(terminalSlidePanel);
+
+        toolbar.setOnTouchListener(new EdgeDragListener(true));
+        handleRow.setOnTouchListener(new EdgeDragListener(false));
+    }
+
+    /**
+     * Shared drag handler for both directions: {@code opensPanel=true} on the toolbar (drag DOWN
+     * opens), {@code opensPanel=false} on the handle (drag UP closes). Only starts actually
+     * intercepting once the drag passes touch-slop in the expected direction, so ordinary taps on
+     * toolbar icons (search / save / overflow) keep working untouched.
+     */
+    private class EdgeDragListener implements View.OnTouchListener {
+        private final boolean opensPanel;
+        private float startY;
+        private boolean dragging = false;
+        private final int touchSlop = android.view.ViewConfiguration.get(DesignActivity.this).getScaledTouchSlop();
+        private android.view.VelocityTracker velocityTracker;
+
+        EdgeDragListener(boolean opensPanel) {
+            this.opensPanel = opensPanel;
+        }
+
+        @Override
+        public boolean onTouch(View v, android.view.MotionEvent event) {
+            int panelHeight = terminalSlidePanel.getHeight();
+            if (panelHeight == 0) return false;
+
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    startY = event.getRawY();
+                    dragging = false;
+                    if (velocityTracker != null) velocityTracker.recycle();
+                    velocityTracker = android.view.VelocityTracker.obtain();
+                    velocityTracker.addMovement(event);
+                    return false; // don't consume yet — let a plain tap pass through normally
+
+                case android.view.MotionEvent.ACTION_MOVE: {
+                    if (velocityTracker != null) velocityTracker.addMovement(event);
+                    float dy = event.getRawY() - startY;
+                    boolean correctDirection = opensPanel ? dy > 0 : dy < 0;
+                    if (!dragging && correctDirection && Math.abs(dy) > touchSlop) {
+                        dragging = true;
+                        if (opensPanel && !terminalPanelOpen) {
+                            // BUG FIX (opened full-screen immediately on project load, twice
+                            // over): trying to precisely time when translationY got set to
+                            // "parked off-screen" (first via post{}, then via a persistent
+                            // OnGlobalLayoutListener) kept losing to some layout-timing edge case
+                            // I couldn't fully pin down. Removed that guessing game entirely:
+                            // the panel now defaults to View.INVISIBLE, which — unlike
+                            // translationY — is a hard guarantee that nothing is drawn, no
+                            // matter what timing race might affect the height/position
+                            // computation. We only need translationY to be correct at the exact
+                            // moment we're about to reveal it (right here, at drag-start), and by
+                            // then the Activity has definitely been through real layout passes —
+                            // "is this view visible" no longer depends on layout timing at all.
+                            terminalSlidePanel.setTranslationY(-panelHeight);
+                            terminalSlidePanel.setVisibility(View.VISIBLE);
+                        }
+                    }
+                    if (dragging) {
+                        float translation = opensPanel
+                                ? Math.min(0, -panelHeight + dy)
+                                : Math.min(0, Math.max(-panelHeight, dy));
+                        terminalSlidePanel.setTranslationY(translation);
+                        return true;
+                    }
+                    return false;
+                }
+
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    if (dragging) {
+                        float currentY = terminalSlidePanel.getTranslationY();
+                        // 0 = fully closed (currentY == -panelHeight), 1 = fully open (currentY == 0).
+                        float openness = 1f + (currentY / panelHeight);
+
+                        // A quick, deliberate flick should work even over a short drag distance —
+                        // matching how a real notification shade / bottom sheet feels. Without
+                        // this, a fast flick that only covered ~15% of the height (fully valid,
+                        // natural gesture) would snap back the "wrong" way because it didn't clear
+                        // the distance threshold below.
+                        float flingVelocity = 0f;
+                        if (velocityTracker != null) {
+                            velocityTracker.computeCurrentVelocity(1000); // px/sec
+                            flingVelocity = velocityTracker.getYVelocity();
+                        }
+                        boolean fastFlingInExpectedDirection = opensPanel
+                                ? flingVelocity > 800f
+                                : flingVelocity < -800f;
+
+                        // Closing is intentionally more forgiving than opening on plain distance
+                        // (a real drag up from open should close easily) — a single 60%-of-height
+                        // threshold applied to BOTH directions meant closing needed the panel
+                        // dragged up by 60% of the ENTIRE screen height to register at all, which
+                        // is why "hold and push up" used to appear to do nothing.
+                        boolean shouldBeOpen = fastFlingInExpectedDirection
+                                ? opensPanel
+                                : (opensPanel ? openness > 0.30f : openness > 0.75f);
+                        setTerminalPanelOpen(shouldBeOpen);
+                        dragging = false;
+                        if (velocityTracker != null) {
+                            velocityTracker.recycle();
+                            velocityTracker = null;
+                        }
+                        return true;
+                    }
+                    if (velocityTracker != null) {
+                        velocityTracker.recycle();
+                        velocityTracker = null;
+                    }
+                    return false;
+
+                default:
+                    return false;
+            }
+        }
+    }
+
+    private void setTerminalPanelOpen(boolean open) {
+        if (terminalSlidePanel == null) return;
+        int height = terminalSlidePanel.getHeight();
+        if (open) {
+            if (height == 0) return; // not laid out yet at all — nothing sane to animate to
+            if (terminalSlidePanel.getVisibility() != View.VISIBLE) {
+                terminalSlidePanel.setTranslationY(-height);
+                terminalSlidePanel.setVisibility(View.VISIBLE);
+            }
+        }
+        terminalPanelOpen = open;
+        terminalSlidePanel.animate()
+                .translationY(open ? 0 : -height)
+                .setDuration(220)
+                .withEndAction(() -> {
+                    if (!open) terminalSlidePanel.setVisibility(View.INVISIBLE);
+                })
+                .start();
+    }
+
+    /** Manual trigger — the "Open Terminal" menu item still works alongside the swipe gesture. */
+    private void showTerminalBottomSheet() {
+        if (terminalSlidePanel == null) setupTerminalSlidePanel();
+        terminalSlidePanel.post(() -> setTerminalPanelOpen(true)); // post{}: give a freshly-built panel one layout pass so getHeight() is real
     }
 
     private void checkAndInitGit() {
@@ -765,16 +977,15 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         }
         return super.onOptionsItemSelected(item);
     }
-
+    
     private void handleSearchIconClick() {
         if (currentTabNumber == 1) {
             showEventSearchPopup();
-        } else if (pluginsTabEnabled && currentTabNumber == 3) {
-            if (pluginsTabAdapter != null) pluginsTabAdapter.toggleSearchBar();
         } else {
             openGlobalSearch();
         }
     }
+
 
     private void openGlobalSearch() {
         GlobalSearchDialog dialog = new GlobalSearchDialog(sc_id, this);
@@ -1549,12 +1760,12 @@ if (canceled) return;
 
         public ViewPagerAdapter(FragmentManager fragmentManager) {
             super(fragmentManager);
-            if (pluginsTabEnabled) {
+            if (terminalPlacement.equals("0")) {
                 labels = new String[]{
                         Helper.getResString(R.string.design_tab_title_view),
                         Helper.getResString(R.string.design_tab_title_event),
                         Helper.getResString(R.string.design_tab_title_component),
-                        "Plugins"};
+                        "Terminal"};
             } else {
                 labels = new String[]{
                         Helper.getResString(R.string.design_tab_title_view),
@@ -1563,45 +1774,26 @@ if (canceled) return;
             }
         }
 
-        @Override
-        public int getCount() {
-            return labels.length;
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            return labels[position];
-        }
+        @Override public int getCount() { return labels.length; }
+        @Override public CharSequence getPageTitle(int position) { return labels[position]; }
 
         @Override
         @NonNull
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
             Fragment fragment = (Fragment) super.instantiateItem(container, position);
-            if (position == 0) {
-                viewTabAdapter = (ViewEditorFragment) fragment;
-            } else if (position == 1) {
-                eventTabAdapter = (rs) fragment;
-            } else if (position == 2) {
-                componentTabAdapter = (br) fragment;
-            } else if (position == 3) {
-                pluginsTabAdapter = (PluginsTabFragment) fragment;
-            }
-
+            if (position == 0) viewTabAdapter = (ViewEditorFragment) fragment;
+            else if (position == 1) eventTabAdapter = (rs) fragment;
+            else if (position == 2) componentTabAdapter = (br) fragment;
             return fragment;
         }
 
         @Override
         @NonNull
         public Fragment getItem(int position) {
-            if (position == 0) {
-                return new ViewEditorFragment();
-            } else if (position == 1) {
-                return new rs();
-            } else if (position == 2) {
-                return new br();
-            } else {
-                return new PluginsTabFragment();
-            }
+            if (position == 0) return new ViewEditorFragment();
+            else if (position == 1) return new rs();
+            else if (position == 2) return new br();
+            else return new TerminalFragment();
         }
     }
     

@@ -75,7 +75,7 @@ import pro.sketchware.SketchApplication;
 import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FilePathUtil;
 import mod.hey.studios.activity.managers.cpp.CppExporter;
-import mod.hey.studios.activity.managers.cpp.TermuxNativeCompiler;
+import mod.hey.studios.activity.managers.cpp.NativeCompiler;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import proguard.Configuration;
@@ -245,7 +245,7 @@ public class ProjectBuilder {
         String tempBuildPath = yq.projectMyscPath + File.separator + "cpp_build";
 
         try {
-            TermuxNativeCompiler.compileOnDevice(
+            NativeCompiler.compileOnDevice(
                     context, 
                     yq.sc_id, 
                     cppSourcePath, 
@@ -316,7 +316,15 @@ public class ProjectBuilder {
         }
 
         String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
-        if (!javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_1_7) && !javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_11) && !javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
+        // BUG FIX (Java 11/17 → "The type java.lang.invoke.LambdaMetafactory cannot be
+        // resolved"): this used to also exclude -source 11 and 17 from getting
+        // core-lambda-stubs.jar on the classpath. That's wrong — LambdaMetafactory needs to be
+        // resolvable on the compile-time classpath for ANY source level that has lambda syntax
+        // in the actual .java files being compiled (which is true for 11/17 same as 8/9/10);
+        // android.jar's stub deliberately excludes java.lang.invoke.* regardless of API level,
+        // which is exactly why core-lambda-stubs.jar exists as a separate file in the first
+        // place. Only -source 1.7 is correctly excluded — Java 7 has no lambda syntax at all.
+        if (!javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_1_7)) {
             classpath.append(":").append(new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "core-lambda-stubs.jar").getAbsolutePath());
         }
 
@@ -574,19 +582,90 @@ public class ProjectBuilder {
 
             org.eclipse.jdt.internal.compiler.batch.Main main = new org.eclipse.jdt.internal.compiler.batch.Main(outWriter, errWriter, false, null, null);
             LogUtil.d(TAG, "Running Eclipse compiler with these arguments: " + args);
-            main.compile(args.toArray(new String[0]));
+
+            // BUG FIX (Java 11/17 → empty classes.dex): main.compile()'s return value was being
+            // discarded entirely, and success was judged ONLY by globalErrorsCount == 0. ECJ's
+            // compile() returns false for CONFIGURATION-level failures (an unsupported -source/
+            // -target value for whatever ECJ/JDT batch-compiler version is bundled, a bad
+            // classpath entry, etc.) WITHOUT incrementing globalErrorsCount — that counter only
+            // tracks per-file semantic errors found while actually compiling a compilation unit,
+            // which never starts if argument validation fails first. Net effect: zero .class
+            // files are written, this method still logged "success", D8/Dx then had an empty
+            // input directory, and classes.dex silently ended up with no project classes at all
+            // — no error anywhere in the chain to point at. This reproduces specifically for
+            // Java 11/17 because those are exactly the two values passed via -source/-target
+            // above; 1.7/1.8/1.9/10 apparently don't hit whatever unsupported-value path this is.
+            boolean compileSucceeded;
+            try {
+                compileSucceeded = main.compile(args.toArray(new String[0]));
+            } catch (LinkageError hostRuntimeMismatch) {
+                // BUG FIX (java.lang.NoClassDefFoundError: Ljava/lang/Runtime$Version; on
+                // Java 11/17): recent org.eclipse.jdt:ecj builds (3.34.0+, ~Eclipse 4.28,
+                // mid-2023 onward) internally require their OWN host JVM to be a real desktop
+                // Java 17 — see https://github.com/eclipse-jdt/eclipse.jdt.core/issues/886.
+                // That's unrelated to -source/-target (the requested compile target); it's ecj
+                // checking ITS OWN runtime, which Android's ART never satisfies (ART has no
+                // java.lang.Runtime$Version, and core library desugaring does not add it — it's
+                // not on Google's desugared-API list). The fix is pinning `ecj` to a
+                // pre-3.34.0 build (e.g. 3.33.0) in libs_versions.toml, not something fixable
+                // from this method. Fail loud and specific instead of an unexplained crash.
+                String diagnostic = "Java compiler crashed with a LinkageError (" + hostRuntimeMismatch.getMessage()
+                        + ") instead of compiling. This means the bundled 'ecj' library version requires "
+                        + "a real desktop JDK to run and is incompatible with Android's runtime — pin "
+                        + "org.eclipse.jdt:ecj to an older version (3.33.0 or earlier) in libs_versions.toml.";
+                LogUtil.e(TAG, diagnostic, hostRuntimeMismatch);
+                broadcastBuildOutput(diagnostic);
+                throw new zy(diagnostic);
+            }
 
             LogUtil.d(TAG, "System.out of Eclipse compiler: " + outOutputStream.getOut());
-            if (main.globalErrorsCount <= 0) {
+
+            if (compileSucceeded && main.globalErrorsCount <= 0) {
+                // Second safety net: even a reported "success" with zero errors is worthless if
+                // it silently compiled nothing. Verify at least one .class file actually landed
+                // in compiledClassesPath before trusting this step — this is exactly the check
+                // that would have turned this bug into a loud, immediate build failure instead
+                // of a mysteriously classless APK discovered only after install.
+                if (!directoryContainsAnyFile(new File(yq.compiledClassesPath), ".class")) {
+                    String diagnostic = "Java compiler reported success (0 errors) but produced NO .class files.\n"
+                            + "This usually means ECJ rejected the -source/-target arguments for Java version '"
+                            + javaVer + "' as unsupported by the bundled compiler version, and failed at the "
+                            + "argument-parsing stage before compiling anything (a failure mode ECJ does not "
+                            + "count in globalErrorsCount).\n\n"
+                            + "Eclipse compiler stdout:\n" + outOutputStream.getOut()
+                            + "\n\nEclipse compiler stderr:\n" + errOutputStream.getOut();
+                    LogUtil.e(TAG, "compileJavaCode produced zero .class files despite reporting success");
+                    broadcastBuildOutput(diagnostic);
+                    throw new zy(diagnostic);
+                }
                 LogUtil.d(TAG, "System.err of Eclipse compiler: " + errOutputStream.getOut());
                 LogUtil.d(TAG, "Compiling Java files took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
             } else {
                 String errorOutput = errOutputStream.getOut();
+                if (!compileSucceeded) {
+                    errorOutput = "Eclipse compiler reported a configuration failure (invalid arguments, "
+                            + "unsupported -source/-target '" + javaVer + "', or similar) before any file was "
+                            + "compiled.\n\n" + errorOutput;
+                }
                 LogUtil.e(TAG, "Failed to compile Java files");
-                broadcastBuildOutput(errorOutput); 
+                broadcastBuildOutput(errorOutput);
                 throw new zy(errorOutput);
             }
         }
+    }
+
+    /** Recursively checks whether {@code dir} contains at least one file ending in {@code suffix}. */
+    private static boolean directoryContainsAnyFile(File dir, String suffix) {
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                if (directoryContainsAnyFile(child, suffix)) return true;
+            } else if (child.getName().endsWith(suffix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void buildApk() throws By {

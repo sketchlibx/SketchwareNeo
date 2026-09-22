@@ -577,7 +577,7 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
             }));
         }
 
-        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_edit, () -> { bottomSheet.dismiss(); showRenameDialog(position); }));
+        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_rename, () -> { bottomSheet.dismiss(); showRenameDialog(position); }));
         layout.addView(createSheetItem("Delete", R.drawable.ic_delete_white_24dp, () -> { bottomSheet.dismiss(); showDeleteDialog(position); }));
 
         bottomSheet.setContentView(layout);

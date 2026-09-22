@@ -27,6 +27,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -63,33 +66,13 @@ import pro.sketchware.utility.ThemeUtils;
 @SuppressLint("SetTextI18n")
 public class ManageCppActivity extends BaseAppCompatActivity {
 
-    // ── File templates ────────────────────────────────────────────────────────
-    private static final String C_TEMPLATE =
-            "/* %s.c */\n\n" +
-            "#include <stdio.h>\n\n" +
-            "/* TODO: implement %s */\n";
-
-    private static final String CPP_TEMPLATE =
-            "// %s.cpp\n\n" +
-            "#include <iostream>\n\n" +
-            "// TODO: implement %s\n";
-
-    private static final String H_TEMPLATE =
-            "/* %s.h */\n\n" +
-            "#pragma once\n\n" +
-            "/* TODO: declare %s */\n";
-
-    private static final String HPP_TEMPLATE =
-            "// %s.hpp\n\n" +
-            "#pragma once\n\n" +
-            "// TODO: declare %s\n";
-
-    private static final String MK_TEMPLATE =
-            "# %s.mk\n\n";
-
+    private static final String C_TEMPLATE = "/* %s.c */\n\n#include <stdio.h>\n\n/* TODO: implement %s */\n";
+    private static final String CPP_TEMPLATE = "// %s.cpp\n\n#include <iostream>\n\n// TODO: implement %s\n";
+    private static final String H_TEMPLATE = "/* %s.h */\n\n#pragma once\n\n/* TODO: declare %s */\n";
+    private static final String HPP_TEMPLATE = "// %s.hpp\n\n#pragma once\n\n// TODO: declare %s\n";
+    private static final String MK_TEMPLATE = "# %s.mk\n\n";
     private static final String TXT_TEMPLATE = "";
 
-    // ── Fields ────────────────────────────────────────────────────────────────
     private ManageFileBinding binding;
     private String current_path;
     private FilePathUtil fpu;
@@ -109,7 +92,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
 
     public enum SortMode { NAME, TYPE }
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
     @Override
     public void onCreate(Bundle savedInstanceState) {
         enableEdgeToEdgeNoContrast();
@@ -161,7 +143,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         }
     }
 
-    // ── Setup ─────────────────────────────────────────────────────────────────
     private void setupUI() {
         binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
         binding.topAppBar.setTitle("C/C++ Manager");
@@ -207,9 +188,13 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         });
     }
 
-    // ── Options menu ──────────────────────────────────────────────────────────
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        boolean ndkInstalled = InbuiltNdkManager.isNdkInstalled(this);
+        menu.add(Menu.NONE, 100, Menu.NONE, ndkInstalled ? "NDK Manager" : "Setup NDK")
+                .setIcon(R.drawable.ic_mtrl_file_download)
+                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+
         menu.add(Menu.NONE, 1, Menu.NONE, "Search")
                 .setIcon(R.drawable.ic_mtrl_search)
                 .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -227,6 +212,9 @@ public class ManageCppActivity extends BaseAppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
+            case 100 -> {
+                if (InbuiltNdkManager.isNdkInstalled(this)) showNdkManagerDialog(); else showNdkInstallDialog();
+            }
             case 1 -> {
                 boolean visible = binding.searchLayout.getVisibility() == View.VISIBLE;
                 binding.searchLayout.setVisibility(visible ? View.GONE : View.VISIBLE);
@@ -249,7 +237,142 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    // ── Dialogs ───────────────────────────────────────────────────────────────
+    // ── NDK Dialog & Installation Logic ──────────────────────────────────────────
+    private void showNdkManagerDialog() {
+        java.util.List<String> versions = InbuiltNdkManager.listInstalledNdkVersions(this);
+        String message = versions.isEmpty()
+                ? "No NDK installation detected."
+                : "Installed: " + String.join(", ", versions);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("NDK Manager")
+                .setMessage(message)
+                .setPositiveButton("Install another version", (d, w) -> showNdkInstallDialog())
+                .setNeutralButton("Repair", (d, w) -> {
+                    for (String v : versions) InbuiltNdkManager.repairInstalledNdk(this, v);
+                    SketchwareUtil.toast("Repair finished");
+                })
+                .setNegativeButton("Delete...", (d, w) -> showNdkDeleteDialog(versions))
+                .show();
+    }
+
+    private void showNdkDeleteDialog(java.util.List<String> versions) {
+        if (versions.isEmpty()) return;
+        String[] items = versions.toArray(new String[0]);
+        boolean[] checked = new boolean[items.length];
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete NDK version")
+                .setMultiChoiceItems(items, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("Delete selected", (d, w) -> {
+                    boolean any = false;
+                    for (int i = 0; i < items.length; i++) {
+                        if (checked[i]) {
+                            InbuiltNdkManager.deleteNdkVersion(this, items[i]);
+                            any = true;
+                        }
+                    }
+                    if (any) {
+                        SketchwareUtil.toast("Deleted");
+                        invalidateOptionsMenu();
+                    }
+                })
+                .setNeutralButton("Delete all", (d, w) -> {
+                    InbuiltNdkManager.deleteAllNdkVersions(this);
+                    SketchwareUtil.toast("All NDK versions deleted");
+                    invalidateOptionsMenu();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showNdkInstallDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int dp24 = SketchwareUtil.dpToPx(24);
+        int dp16 = SketchwareUtil.dpToPx(16);
+        layout.setPadding(dp24, dp16, dp24, dp16);
+
+        TextInputLayout til = new TextInputLayout(this);
+        til.setHint("Paste NDK Zip Link (aarch64)");
+
+        TextInputEditText et = new TextInputEditText(this);
+        // Default MrIkso AndroidIDE NDK URL
+        et.setText("https://github.com/MrIkso/AndroidIDE-NDK/releases/download/ndk/android-ndk-r26b-aarch64.zip");
+        til.addView(et);
+        layout.addView(til);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Setup Inbuilt NDK")
+                .setMessage("To compile C/C++ offline natively on your device, download the NDK & CMake toolchain via a direct zip link.")
+                .setView(layout)
+                .setPositiveButton("Download", (dialog, which) -> {
+                    String url = et.getText().toString().trim();
+                    if (!url.isEmpty()) {
+                        startNdkDownload(url);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startNdkDownload(String url) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int dp24 = SketchwareUtil.dpToPx(24);
+        layout.setPadding(dp24, dp24, dp24, dp24);
+        layout.setGravity(android.view.Gravity.CENTER);
+
+        TextView statusText = new TextView(this);
+        statusText.setText("Initializing Download...");
+        statusText.setTextSize(14f);
+        statusText.setTypeface(Typeface.DEFAULT_BOLD);
+        statusText.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
+        statusText.setPadding(0, 0, 0, SketchwareUtil.dpToPx(16));
+
+        LinearProgressIndicator progressIndicator = new LinearProgressIndicator(this);
+        progressIndicator.setIndeterminate(true);
+
+        layout.addView(statusText);
+        layout.addView(progressIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        androidx.appcompat.app.AlertDialog progressDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Setting up C/C++ compiler")
+                .setView(layout)
+                .setCancelable(false)
+                .show();
+
+        InbuiltNdkManager.installNdkAndCmake(this, url, new InbuiltNdkManager.InstallCallback() {
+            @Override
+            public void onProgress(String message, int progress, boolean isIndeterminate) {
+                statusText.setText(message);
+                if (isIndeterminate) {
+                    if (!progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(true);
+                } else {
+                    if (progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(false);
+                    progressIndicator.setProgressCompat(progress, true);
+                }
+            }
+
+            @Override
+            public void onSuccess() {
+                progressDialog.dismiss();
+                SketchwareUtil.toast("NDK and CMake installed successfully!");
+                invalidateOptionsMenu(); // Removes the download icon
+            }
+
+            @Override
+            public void onError(String error) {
+                progressDialog.dismiss();
+                new MaterialAlertDialogBuilder(ManageCppActivity.this)
+                        .setTitle("Installation Failed")
+                        .setMessage(error)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
+    }
+
     private void showCreateDialog(String targetPath) {
         DialogCreateCppFileLayoutBinding dialogBinding =
                 DialogCreateCppFileLayoutBinding.inflate(getLayoutInflater());
@@ -267,7 +390,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             alertDialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
             inputText.requestFocus();
 
-            // Show the Java class name field only when JNI Bridge chip is selected
             dialogBinding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
                 boolean isJni = !checkedIds.isEmpty()
                         && checkedIds.get(0) == R.id.chip_jni_bridge;
@@ -312,21 +434,16 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                     content = String.format(MK_TEMPLATE, name);
                     finalName = name + ".mk";
                 } else if (chipId == R.id.chip_jni_bridge) {
-                    // Derive class name from the extra input field
                     String javaClassName = Helper.getText(dialogBinding.javaClassInput).trim();
                     if (javaClassName.isEmpty()) javaClassName = "MainActivity";
 
-                    // Derive library name from package name last segment
                     String libName = JniBridgeGenerator.inferLibName(pkgName);
 
-                    // Generate using the full JniBridgeGenerator
-                    List<JniBridgeGenerator.JniMethodSpec> samples =
-                            JniBridgeGenerator.defaultSampleMethods();
+                    List<JniBridgeGenerator.JniMethodSpec> samples = JniBridgeGenerator.defaultSampleMethods();
                     content   = JniBridgeGenerator.generateBridgeFile(
                             name, pkgName, javaClassName, libName, samples);
                     finalName = name + ".cpp";
 
-                    // Stash for post-creation dialog
                     pendingJavaStub = JniBridgeGenerator.generateJavaStub(
                             javaClassName, libName, samples);
                 } else if (chipId == R.id.chip_cpp_folder) {
@@ -349,7 +466,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 forceRefreshTree();
                 alertDialog.dismiss();
 
-                // Show Java stub dialog immediately after JNI bridge creation
                 if (pendingJavaStub != null) {
                     String stub = pendingJavaStub;
                     pendingJavaStub = null;
@@ -367,7 +483,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         FilePickerOptions options = new FilePickerOptions();
         options.setSelectionMode(SelectionMode.BOTH);
         options.setMultipleSelection(true);
-        // ADDED SUPPORT FOR TXT AND MK IMPORTING HERE
         options.setExtensions(new String[]{"c", "cpp", "h", "hpp", "txt", "mk"});
         options.setTitle("Select C/C++ file(s)");
 
@@ -433,14 +548,7 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 .create().show();
     }
     
-    /**
-     * Shows a dialog with the Java-side stub code the user must add to their Activity.
-     * Includes a "Copy" button that copies the stub to clipboard.
-     *
-     * <p>Called automatically after JNI bridge file creation.
-     */
     private void showJavaStubDialog(String javaStub) {
-        // Build a scrollable code view
         android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
         TextView codeView = new TextView(this);
         codeView.setText(javaStub);
@@ -471,10 +579,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 .show();
     }
     
-    /**
-     * Runs JniValidator against this project and shows results in a dialog.
-     * Accessible from the overflow menu as "Validate JNI".
-     */
     private void showJniValidationReport() {
         JniValidator.ValidationReport report = JniValidator.validate(sc_id);
 
@@ -486,7 +590,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 .show();
     }
 
-    // ── Tree / list management ────────────────────────────────────────────────
     private void forceRefreshTree() {
         rootNodes.clear();
         refresh();
@@ -515,13 +618,11 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             FileUtil.makeDir(fpu.getPathCpp(sc_id));
         }
 
-        // Respect the global tree-view setting + per-type cpp setting
         boolean globalTree = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_TREE_VIEW);
         boolean cppTreeView;
         try {
             cppTreeView = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_CPP_TREE_VIEW);
         } catch (Exception ignored) {
-            // Constant not yet added to ConfigActivity; fall back to java tree-view setting
             cppTreeView = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_JAVA_TREE_VIEW);
         }
         isTreeViewEnabled = globalTree;
@@ -633,7 +734,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         return count;
     }
 
-    // ── FileNode ──────────────────────────────────────────────────────────────
     public static class FileNode {
         public final String path;
         public final String name;
@@ -648,7 +748,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         }
     }
 
-    // ── Bottom sheet ──────────────────────────────────────────────────────────
     private void showModernBottomSheet(FileNode node, int position) {
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         LinearLayout layout    = new LinearLayout(this);
@@ -685,7 +784,7 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             }));
         }
 
-        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_edit, () -> {
+        layout.addView(createSheetItem("Rename", R.drawable.ic_mtrl_rename, () -> {
             sheet.dismiss(); showRenameDialog(position);
         }));
         layout.addView(createSheetItem("Delete", R.drawable.ic_delete_white_24dp, () -> {
@@ -729,21 +828,14 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         return row;
     }
 
-    // ── Icon helper ───────────────────────────────────────────────────────────
-    /**
-     * Returns the appropriate drawable resource for a given C/C++ file name.
-     * Header files get ic_mtrl_file; source files get ic_mtrl_code.
-     */
     private static int getIconForCppFile(String fileName) {
         String lower = fileName.toLowerCase();
-        // ADDED SUPPORT FOR TXT AND MK FILE ICONS
         if (lower.endsWith(".h") || lower.endsWith(".hpp") || lower.endsWith(".txt") || lower.endsWith(".mk")) {
             return R.drawable.ic_mtrl_file;
         }
         return R.drawable.ic_mtrl_code;
     }
 
-    // ── Adapter ───────────────────────────────────────────────────────────────
     public class CppAdapter extends RecyclerView.Adapter<CppAdapter.ViewHolder> {
 
         @NonNull
@@ -763,7 +855,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             b.more.setOnClickListener(v -> showModernBottomSheet(node, position));
 
             if (isTreeViewEnabled) {
-                // ── Tree mode ──────────────────────────────────────────
                 int indentPx = (int) TypedValue.applyDimension(
                         TypedValue.COMPLEX_UNIT_DIP,
                         node.depth * 20f,
@@ -802,7 +893,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
                 });
 
             } else {
-                // ── Flat mode ──────────────────────────────────────────
                 b.indentSpacer.getLayoutParams().width = 0;
                 b.chevron.setVisibility(View.GONE);
                 b.title.setTypeface(null, Typeface.NORMAL);

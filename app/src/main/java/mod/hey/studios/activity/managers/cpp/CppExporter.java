@@ -149,8 +149,10 @@ public final class CppExporter {
      * because that is where AGP expects it when using
      * {@code externalNativeBuild { cmake { path "CMakeLists.txt" } }}.
      *
-     * <p>The CMakeLists.txt uses {@code CMAKE_CURRENT_SOURCE_DIR} with a relative path
-     * to {@code src/main/jni} so the path resolves correctly from the {@code app/} directory.
+     * <p>{@link CmakeListsGenerator}'s template already globs the relative path
+     * {@code "src/main/jni/*.c"}, which CMake resolves against {@code CMAKE_CURRENT_SOURCE_DIR}
+     * (i.e. {@code app/}) by default — so it already points at exactly where
+     * {@link #copySourceFiles} puts the sources, with no further path rewriting needed.
      */
     private static void generateCmakeListsIfAbsent(yq metadata) {
         // app/CMakeLists.txt — alongside build.gradle
@@ -162,20 +164,6 @@ public final class CppExporter {
         }
 
         String content = CmakeListsGenerator.generate(metadata.projectName);
-
-        // The generated CMakeLists.txt lives in app/ and references src/main/jni via
-        // CMAKE_CURRENT_SOURCE_DIR. We need to adjust the GLOB path to be relative:
-        // Replace the self-referencing pattern with the correct relative path.
-        content = content.replace(
-                "\"${CMAKE_CURRENT_SOURCE_DIR}/*.c\"",
-                "\"${CMAKE_CURRENT_SOURCE_DIR}/src/main/jni/*.c\"");
-        content = content.replace(
-                "\"${CMAKE_CURRENT_SOURCE_DIR}/*.cpp\"",
-                "\"${CMAKE_CURRENT_SOURCE_DIR}/src/main/jni/*.cpp\"");
-        content = content.replace(
-                "${CMAKE_CURRENT_SOURCE_DIR})",
-                "${CMAKE_CURRENT_SOURCE_DIR}/src/main/jni)");
-
         FileUtil.writeFile(cmakePath, content);
         Log.d(TAG, "Generated CMakeLists.txt at " + cmakePath);
     }

@@ -194,7 +194,6 @@ public class ProjectsFragment extends DA {
             binding.iconSort.setOnClickListener(v -> showProjectSortingDialog());
         }
         
-        // Fixed Restore Button Click mapping using `.getRoot()` to avoid binding clash
         if (binding.specialAction != null) {
             binding.specialAction.getRoot().setOnClickListener(v -> showImportRestoreDialog());
         }
@@ -265,10 +264,8 @@ public class ProjectsFragment extends DA {
                 
                 boolean isEmpty = loadedProjects.isEmpty();
                 
-                // Hide loading spinner as data has loaded
                 if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
                 
-                // Show Empty state if list is 0, else show the list
                 if (binding.emptyContainer != null) binding.emptyContainer.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
                 if (binding.myprojects != null) binding.myprojects.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
 

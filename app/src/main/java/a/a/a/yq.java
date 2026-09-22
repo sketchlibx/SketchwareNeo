@@ -258,8 +258,8 @@ public class yq {
 
         fileUtil.b(projectMyscPath + File.separator + "gradle.properties", "android.enableR8.fullMode=false\nandroid.enableJetifier=true\nandroid.useAndroidX=true");
 
-        // generateCppBuildFiles();
-        
+        generateCppBuildFiles(isCustomGradleEnabled);
+
         if (isAndroidStudioExport) {
             CppExporter.processForAndroidStudioExport(this, sc_id);
         }
@@ -792,7 +792,7 @@ public class yq {
         return generateDataBindingClasses && projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE);
     }
     
-    private void generateCppBuildFiles() {
+    private void generateCppBuildFiles(boolean isCustomGradleEnabled) {
     if (!CppBuildHelper.hasCppFiles(sc_id)) return;
 
     // Copy source files to build tree
@@ -803,6 +803,10 @@ public class yq {
     if (!FileUtil.isExistFile(cmakePath)) {
         FileUtil.writeFile(cmakePath, CppBuildHelper.generateCmakeLists(projectName));
     }
+
+    // Custom Gradle users own their app/build.gradle entirely — don't touch content they
+    // provided. They can add externalNativeBuild themselves using the CMakeLists.txt above.
+    if (isCustomGradleEnabled) return;
 
     // Inject externalNativeBuild block into app/build.gradle
     String appGradlePath = projectMyscPath + "app" + File.separator + "build.gradle";

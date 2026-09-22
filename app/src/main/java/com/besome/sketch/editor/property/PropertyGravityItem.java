@@ -24,6 +24,7 @@ import a.a.a.sq;
 import a.a.a.wB;
 import mod.hey.studios.util.Helper;
 import pro.sketchware.R;
+import pro.sketchware.utility.ThemeUtils;
 
 @SuppressLint("ViewConstructor")
 public class PropertyGravityItem extends RelativeLayout implements View.OnClickListener {
@@ -127,7 +128,6 @@ public class PropertyGravityItem extends RelativeLayout implements View.OnClickL
                 {Gravity.BOTTOM | Gravity.LEFT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, Gravity.BOTTOM | Gravity.RIGHT}
         };
 
-        // Initialize tempGravity: agar koi pehle se set nahi hai ya 0 (NO_GRAVITY) hai, toh -1 assign karo.
         final int[] tempGravity = {(gravityValue <= 0) ? -1 : gravityValue};
         List<View> allBoxes = new ArrayList<>();
 
@@ -153,11 +153,10 @@ public class PropertyGravityItem extends RelativeLayout implements View.OnClickL
                 updateBoxDesign(box, currentBoxGravity == tempGravity[0]);
 
                 box.setOnClickListener(view -> {
-                    // Double Tap Unselect Logic
                     if (tempGravity[0] == currentBoxGravity) {
-                        tempGravity[0] = -1; // Unselect kar do
+                        tempGravity[0] = -1;
                     } else {
-                        tempGravity[0] = currentBoxGravity; // Naya select karo
+                        tempGravity[0] = currentBoxGravity;
                     }
                     
                     for (View b : allBoxes) {
@@ -177,7 +176,6 @@ public class PropertyGravityItem extends RelativeLayout implements View.OnClickL
         dialog.setView(gridContainer);
 
         dialog.setPositiveButton(Helper.getResString(R.string.common_word_select), (v, which) -> {
-            // Agar -1 (unselected) hai, toh NO_GRAVITY (0) pass karo taaki XML clean rahe
             int finalValue = (tempGravity[0] == -1) ? Gravity.NO_GRAVITY : tempGravity[0];
             setValue(finalValue);
             if (valueChangeListener != null) {
@@ -195,11 +193,11 @@ public class PropertyGravityItem extends RelativeLayout implements View.OnClickL
         gd.setCornerRadius(20f); 
         
         if (isSelected) {
-            gd.setColor(Color.parseColor("#2196F3")); // Sketchware Neo Material Blue
-            gd.setStroke(4, Color.parseColor("#64B5F6")); // Lighter highlight
+            gd.setColor(ThemeUtils.getColor(getContext(), R.attr.colorSecondaryContainer)); 
+            gd.setStroke(4, ThemeUtils.getColor(getContext(), R.attr.colorPrimary)); 
         } else {
-            gd.setColor(Color.parseColor("#252525")); // Dark background
-            gd.setStroke(2, Color.parseColor("#3D3D3D")); // Subtle border
+            gd.setColor(ThemeUtils.getColor(getContext(), R.attr.colorSurfaceContainerLow)); 
+            gd.setStroke(2, ThemeUtils.getColor(getContext(), R.attr.colorOutlineVariant)); 
         }
         
         box.setBackground(gd);

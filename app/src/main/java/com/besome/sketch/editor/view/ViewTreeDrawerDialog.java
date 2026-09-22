@@ -1,13 +1,11 @@
 package com.besome.sketch.editor.view;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.app.Dialog;
-import android.content.res.ColorStateList;
+import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Typeface;
+import android.graphics.Paint;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.Editable;
@@ -16,35 +14,29 @@ import android.text.Spanned;
 import android.text.TextWatcher;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.view.animation.AccelerateDecelerateInterpolator;
-import android.view.animation.DecelerateInterpolator;
-import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.besome.sketch.beans.ViewBean;
-import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.shape.ShapeAppearanceModel;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,58 +47,29 @@ import pro.sketchware.R;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 
-/**
- * ViewTreeDrawerDialog — Professional Android-IDE-style Component Tree.
- *
- * Features:
- *  • Full-screen height side drawer (START gravity)
- *  • Live search with highlighted matches
- *  • Expand / collapse with smooth rotation + height animation
- *  • Currently-selected view is highlighted with a tinted card
- *  • No text truncation — HorizontalScrollView handles deep nesting
- *  • DiffUtil for smooth, flicker-free list updates
- *  • "Expand All" / "Collapse All" via long-press on header
- */
 public class ViewTreeDrawerDialog extends DialogFragment {
-
-    // ─── Public interface ───────────────────────────────────────────────────
 
     public interface OnViewSelectedListener {
         void onSelected(String viewId);
     }
 
-    // ─── Fields ─────────────────────────────────────────────────────────────
-
     private final ArrayList<ViewBean> currentViews;
     private final OnViewSelectedListener listener;
-    private final String selectedViewId;          // currently active view — may be null
+    private final String selectedViewId;
 
-    private final List<TreeNode>  rootNodes    = new ArrayList<>();
-    private final List<TreeNode>  displayNodes = new ArrayList<>();    // flat list fed to adapter
-    private final List<TreeNode>  filteredNodes = new ArrayList<>();   // after search filter
-
+    private final List<TreeNode> rootNodes = new ArrayList<>();
+    private final List<TreeNode> displayNodes = new ArrayList<>();
+    
     private TreeAdapter adapter;
-    private String      searchQuery = "";
-
+    private String searchQuery = "";
     private RecyclerView recyclerView;
-    private TextView     tvNoResults;
+    private TextView tvNoResults;
 
-    // ─── Constructor ────────────────────────────────────────────────────────
-
-    public ViewTreeDrawerDialog(ArrayList<ViewBean> views,
-                                OnViewSelectedListener listener,
-                                @Nullable String selectedViewId) {
-        this.currentViews   = views;
-        this.listener       = listener;
+    public ViewTreeDrawerDialog(ArrayList<ViewBean> views, OnViewSelectedListener listener, @Nullable String selectedViewId) {
+        this.currentViews = views;
+        this.listener = listener;
         this.selectedViewId = selectedViewId;
     }
-
-    /** Backwards-compatible constructor (no pre-selected view). */
-    public ViewTreeDrawerDialog(ArrayList<ViewBean> views, OnViewSelectedListener listener) {
-        this(views, listener, null);
-    }
-
-    // ─── Dialog window setup ────────────────────────────────────────────────
 
     @NonNull
     @Override
@@ -125,160 +88,38 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         super.onStart();
         Window window = getDialog() != null ? getDialog().getWindow() : null;
         if (window != null) {
-            window.setLayout(SketchwareUtil.dpToPx(300), ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setLayout(SketchwareUtil.dpToPx(320), ViewGroup.LayoutParams.MATCH_PARENT);
             window.setGravity(Gravity.START);
             window.setWindowAnimations(R.style.Animation_Design_BottomSheetDialog);
 
             WindowManager.LayoutParams params = window.getAttributes();
-            params.dimAmount  = 0.4f;
-            params.gravity    = Gravity.START;
+            params.dimAmount = 0.4f;
             window.setAttributes(params);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
     }
 
-    // ─── View creation ──────────────────────────────────────────────────────
-
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View root = inflater.inflate(R.layout.layout_view_tree_dialog, container, false);
 
-        // Root container
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-
-        // Rounded right-side background
         ShapeAppearanceModel shape = ShapeAppearanceModel.builder()
-                .setTopRightCornerSize(SketchwareUtil.getDip(20))
-                .setBottomRightCornerSize(SketchwareUtil.getDip(20))
+                .setTopRightCornerSize(SketchwareUtil.dpToPx(24))
+                .setBottomRightCornerSize(SketchwareUtil.dpToPx(24))
                 .build();
         MaterialShapeDrawable bg = new MaterialShapeDrawable(shape);
-        bg.setFillColor(ColorStateList.valueOf(
-                ThemeUtils.getColor(requireContext(), R.attr.colorSurfaceContainerLow)));
-        bg.initializeElevationOverlay(requireContext());
+        bg.setFillColor(android.content.res.ColorStateList.valueOf(ThemeUtils.getColor(requireContext(), R.attr.colorSurfaceContainerLow)));
         root.setBackground(bg);
-        root.setElevation(SketchwareUtil.dpToPx(6));
 
-        // ── Header ──────────────────────────────────────────────────────────
-        root.addView(buildHeader());
+        TextView tvCountBadge = root.findViewById(R.id.tv_count_badge);
+        EditText etSearch = root.findViewById(R.id.et_search);
+        recyclerView = root.findViewById(R.id.recycler_view);
+        tvNoResults = root.findViewById(R.id.tv_no_results);
 
-        // ── Search bar ──────────────────────────────────────────────────────
-        root.addView(buildSearchBar());
-
-        // ── Divider ─────────────────────────────────────────────────────────
-        root.addView(buildDivider());
-
-        // ── Tree (HorizontalScrollView → RecyclerView) ──────────────────────
-        HorizontalScrollView hsv = new HorizontalScrollView(requireContext());
-        LinearLayout.LayoutParams hsvParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
-        hsv.setLayoutParams(hsvParams);
-        hsv.setFillViewport(true);
-        hsv.setHorizontalScrollBarEnabled(true);
-
-        FrameLayout hsvContent = new FrameLayout(requireContext());
-
-        recyclerView = new RecyclerView(requireContext());
-        FrameLayout.LayoutParams rvParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.MATCH_PARENT);
-        recyclerView.setLayoutParams(rvParams);
-        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-        recyclerView.setMinimumWidth(SketchwareUtil.dpToPx(290));
-        recyclerView.setClipToPadding(false);
-        recyclerView.setPadding(0, SketchwareUtil.dpToPx(4), SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(24));
-        recyclerView.setHasFixedSize(false);
-        // Smooth scroll-in entrance
-        recyclerView.setAlpha(0f);
-        recyclerView.animate().alpha(1f).setDuration(220).setStartDelay(80).start();
-
-        // "No results" overlay
-        tvNoResults = new TextView(requireContext());
-        tvNoResults.setText("No matching views");
-        tvNoResults.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-        tvNoResults.setTextSize(14f);
-        tvNoResults.setTypeface(null, Typeface.ITALIC);
-        tvNoResults.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams noResParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        noResParams.topMargin = SketchwareUtil.dpToPx(40);
-        tvNoResults.setLayoutParams(noResParams);
-        tvNoResults.setVisibility(View.GONE);
-
-        hsvContent.addView(recyclerView);
-        hsvContent.addView(tvNoResults);
-        hsv.addView(hsvContent, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        root.addView(hsv);
-
-        // ── Build data & adapter ─────────────────────────────────────────────
-        buildTree();
-        rebuildDisplayList();
-
-        adapter = new TreeAdapter();
-        recyclerView.setAdapter(adapter);
-
-        // ✅ Initial population — without this, list stays empty until search is typed
-        adapter.submitList(new ArrayList<>(displayNodes));
-
-        // Scroll to selected item
-        scrollToSelected();
-
-        return root;
-    }
-
-    // ─── Header ─────────────────────────────────────────────────────────────
-
-    private View buildHeader() {
-        LinearLayout header = new LinearLayout(requireContext());
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        int ph = SketchwareUtil.dpToPx(16);
-        int pv = SketchwareUtil.dpToPx(14);
-        header.setPadding(ph, pv, ph, pv);
-
-        // Icon
-        ImageView icon = new ImageView(requireContext());
-        icon.setImageResource(R.drawable.ic_mtrl_devices);
-        icon.setColorFilter(ThemeUtils.getColor(requireContext(), R.attr.colorPrimary));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                SketchwareUtil.dpToPx(22), SketchwareUtil.dpToPx(22));
-        iconParams.setMarginEnd(SketchwareUtil.dpToPx(10));
-        icon.setLayoutParams(iconParams);
-        header.addView(icon);
-
-        // Title
-        TextView title = new TextView(requireContext());
-        title.setText("Component Tree");
-        title.setTextSize(16f);
-        title.setTypeface(null, Typeface.BOLD);
-        title.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurface));
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        title.setLayoutParams(titleParams);
-        header.addView(title);
-
-        // Count badge
-        TextView countBadge = new TextView(requireContext());
-        countBadge.setText(String.valueOf(currentViews.size()));
-        countBadge.setTextSize(11f);
-        countBadge.setTypeface(null, Typeface.BOLD);
-        countBadge.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnPrimaryContainer));
-        countBadge.setBackground(buildBadgeBackground());
-        int bp = SketchwareUtil.dpToPx(6);
-        int bpv = SketchwareUtil.dpToPx(2);
-        countBadge.setPadding(bp, bpv, bp, bpv);
-        header.addView(countBadge);
-
-        // Expand-all / Collapse-all on long-press
-        header.setOnLongClickListener(v -> {
+        tvCountBadge.setText(String.valueOf(currentViews.size()));
+        
+        ((View) root.findViewById(R.id.tv_count_badge).getParent()).setOnLongClickListener(v -> {
             boolean anyExpanded = false;
             for (TreeNode node : rootNodes) {
                 if (hasExpandedNode(node)) { anyExpanded = true; break; }
@@ -289,110 +130,46 @@ public class ViewTreeDrawerDialog extends DialogFragment {
             return true;
         });
 
-        return header;
-    }
+        LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext()) {
+            @Override
+            public void smoothScrollToPosition(RecyclerView recyclerView, RecyclerView.State state, int position) {
+                LinearSmoothScroller scroller = new LinearSmoothScroller(requireContext()) {
+                    @Override
+                    protected float calculateSpeedPerPixel(DisplayMetrics displayMetrics) {
+                        return 0.2f; 
+                    }
+                };
+                scroller.setTargetPosition(position);
+                startSmoothScroll(scroller);
+            }
+        };
+        recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setItemViewCacheSize(30);
+        recyclerView.setHasFixedSize(true);
+        
+        buildTree();
+        rebuildDisplayList();
+        adapter = new TreeAdapter();
+        recyclerView.setAdapter(adapter);
+        adapter.submitList(new ArrayList<>(displayNodes));
+        
+        scrollToSelected();
 
-    private android.graphics.drawable.GradientDrawable buildBadgeBackground() {
-        android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-        gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        gd.setCornerRadius(SketchwareUtil.dpToPx(10));
-        gd.setColor(ThemeUtils.getColor(requireContext(), R.attr.colorPrimaryContainer));
-        return gd;
-    }
-
-    // ─── Search bar ─────────────────────────────────────────────────────────
-
-    private View buildSearchBar() {
-        LinearLayout wrapper = new LinearLayout(requireContext());
-        wrapper.setOrientation(LinearLayout.VERTICAL);
-        int ph = SketchwareUtil.dpToPx(12);
-        wrapper.setPadding(ph, 0, ph, SketchwareUtil.dpToPx(8));
-
-        // Simple EditText wrapped in a card
-        MaterialCardView card = new MaterialCardView(requireContext());
-        card.setRadius(SketchwareUtil.dpToPx(10));
-        card.setCardElevation(0f);
-        card.setStrokeWidth(SketchwareUtil.dpToPx(1));
-        card.setStrokeColor(ThemeUtils.getColor(requireContext(), R.attr.colorOutlineVariant));
-        card.setCardBackgroundColor(ThemeUtils.getColor(requireContext(), R.attr.colorSurfaceContainer));
-
-        LinearLayout innerRow = new LinearLayout(requireContext());
-        innerRow.setOrientation(LinearLayout.HORIZONTAL);
-        innerRow.setGravity(Gravity.CENTER_VERTICAL);
-        int ip = SketchwareUtil.dpToPx(10);
-        innerRow.setPadding(ip, 0, ip, 0);
-
-        ImageView searchIcon = new ImageView(requireContext());
-        searchIcon.setImageResource(R.drawable.ic_mtrl_search);
-        searchIcon.setColorFilter(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-        LinearLayout.LayoutParams siParams = new LinearLayout.LayoutParams(
-                SketchwareUtil.dpToPx(18), SketchwareUtil.dpToPx(18));
-        siParams.setMarginEnd(SketchwareUtil.dpToPx(8));
-        searchIcon.setLayoutParams(siParams);
-        innerRow.addView(searchIcon);
-
-        android.widget.EditText searchEt = new android.widget.EditText(requireContext());
-        searchEt.setHint("Search views…");
-        searchEt.setHintTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-        searchEt.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurface));
-        searchEt.setTextSize(14f);
-        searchEt.setBackground(null);
-        searchEt.setSingleLine(true);
-        searchEt.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(0,
-                SketchwareUtil.dpToPx(40), 1f);
-        searchEt.setLayoutParams(etParams);
-        innerRow.addView(searchEt);
-
-        // Clear button
-        ImageView clearBtn = new ImageView(requireContext());
-        clearBtn.setImageResource(R.drawable.ic_mtrl_clear_all);
-        clearBtn.setColorFilter(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-        clearBtn.setVisibility(View.GONE);
-        LinearLayout.LayoutParams cbParams = new LinearLayout.LayoutParams(
-                SketchwareUtil.dpToPx(18), SketchwareUtil.dpToPx(18));
-        clearBtn.setLayoutParams(cbParams);
-        clearBtn.setOnClickListener(v -> {
-            searchEt.setText("");
-            clearBtn.setVisibility(View.GONE);
-        });
-        innerRow.addView(clearBtn);
-
-        card.addView(innerRow, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        wrapper.addView(card);
-
-        // Watcher
-        searchEt.addTextChangedListener(new TextWatcher() {
+        etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
             @Override
             public void afterTextChanged(Editable s) {
                 searchQuery = s.toString().trim().toLowerCase(Locale.getDefault());
-                clearBtn.setVisibility(searchQuery.isEmpty() ? View.GONE : View.VISIBLE);
                 applyFilter();
             }
         });
 
-        return wrapper;
+        recyclerView.setAlpha(0f);
+        recyclerView.animate().alpha(1f).setDuration(250).setStartDelay(50).start();
+
+        return root;
     }
-
-    // ─── Divider ────────────────────────────────────────────────────────────
-
-    private View buildDivider() {
-        View divider = new View(requireContext());
-        divider.setBackgroundColor(
-                ThemeUtils.getColor(requireContext(), R.attr.colorOutlineVariant));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, SketchwareUtil.dpToPx(1));
-        int margin = SketchwareUtil.dpToPx(12);
-        p.setMargins(margin, 0, margin, SketchwareUtil.dpToPx(4));
-        divider.setLayoutParams(p);
-        return divider;
-    }
-
-    // ─── Tree building ──────────────────────────────────────────────────────
 
     private void buildTree() {
         rootNodes.clear();
@@ -406,26 +183,26 @@ public class ViewTreeDrawerDialog extends DialogFragment {
                 childrenMap.computeIfAbsent(bean.parent, k -> new ArrayList<>()).add(bean);
             }
         }
-        for (ViewBean root : roots) {
-            rootNodes.add(createNode(root, childrenMap, 0));
+        for (int i = 0; i < roots.size(); i++) {
+            boolean isLast = (i == roots.size() - 1);
+            rootNodes.add(createNode(roots.get(i), childrenMap, 0, isLast, new ArrayList<>()));
         }
     }
 
-    private TreeNode createNode(ViewBean view,
-                                HashMap<String, List<ViewBean>> childrenMap,
-                                int depth) {
-        TreeNode node = new TreeNode(view, depth);
+    private TreeNode createNode(ViewBean view, HashMap<String, List<ViewBean>> childrenMap, int depth, boolean isLastChild, List<Boolean> parentIsLastList) {
+        TreeNode node = new TreeNode(view, depth, isLastChild, parentIsLastList);
         node.isExpanded = true;
         List<ViewBean> children = childrenMap.get(view.id);
         if (children != null) {
-            for (ViewBean child : children) {
-                node.children.add(createNode(child, childrenMap, depth + 1));
+            List<Boolean> newParentList = new ArrayList<>(parentIsLastList);
+            newParentList.add(isLastChild);
+            for (int i = 0; i < children.size(); i++) {
+                boolean childIsLast = (i == children.size() - 1);
+                node.children.add(createNode(children.get(i), childrenMap, depth + 1, childIsLast, newParentList));
             }
         }
         return node;
     }
-
-    // ─── Display list & filter ───────────────────────────────────────────────
 
     private void rebuildDisplayList() {
         displayNodes.clear();
@@ -439,13 +216,10 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         }
     }
 
-    /** Apply search filter — expands all matching paths. */
     private void applyFilter() {
         if (searchQuery.isEmpty()) {
-            // Restore normal display
             rebuildDisplayList();
         } else {
-            // Expand all nodes that match or contain a match
             markMatchingNodes(rootNodes, searchQuery);
             displayNodes.clear();
             for (TreeNode root : rootNodes) addFilteredNode(root);
@@ -454,25 +228,18 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         boolean empty = displayNodes.isEmpty();
         tvNoResults.setVisibility(empty ? View.VISIBLE : View.GONE);
         recyclerView.setVisibility(empty ? View.INVISIBLE : View.VISIBLE);
-
-        List<TreeNode> newList = new ArrayList<>(displayNodes);
-        adapter.submitList(newList);
+        adapter.submitList(new ArrayList<>(displayNodes));
     }
 
-    /**
-     * Returns true if this node or any descendant matches the query.
-     * Also sets node.matchesSearch and forces expansion.
-     */
     private boolean markMatchingNodes(List<TreeNode> nodes, String query) {
         boolean anyMatch = false;
         for (TreeNode node : nodes) {
             boolean selfMatch = node.viewBean.id.toLowerCase(Locale.getDefault()).contains(query)
-                    || ViewBean.getViewTypeName(node.viewBean.type)
-                        .toLowerCase(Locale.getDefault()).contains(query);
+                    || ViewBean.getViewTypeName(node.viewBean.type).toLowerCase(Locale.getDefault()).contains(query);
             boolean childMatch = markMatchingNodes(node.children, query);
             node.matchesSearch = selfMatch || childMatch;
             if (node.matchesSearch) {
-                node.isExpanded = true; // expand to show matches
+                node.isExpanded = true; 
                 anyMatch = true;
             }
         }
@@ -486,8 +253,6 @@ public class ViewTreeDrawerDialog extends DialogFragment {
             for (TreeNode child : node.children) addFilteredNode(child);
         }
     }
-
-    // ─── Helpers ────────────────────────────────────────────────────────────
 
     private boolean hasExpandedNode(TreeNode node) {
         if (node.isExpanded && node.hasChildren()) return true;
@@ -509,38 +274,85 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         for (int i = 0; i < displayNodes.size(); i++) {
             if (selectedViewId.equals(displayNodes.get(i).viewBean.id)) {
                 int finalI = i;
-                recyclerView.post(() -> {
-                    LinearLayoutManager lm = (LinearLayoutManager)
-                            recyclerView.getLayoutManager();
-                    if (lm != null) lm.scrollToPositionWithOffset(finalI,
-                            SketchwareUtil.dpToPx(60));
-                });
+                recyclerView.post(() -> recyclerView.smoothScrollToPosition(finalI));
                 break;
             }
         }
     }
 
-    // ─── Data model ─────────────────────────────────────────────────────────
+    public static class TreeIndentView extends View {
+        private int depth = 0;
+        private boolean isLastChild = false;
+        private List<Boolean> parentIsLastList = new ArrayList<>();
+        private final Paint paint;
+        private final int indentWidth;
+
+        public TreeIndentView(Context context) {
+            super(context);
+            paint = new Paint();
+            paint.setColor(ThemeUtils.getColor(context, R.attr.colorOutlineVariant));
+            paint.setStrokeWidth(SketchwareUtil.dpToPx(1.5f));
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setAntiAlias(true);
+            indentWidth = SketchwareUtil.dpToPx(24); 
+        }
+
+        public void bind(int depth, boolean isLastChild, List<Boolean> parentIsLastList) {
+            this.depth = depth;
+            this.isLastChild = isLastChild;
+            this.parentIsLastList = parentIsLastList;
+            ViewGroup.LayoutParams lp = getLayoutParams();
+            if (lp != null) {
+                lp.width = depth > 0 ? depth * indentWidth : 0;
+                setLayoutParams(lp);
+            }
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (depth == 0) return;
+            int h = getHeight();
+            int halfH = h / 2;
+            int w = indentWidth;
+
+            for (int i = 0; i < depth; i++) {
+                int x = i * w + w / 2;
+                if (i == depth - 1) {
+                    canvas.drawLine(x, 0, x, halfH, paint);
+                    if (!isLastChild) {
+                        canvas.drawLine(x, halfH, x, h, paint);
+                    }
+                    canvas.drawLine(x, halfH, x + w / 2, halfH, paint);
+                } else {
+                    if (parentIsLastList.size() > i && !parentIsLastList.get(i)) {
+                        canvas.drawLine(x, 0, x, h, paint);
+                    }
+                }
+            }
+        }
+    }
 
     private static class TreeNode {
         final ViewBean viewBean;
         final int depth;
+        final boolean isLastChild;
+        final List<Boolean> parentIsLastList;
         boolean isExpanded;
         boolean matchesSearch = true;
         final List<TreeNode> children = new ArrayList<>();
 
-        TreeNode(ViewBean viewBean, int depth) {
+        TreeNode(ViewBean viewBean, int depth, boolean isLastChild, List<Boolean> parentIsLastList) {
             this.viewBean = viewBean;
-            this.depth    = depth;
+            this.depth = depth;
+            this.isLastChild = isLastChild;
+            this.parentIsLastList = parentIsLastList;
         }
-
         boolean hasChildren() { return !children.isEmpty(); }
     }
 
-    // ─── Adapter ────────────────────────────────────────────────────────────
-
     private class TreeAdapter extends RecyclerView.Adapter<TreeAdapter.VH> {
-
         private List<TreeNode> currentList = new ArrayList<>();
 
         void submitList(List<TreeNode> newList) {
@@ -549,16 +361,13 @@ public class ViewTreeDrawerDialog extends DialogFragment {
                 @Override public int getNewListSize() { return newList.size(); }
                 @Override
                 public boolean areItemsTheSame(int oldPos, int newPos) {
-                    return currentList.get(oldPos).viewBean.id
-                            .equals(newList.get(newPos).viewBean.id);
+                    return currentList.get(oldPos).viewBean.id.equals(newList.get(newPos).viewBean.id);
                 }
                 @Override
                 public boolean areContentsTheSame(int oldPos, int newPos) {
                     TreeNode o = currentList.get(oldPos);
                     TreeNode n = newList.get(newPos);
-                    return o.isExpanded == n.isExpanded
-                            && o.depth == n.depth
-                            && o.matchesSearch == n.matchesSearch;
+                    return o.isExpanded == n.isExpanded && o.depth == n.depth && o.matchesSearch == n.matchesSearch;
                 }
             });
             currentList = newList;
@@ -568,165 +377,54 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            // Build item view programmatically to keep layout consistent
-            return new VH(buildItemView());
+            View view = LayoutInflater.from(requireContext()).inflate(R.layout.item_view_tree_node, parent, false);
+            return new VH(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull VH holder, int position) {
             TreeNode node = currentList.get(position);
-            boolean isSelected = selectedViewId != null
-                    && selectedViewId.equals(node.viewBean.id);
+            boolean isSelected = selectedViewId != null && selectedViewId.equals(node.viewBean.id);
             holder.bind(node, isSelected, searchQuery);
         }
 
         @Override
         public int getItemCount() { return currentList.size(); }
 
-        // ── Build item view ──────────────────────────────────────────────────
-
-        private View buildItemView() {
-            // Outer card (shows selection highlight)
-            MaterialCardView card = new MaterialCardView(requireContext());
-            card.setLayoutParams(new RecyclerView.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
-            card.setCardElevation(0f);
-            card.setRadius(SketchwareUtil.dpToPx(8));
-            card.setUseCompatPadding(false);
-            int cardMarginH = SketchwareUtil.dpToPx(6);
-            int cardMarginV = SketchwareUtil.dpToPx(1);
-            RecyclerView.LayoutParams clp = new RecyclerView.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            clp.setMargins(cardMarginH, cardMarginV, cardMarginH, cardMarginV);
-            card.setLayoutParams(clp);
-            card.setTag("card");
-
-            // Inner row
-            LinearLayout row = new LinearLayout(requireContext());
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, SketchwareUtil.dpToPx(6), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(6));
-            row.setTag("row");
-
-            // Tree-line / indent spacer (will be set in bind)
-            View indent = new View(requireContext());
-            indent.setTag("indent");
-            row.addView(indent, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
-
-            // Expand arrow
-            ImageView arrow = new ImageView(requireContext());
-            arrow.setImageResource(R.drawable.ic_mtrl_arrow_right);
-            arrow.setColorFilter(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-            arrow.setTag("arrow");
-            arrow.setBackground(makeRippleBackground());
-            arrow.setClickable(true);
-            arrow.setFocusable(true);
-            LinearLayout.LayoutParams arrowParams = new LinearLayout.LayoutParams(
-                    SketchwareUtil.dpToPx(22), SketchwareUtil.dpToPx(22));
-            arrowParams.setMarginEnd(SketchwareUtil.dpToPx(2));
-            arrow.setLayoutParams(arrowParams);
-            row.addView(arrow);
-
-            // Type icon
-            ImageView icon = new ImageView(requireContext());
-            icon.setTag("icon");
-            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                    SketchwareUtil.dpToPx(20), SketchwareUtil.dpToPx(20));
-            iconParams.setMarginEnd(SketchwareUtil.dpToPx(10));
-            icon.setLayoutParams(iconParams);
-            row.addView(icon);
-
-            // Text block
-            LinearLayout textBlock = new LinearLayout(requireContext());
-            textBlock.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout.LayoutParams tbParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            textBlock.setLayoutParams(tbParams);
-
-            TextView tvId = new TextView(requireContext());
-            tvId.setTag("tvId");
-            tvId.setTextSize(14f);
-            tvId.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurface));
-            tvId.setTypeface(null, Typeface.BOLD);
-            tvId.setSingleLine(false);   // never truncate
-            tvId.setMaxLines(2);
-            textBlock.addView(tvId);
-
-            TextView tvType = new TextView(requireContext());
-            tvType.setTag("tvType");
-            tvType.setTextSize(11.5f);
-            tvType.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
-            tvType.setSingleLine(false);
-            tvType.setMaxLines(2);
-            textBlock.addView(tvType);
-
-            row.addView(textBlock);
-            card.addView(row, new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
-            return card;
-        }
-
-        private android.graphics.drawable.RippleDrawable makeRippleBackground() {
-            int rippleColor = ThemeUtils.getColor(requireContext(), R.attr.colorControlHighlight);
-            android.graphics.drawable.GradientDrawable mask =
-                    new android.graphics.drawable.GradientDrawable();
-            mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            mask.setColor(Color.WHITE);
-            return new android.graphics.drawable.RippleDrawable(
-                    ColorStateList.valueOf(rippleColor), null, mask);
-        }
-
-        // ── ViewHolder ───────────────────────────────────────────────────────
-
         class VH extends RecyclerView.ViewHolder {
-            MaterialCardView card;
-            View             indent;
-            ImageView        arrow, icon;
-            TextView         tvId, tvType;
-            LinearLayout     row;
+            View rootLayout;
+            FrameLayout indentContainer;
+            TreeIndentView indentView;
+            ImageView imgArrow, imgIcon;
+            TextView tvId, tvType;
 
             VH(View v) {
                 super(v);
-                card    = (MaterialCardView) v;
-                row     = card.findViewWithTag("row");
-                indent  = card.findViewWithTag("indent");
-                arrow   = card.findViewWithTag("arrow");
-                icon    = card.findViewWithTag("icon");
-                tvId    = card.findViewWithTag("tvId");
-                tvType  = card.findViewWithTag("tvType");
+                rootLayout = v;
+                indentContainer = v.findViewById(R.id.view_indent_container);
+                indentView = new TreeIndentView(v.getContext());
+                indentContainer.addView(indentView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                
+                imgArrow = v.findViewById(R.id.img_expand);
+                imgIcon = v.findViewById(R.id.img_icon);
+                tvId = v.findViewById(R.id.tv_title);
+                tvType = v.findViewById(R.id.tv_subtitle);
             }
 
             void bind(TreeNode node, boolean isSelected, String query) {
+                indentView.bind(node.depth, node.isLastChild, node.parentIsLastList);
 
-                // ── Indent ───────────────────────────────────────────────────
-                int indentPx = SketchwareUtil.dpToPx(16)
-                             + SketchwareUtil.dpToPx(node.depth * 20);
-                LinearLayout.LayoutParams indentLp =
-                        (LinearLayout.LayoutParams) indent.getLayoutParams();
-                indentLp.width = indentPx;
-                indent.setLayoutParams(indentLp);
-
-                // ── Arrow ────────────────────────────────────────────────────
                 if (node.hasChildren()) {
-                    arrow.setVisibility(View.VISIBLE);
-                    arrow.setRotation(node.isExpanded ? 90f : 0f);
-                    arrow.setOnClickListener(v -> {
+                    imgArrow.setVisibility(View.VISIBLE);
+                    imgArrow.setRotation(node.isExpanded ? 90f : 0f);
+                    imgArrow.setOnClickListener(v -> {
                         boolean expanding = !node.isExpanded;
                         node.isExpanded = expanding;
 
-                        // Animate arrow rotation
-                        ObjectAnimator rotAnim = ObjectAnimator.ofFloat(
-                                arrow, "rotation",
-                                expanding ? 0f : 90f,
-                                expanding ? 90f : 0f);
-                        rotAnim.setDuration(180);
-                        rotAnim.setInterpolator(new DecelerateInterpolator());
-                        rotAnim.start();
+                        ObjectAnimator.ofFloat(imgArrow, "rotation", expanding ? 0f : 90f, expanding ? 90f : 0f)
+                                .setDuration(200)
+                                .start();
 
-                        // Rebuild and submit
                         if (searchQuery.isEmpty()) {
                             rebuildDisplayList();
                         } else {
@@ -737,68 +435,49 @@ public class ViewTreeDrawerDialog extends DialogFragment {
                         submitList(new ArrayList<>(displayNodes));
                     });
                 } else {
-                    arrow.setVisibility(View.INVISIBLE);
-                    arrow.setOnClickListener(null);
+                    imgArrow.setVisibility(View.INVISIBLE);
+                    imgArrow.setOnClickListener(null);
                 }
 
-                // ── Icon ─────────────────────────────────────────────────────
-                icon.setImageResource(ViewBean.getViewTypeResId(node.viewBean.type));
-                int iconTint = isSelected
-                        ? ThemeUtils.getColor(requireContext(), R.attr.colorPrimary)
+                imgIcon.setImageResource(ViewBean.getViewTypeResId(node.viewBean.type));
+                int iconTint = isSelected ? ThemeUtils.getColor(requireContext(), R.attr.colorPrimary)
                         : ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant);
-                icon.setColorFilter(iconTint);
+                imgIcon.setColorFilter(iconTint);
 
-                // ── Text (with search highlight) ─────────────────────────────
                 tvId.setText(highlight(node.viewBean.id, query,
                         ThemeUtils.getColor(requireContext(), R.attr.colorPrimaryContainer),
                         ThemeUtils.getColor(requireContext(), R.attr.colorPrimary)));
 
                 String typeName = ViewBean.getViewTypeName(node.viewBean.type);
-                if (node.viewBean.customView != null
-                        && !node.viewBean.customView.isEmpty()
-                        && !node.viewBean.customView.equals("none")
-                        && !node.viewBean.customView.equals("NONE")) {
+                if (node.viewBean.customView != null && !node.viewBean.customView.isEmpty() && !node.viewBean.customView.equals("none")) {
                     typeName += " (" + node.viewBean.customView + ")";
                 }
                 tvType.setText(highlight(typeName, query,
                         ThemeUtils.getColor(requireContext(), R.attr.colorPrimaryContainer),
                         ThemeUtils.getColor(requireContext(), R.attr.colorPrimary)));
 
-                // ── Selected highlight ────────────────────────────────────────
                 if (isSelected) {
-                    card.setCardBackgroundColor(
-                            ThemeUtils.getColor(requireContext(), R.attr.colorPrimaryContainer));
-                    card.setStrokeWidth(SketchwareUtil.dpToPx(1));
-                    card.setStrokeColor(
-                            ThemeUtils.getColor(requireContext(), R.attr.colorPrimary));
-                    tvId.setTextColor(
-                            ThemeUtils.getColor(requireContext(), R.attr.colorPrimary));
+                    tvId.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorPrimary));
+                    tvType.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorPrimary));
                 } else {
-                    card.setCardBackgroundColor(Color.TRANSPARENT);
-                    card.setStrokeWidth(0);
-                    tvId.setTextColor(
-                            ThemeUtils.getColor(requireContext(), R.attr.colorOnSurface));
+                    tvId.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurface));
+                    tvType.setTextColor(ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant));
                 }
 
-                // ── Click: select ────────────────────────────────────────────
-                card.setOnClickListener(v -> {
+                rootLayout.setOnClickListener(v -> {
                     listener.onSelected(node.viewBean.id);
                     dismiss();
                 });
             }
 
-            /** Highlights all occurrences of {@code query} inside {@code text}. */
-            private CharSequence highlight(String text, String query,
-                                           int bgColor, int fgColor) {
+            private CharSequence highlight(String text, String query, int bgColor, int fgColor) {
                 if (query.isEmpty() || text == null) return text != null ? text : "";
                 SpannableString ss = new SpannableString(text);
                 String lower = text.toLowerCase(Locale.getDefault());
                 int idx = 0;
                 while ((idx = lower.indexOf(query, idx)) != -1) {
-                    ss.setSpan(new BackgroundColorSpan(bgColor),
-                            idx, idx + query.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    ss.setSpan(new ForegroundColorSpan(fgColor),
-                            idx, idx + query.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ss.setSpan(new BackgroundColorSpan(bgColor), idx, idx + query.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    ss.setSpan(new ForegroundColorSpan(fgColor), idx, idx + query.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     idx += query.length();
                 }
                 return ss;

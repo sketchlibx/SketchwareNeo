@@ -1,17 +1,21 @@
 package mod.hey.studios.project.backup;
 
 import android.app.Activity;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -66,13 +70,23 @@ public class BackupRestoreManager {
 		dialog.setIcon(R.drawable.ic_backup);
 		dialog.setTitle("Backup Options");
 		
-		LinearLayout checkboxContainer = new LinearLayout(act);
-		checkboxContainer.setOrientation(LinearLayout.VERTICAL);
-		checkboxContainer.setLayoutParams(new LinearLayout.LayoutParams(
-		LinearLayout.LayoutParams.MATCH_PARENT,
-		LinearLayout.LayoutParams.MATCH_PARENT));
-		int dip = (int) SketchwareUtil.getDip(8);
-		checkboxContainer.setPadding(dip, dip, dip, dip);
+		int dip8  = (int) SketchwareUtil.getDip(8);
+		int dip12 = (int) SketchwareUtil.getDip(12);
+		int dip16 = (int) SketchwareUtil.getDip(16);
+		
+		LinearLayout root = new LinearLayout(act);
+		root.setOrientation(LinearLayout.VERTICAL);
+		root.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT,
+				LinearLayout.LayoutParams.WRAP_CONTENT));
+		root.setPadding(dip16, dip8, dip16, 0);
+		
+		// Always-included row (not a toggle — informational, so the user can see exactly
+		// what a backup always contains before deciding on the optional extras below).
+		root.addView(buildInfoRow(
+				"Project data & resources",
+				"Layouts, logic, Java sources, images, sounds, fonts — always included",
+				dip8, dip16));
 		
 		CompoundButton.OnCheckedChangeListener listener = (buttonView, isChecked) -> {
 			int index;
@@ -92,31 +106,94 @@ public class BackupRestoreManager {
 			}
 		};
 		
-		CheckBox includeLocalLibraries = new CheckBox(act);
-		includeLocalLibraries.setTag(localLibrariesTag);
-		includeLocalLibraries.setText("Include used Local libraries");
-		includeLocalLibraries.setLayoutParams(new LinearLayout.LayoutParams(
-		LinearLayout.LayoutParams.MATCH_PARENT,
-		LinearLayout.LayoutParams.WRAP_CONTENT));
-		includeLocalLibraries.setOnCheckedChangeListener(listener);
-		checkboxContainer.addView(includeLocalLibraries);
+		MaterialSwitch includeLocalLibraries = buildToggleSwitch(
+				localLibrariesTag, listener);
+		root.addView(buildToggleRow(includeLocalLibraries,
+				"Include used local libraries",
+				"Bundles any .aar/.jar local libraries this project depends on",
+				dip8, dip12, dip16));
 		
-		CheckBox includeUsedCustomBlocks = new CheckBox(act);
-		includeUsedCustomBlocks.setTag(customBlocksTag);
-		includeUsedCustomBlocks.setText("Include used Custom Blocks");
-		includeUsedCustomBlocks.setLayoutParams(new LinearLayout.LayoutParams(
-		LinearLayout.LayoutParams.MATCH_PARENT,
-		LinearLayout.LayoutParams.WRAP_CONTENT));
-		includeUsedCustomBlocks.setOnCheckedChangeListener(listener);
-		checkboxContainer.addView(includeUsedCustomBlocks);
+		MaterialSwitch includeUsedCustomBlocks = buildToggleSwitch(
+				customBlocksTag, listener);
+		root.addView(buildToggleRow(includeUsedCustomBlocks,
+				"Include used custom blocks",
+				"Bundles any custom blocks this project's logic depends on",
+				dip8, dip12, dip16));
 		
-		dialog.setView(checkboxContainer);
+		dialog.setView(root);
 		dialog.setPositiveButton("Back up", (v, which) -> {
 			v.dismiss();
 			doBackup(sc_id, project_name);
 		});
 		dialog.setNegativeButton(Helper.getResString(R.string.common_word_cancel), null);
 		dialog.show();
+	}
+	
+	/** A plain, non-toggleable informational row — used for the "always included" line. */
+	private LinearLayout buildInfoRow(String title, String subtitle, int dip8, int dip16) {
+		LinearLayout row = new LinearLayout(act);
+		row.setOrientation(LinearLayout.VERTICAL);
+		row.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setPadding(0, dip8, 0, dip16);
+		row.addView(buildTitleText(title));
+		row.addView(buildSubtitleText(subtitle));
+		return row;
+	}
+	
+	/** One MaterialCardView-wrapped toggle row: title+subtitle on the left, a switch on the right. */
+	private MaterialCardView buildToggleRow(MaterialSwitch switchView, String title, String subtitle,
+			int dip8, int dip12, int dip16) {
+		LinearLayout textColumn = new LinearLayout(act);
+		textColumn.setOrientation(LinearLayout.VERTICAL);
+		LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+				0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+		textColumn.setLayoutParams(textParams);
+		textColumn.addView(buildTitleText(title));
+		textColumn.addView(buildSubtitleText(subtitle));
+		
+		LinearLayout row = new LinearLayout(act);
+		row.setOrientation(LinearLayout.HORIZONTAL);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setLayoutParams(new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+		row.setPadding(dip16, dip12, dip16, dip12);
+		row.addView(textColumn);
+		row.addView(switchView);
+		
+		MaterialCardView card = new MaterialCardView(act);
+		LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+				LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+		cardParams.bottomMargin = dip8;
+		card.setLayoutParams(cardParams);
+		card.setRadius(SketchwareUtil.getDip(12));
+		card.setCardElevation(SketchwareUtil.getDip(1));
+		card.addView(row);
+		return card;
+	}
+	
+	private MaterialSwitch buildToggleSwitch(String tag, CompoundButton.OnCheckedChangeListener listener) {
+		MaterialSwitch sw = new MaterialSwitch(act);
+		sw.setTag(tag);
+		sw.setChecked(false);
+		sw.setOnCheckedChangeListener(listener);
+		return sw;
+	}
+	
+	private TextView buildTitleText(String text) {
+		TextView tv = new TextView(act);
+		tv.setText(text);
+		tv.setTextSize(15);
+		tv.setTypeface(tv.getTypeface(), Typeface.BOLD);
+		return tv;
+	}
+	
+	private TextView buildSubtitleText(String text) {
+		TextView tv = new TextView(act);
+		tv.setText(text);
+		tv.setTextSize(13);
+		tv.setAlpha(0.7f);
+		return tv;
 	}
 	
 	private void doBackup(String sc_id, String project_name) {

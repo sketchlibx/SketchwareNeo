@@ -2,46 +2,57 @@ package mod.sketchlibx.project.history;
 
 import com.besome.sketch.beans.BlockBean;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Parses the raw "logic" file content into {@code Map<eventName, List<BlockBean>>}.
- *
- * Defensively handles content that's double-JSON-encoded (a JSON string
- * containing the real object as escaped text, e.g. "{\"onCreate\":[...]}"
- * instead of a bare {"onCreate":[...]}) - this is what causes Gson to throw
- * "Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $", since the
- * top-level token is a quote character. If the first parse attempt fails with
- * exactly that shape of error, one level of String-unwrapping is tried before
- * giving up for real.
+ * Parses the real "logic" file format (see SketchwareDataFile's javadoc for
+ * the confirmed on-disk shape). Only extracts the BlockBean sections -
+ * "{activity}.java_components" (ComponentBean) and
+ * "{activity}.java_events" (EventBean) sections are skipped here since this
+ * class is specifically for rendering blocks; a full project-data reader
+ * would want those too.
  */
 public class BlocksJsonParser {
 
     private static final Gson GSON = new Gson();
-    private static final java.lang.reflect.Type MAP_TYPE = new TypeToken<Map<String, List<BlockBean>>>() {}.getType();
 
-    public static Map<String, List<BlockBean>> parse(String json) throws Exception {
-        if (json == null || json.trim().isEmpty()) return null;
+    /** activityJavaFileName -> eventKey -> blocks (chain order not yet resolved - by nextBlock/subStack). */
+    public static Map<String, Map<String, List<BlockBean>>> parse(String raw) {
+        Map<String, Map<String, List<BlockBean>>> result = new LinkedHashMap<>();
+        if (raw == null || raw.isBlank()) return result;
 
-        try {
-            return GSON.fromJson(json, MAP_TYPE);
-        } catch (Exception firstAttemptError) {
-            // Try treating it as a JSON string wrapping the real object, and
-            // parse THAT. If this also fails, surface the ORIGINAL error, since
-            // that's the more informative one if the content isn't actually
-            // double-encoded at all.
-            try {
-                String unwrapped = GSON.fromJson(json, String.class);
-                if (unwrapped != null && !unwrapped.equals(json)) {
-                    return GSON.fromJson(unwrapped, MAP_TYPE);
-                }
-            } catch (Exception ignored) {
-                // fall through to rethrow the original error below
+        SketchwareDataFile file = SketchwareDataFile.parse(raw);
+
+        for (Map.Entry<String, List<String>> section : file.sections.entrySet()) {
+            String sectionKey = section.getKey();
+            int javaIdx = sectionKey.indexOf(".java_");
+            if (javaIdx < 0) continue; // not a per-activity section we recognize
+
+            String activityName = sectionKey.substring(0, javaIdx + ".java".length());
+            String rest = sectionKey.substring(javaIdx + ".java_".length());
+
+            if ("components".equals(rest) || "events".equals(rest)) {
+                continue; // ComponentBean/EventBean sections - not blocks
             }
-            throw firstAttemptError;
+
+            String eventKey = rest;
+            List<BlockBean> blocks = new ArrayList<>();
+            for (String line : section.getValue()) {
+                try {
+                    BlockBean b = GSON.fromJson(line, BlockBean.class);
+                    if (b != null) blocks.add(b);
+                } catch (Exception ignored) {
+                    // One malformed line shouldn't lose the rest of the event's blocks.
+                }
+            }
+
+            result.computeIfAbsent(activityName, k -> new LinkedHashMap<>()).put(eventKey, blocks);
         }
+
+        return result;
     }
 }

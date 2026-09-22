@@ -135,6 +135,12 @@ dependencies {
 
     implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
 
+    // Real PTY terminal (Termux terminal-view / terminal-emulator) — resolved via the
+    // JitPack repo already declared in settings.gradle. Building straight from termux-app's
+    // own terminal-view/terminal-emulator subprojects, not a Maven Central release.
+    implementation 'com.github.termux.termux-app:terminal-view:v0.118.0'
+    implementation 'com.github.termux.termux-app:terminal-emulator:v0.118.0'
+
     coreLibraryDesugaring libs.desugar.jdk.libs.nio
 }
 

@@ -23,6 +23,7 @@ import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.snackbar.BaseTransientBottomBar;
 import com.google.android.material.snackbar.Snackbar;
@@ -60,7 +61,6 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_USE_ASD_HIGHLIGHTER = "use-asd-highlighter";
     public static final String SETTING_CRITICAL_UPDATE_REMINDER = "critical-update-reminder";
     
-    // Variables kept intact as requested
     public static final String SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH = "palletteDir";
     public static final String SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH = "blockDir";
     
@@ -70,7 +70,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_CPP_TREE_VIEW    = "cpp_tree_view";
     public static final String SETTING_RESOURCE_TREE_VIEW = "enable-resource-tree-view"; 
     public static final String SETTING_GIT_DIRECT_PUSH = "git-direct-push";
-    public static final String SETTING_SHOW_PLUGINS_TAB = "show-plugins-tab";
+    
+    public static final String SETTING_TERMINAL_PLACEMENT = "terminal-placement";
 
     private PreferenceActivityNewBinding binding;
 
@@ -134,7 +135,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH,
                 SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW,
                 SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, SETTING_GIT_DIRECT_PUSH,
-                SETTING_SHOW_PLUGINS_TAB);
+                SETTING_TERMINAL_PLACEMENT);
 
         for (String key : keys) {
             settings.put(key, getDefaultValue(key));
@@ -147,8 +148,9 @@ public class ConfigActivity extends BaseAppCompatActivity {
             case SETTING_ALWAYS_SHOW_BLOCKS, SETTING_ROOT_AUTO_INSTALL_PROJECTS, SETTING_SHOW_BUILT_IN_BLOCKS,
                  SETTING_SHOW_EVERY_SINGLE_BLOCK, SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, 
                  SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW, SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, 
-                 SETTING_GIT_DIRECT_PUSH, SETTING_SHOW_PLUGINS_TAB -> false;
+                 SETTING_GIT_DIRECT_PUSH -> false;
             case SETTING_BACKUP_DIRECTORY -> "/.sketchware/backups/";
+            case SETTING_TERMINAL_PLACEMENT -> "0"; 
             case SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING -> true;
             case SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH -> "/.sketchware/resources/block/My Block/palette.json";
             case SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH -> "/.sketchware/resources/block/My Block/block.json";
@@ -186,6 +188,12 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 createSwitchPreference(R.drawable.ic_mtrl_view_module, "Show Every Single Block", "Unhide experimental and deprecated blocks", SETTING_SHOW_EVERY_SINGLE_BLOCK),
                 createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER)
         ));
+        
+        content.addView(createCategoryHeader("IDE Tools"));
+        TextView[] terminalDesc = new TextView[1];
+        content.addView(createPreferenceCard(
+                createActionPreference(R.drawable.ic_mtrl_code, "Terminal Placement (Beta)", getTerminalPlacementText(), v -> showTerminalPlacementDialog(terminalDesc[0]), terminalDesc)
+        ));
 
         content.addView(createCategoryHeader("Project Explorer"));
         content.addView(createPreferenceCard(
@@ -211,11 +219,29 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 createSwitchPreference(R.drawable.ic_mtrl_code, "Auto Install Projects (Root)", "Silently install compiled APKs using root access", SETTING_ROOT_AUTO_INSTALL_PROJECTS),
                 createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING)
         ));
+    }
 
-        content.addView(createCategoryHeader("Beta Features"));
-        content.addView(createPreferenceCard(
-                createSwitchPreference(android.R.drawable.ic_menu_manage, "Plugins Tab (Beta)", "Show a dedicated Plugins tab next to View/Event/Component in the project editor. Experimental, off by default.", SETTING_SHOW_PLUGINS_TAB)
-        ));
+    private String getTerminalPlacementText() {
+        String val = getStringSettingValueOrSetAndGet(SETTING_TERMINAL_PLACEMENT, "0");
+        if (val.equals("1")) return "Bottom Sheet";
+        if (val.equals("2")) return "Drawer Menu";
+        return "Editor Tab";
+    }
+
+    private void showTerminalPlacementDialog(TextView descView) {
+        String[] options = {"Editor Tab", "Bottom Sheet", "Drawer Menu"};
+        int current = Integer.parseInt(getStringSettingValueOrSetAndGet(SETTING_TERMINAL_PLACEMENT, "0"));
+        
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Terminal Placement (Beta)")
+            .setSingleChoiceItems(options, current, (dialog, which) -> {
+                DataStore.getInstance().putString(SETTING_TERMINAL_PLACEMENT, String.valueOf(which));
+                if (descView != null) descView.setText(options[which]);
+                dialog.dismiss();
+                SketchwareUtil.toast("Placement updated. Restart project editor to apply.");
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private View createCategoryHeader(String titleText) {
@@ -236,10 +262,10 @@ public class ConfigActivity extends BaseAppCompatActivity {
         card.setLayoutParams(cardParams);
         
         card.setRadius(SketchwareUtil.dpToPx(16));
-        card.setCardElevation(0); // Flat look for modern M3
+        card.setCardElevation(0); 
         card.setStrokeWidth(SketchwareUtil.dpToPx(1));
         card.setStrokeColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
-        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerLow)); // Distinct surface
+        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerLow)); 
         card.setClipChildren(true);
 
         LinearLayout cardContent = new LinearLayout(this);
@@ -376,13 +402,6 @@ public class ConfigActivity extends BaseAppCompatActivity {
         showInputDialog("Backup Directory", "e.g. /.sketchware/backups/", getBackupPath(), text -> {
             DataStore.getInstance().putString(SETTING_BACKUP_DIRECTORY, text);
             if (descView != null) descView.setText(text);
-        });
-    }
-
-    private void showPathDialog(String title, String key, TextView descView) {
-        showInputDialog(title, "Enter path inside /Internal storage/", DataStore.getInstance().getString(key, ""), text -> {
-            DataStore.getInstance().putString(key, text);
-            if (descView != null) descView.setText("Custom path configured");
         });
     }
 

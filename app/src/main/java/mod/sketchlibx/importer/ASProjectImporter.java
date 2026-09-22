@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -41,23 +42,38 @@ import pro.sketchware.utility.SketchwareUtil;
  * [5]  Parse build.gradle / kts           (GradleParser)
  * [6]  Classify source files              (SourceClassifier)
  * [7]  Import layout XML → view/file data (LayoutImporter)
- * [8]  Map resources                      (ResourceMapper)
- * [9]  Detect libraries                   (LibraryDetector)
- * [10] Copy source files to data/<id>/files/java/
- * [11] Copy assets/
- * [12] Copy native libs (if any)
- * [13] Write all Sketchware project files (SketchwareWriter)
- * [14] Cleanup temp directory
+ * [8]  Detect libraries                   (LibraryDetector)
+ * [9]  Write all Sketchware project files (SketchwareWriter)
+ * [10] Map resources                      (ResourceMapper) — runs AFTER [9]
+ *      because it needs the sc_id-derived destination paths that
+ *      SketchwareWriter.write() creates; any resulting corrections to the
+ *      already-written project go through SketchwareWriter.patchIconFlags()
+ *      / patchResourceData() — never raw a.a.a.lC / a.a.a.oB calls here.
+ * [11] Copy source files to data/<id>/files/java/
+ * [12] Copy assets/
+ * [13] Copy native libs (if any)
+ * [14] Copy local .aar / .jar
+ * [15] Cleanup temp directory
  *
  * Atomicity guarantee:
- * SketchwareWriter.write() is the ONLY step that touches the Sketchware
- * project store. If it throws, SketchwareWriter.rollback() removes any
- * partially-written files before this task reports failure.
+ * SketchwareWriter.write() is the ONLY step that performs the initial
+ * project write. If it throws, SketchwareWriter.rollback() removes any
+ * partially-written files before this task reports failure. Any later
+ * correction to the written project (icon flags, resource data) goes
+ * through SketchwareWriter's dedicated patch* methods, so it remains the
+ * single owner of the Sketchware project store end-to-end.
  * No existing Sketchware project is ever touched.
  *
  * sc_id isolation:
  * lC.b() (called inside SketchwareWriter) reads the existing project list
  * and always returns max(existing_ids) + 1. Confirmed from lC.java source.
+ *
+ * Resource path methods (IMPORTANT — confirmed from wq.java source):
+ * wq's single-letter field names do NOT correspond to the same-letter
+ * accessor methods. The correct accessors are:
+ *   images → wq.g()   sounds → wq.t()   fonts → wq.d()
+ * (wq.n() resolves to the mysc/list project-registry root, NOT images —
+ * do not use it for resource paths.)
  *
  * Usage:
  * new ASProjectImporter(context, zipPath, new ASProjectImporter.Callback() {
@@ -75,7 +91,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
     // ── Version ───────────────────────────────────────────────────────────────
 
     /** Bumped here so the verbose log header always shows the correct version. */
-    static final String IMPORTER_VERSION = "1.0.0";
+    static final String IMPORTER_VERSION = "1.0.1";
 
     private static final String TAG = "ASProjectImporter";
 
@@ -436,21 +452,27 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
 
         List<LayoutImporter.ImportedLayout> layouts =
                 layoutImporter.importLayouts(baseLayoutDir, sources, manifest, manifest.appTheme);
-        String fileData = layoutImporter.buildFileData(layouts);
-        String viewData = layoutImporter.buildViewData(layouts);
+        String fileData     = layoutImporter.buildFileData(layouts);
+        String viewData     = layoutImporter.buildViewData(layouts);
+        String viewRootData = layoutImporter.buildViewRootData(layouts);
 
         stats.layouts = layouts.size();
         logger.info("Layouts imported : " + layouts.size());
+        int rootsRead = 0;
         for (LayoutImporter.ImportedLayout il : layouts) {
+            boolean gotRoot = il.rootClassName != null;
+            if (gotRoot) rootsRead++;
             logger.info("  " + il.sketchwareFileName
-                    + "  (fileType=" + il.fileType + ")");
+                    + "  (fileType=" + il.fileType + ")"
+                    + (gotRoot ? "  root=" + il.rootClassName : "  [root tag unreadable]"));
         }
+        logger.info("Root containers captured (data/view_root) : " + rootsRead + "/" + layouts.size());
         logger.stepDone(true);
         Log.d(TAG, "Imported layouts: " + layouts.size());
 
         // ── [8] Detect libraries ──────────────────────────────────────────────
         progress("Detecting libraries...");
-        logger.step(9, "Detect Libraries");
+        logger.step(8, "Detect Libraries");
         LibraryDetector libDetector = new LibraryDetector();
         String libraryData = libDetector.buildLibraryData(gradle, appModuleDir);
 
@@ -469,7 +491,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
 
         // ── [9] Write all Sketchware files ────────────────────────────────────
         progress("Creating Sketchware project...");
-        logger.step(10, "Write Sketchware Project Files");
+        logger.step(9, "Write Sketchware Project Files");
         writer = new SketchwareWriter();
         SketchwareWriter.WriteInput writeInput = new SketchwareWriter.WriteInput();
         writeInput.appName       = manifest.appName;
@@ -481,8 +503,16 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         writeInput.hasKotlin     = gradle.hasKotlin;
         writeInput.fileData      = fileData;
         writeInput.viewData      = viewData;
+        writeInput.viewRootData  = viewRootData;
         writeInput.libraryData   = libraryData;
         writeInput.manifestContent = buildCustomManifest(manifest);
+        writeInput.launcherFileName = resolveLauncherFileName(sources, manifest);
+        writeInput.permissionsJson  = buildPermissionsJson(manifest.permissions);
+        writeInput.logicData        = buildFullLogicData(sources, baseLayoutDir);
+
+        logger.info("Launcher screen (Injection/androidmanifest/activity_launcher.txt) : "
+                + writeInput.launcherFileName);
+        logger.info("Permissions written to data/permission : " + manifest.permissions.size());
 
         try {
             writer.write(writeInput);
@@ -503,14 +533,24 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.stepDone(true);
 
         // ── [10] Resource copy ────────────────────────────────────────────────
+        // Must run after [9]: swImagesPath/swSoundsPath/swFontsPath and filesPath
+        // are all sc_id-derived, and sc_id only exists once SketchwareWriter.write()
+        // has run. Any resulting correction to the already-written project is
+        // applied through SketchwareWriter.patchIconFlags()/patchResourceData() —
+        // never via raw a.a.a.lC / a.a.a.oB calls here (see class javadoc).
         progress("Copying image and media resources...");
-        logger.step(8, "Map Resources");
+        logger.step(10, "Map Resources");
         logger.info("res dir : " + resDir.getAbsolutePath());
 
         ResourceMapper resMapper = new ResourceMapper();
-        String swImagesPath = wq.n() + "/" + scId;
-        String swSoundsPath = wq.e() + "/" + scId;
-        String swFontsPath  = wq.g() + "/" + scId;
+        // CONFIRMED from wq.java: wq's single-letter methods do NOT map to the
+        // same-letter fields. images = wq.g() (field n), sounds = wq.t() (field o),
+        // fonts = wq.d() (field p). wq.n() is the mysc/list project-registry root —
+        // using it here would silently dump resource files into the same directory
+        // that holds every project's "project" metadata file.
+        String swImagesPath = wq.g() + "/" + scId;
+        String swSoundsPath = wq.t() + "/" + scId;
+        String swFontsPath  = wq.d() + "/" + scId;
 
         ResourceMapper.ResourceResult resResult = resMapper.process(
                 resDir, filesPath, swImagesPath, swSoundsPath, swFontsPath,
@@ -524,8 +564,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
 
         if (!resResult.resourceData.equals("@images\n@sounds\n@fonts\n")) {
             try {
-                a.a.a.oB enc = new a.a.a.oB();
-                enc.a(dataPath + "/resource", enc.d(resResult.resourceData));
+                writer.patchResourceData(scId, resResult.resourceData);
                 logger.info("Resource data file updated.");
                 Log.d(TAG, "Re-wrote resource file with " + resResult.resourceData.length() + " chars.");
             } catch (Exception e) {
@@ -535,10 +574,16 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
         if (resResult.hasCustomIcon) {
             try {
-                java.util.HashMap<String, Object> patch = new java.util.HashMap<>();
-                patch.put("custom_icon", true);
-                a.a.a.lC.b(scId, patch);
-                logger.info("custom_icon flag patched in project map.");
+                // isIconAdaptive is always false here — ResourceMapper does not
+                // currently detect adaptive icons (no source for the required
+                // mipmap-anydpi-v26 XML parsing was available during this audit;
+                // see AS_Importer_Deep_Audit_Report.md, Section 10).
+                boolean patched = writer.patchIconFlags(scId, true, false);
+                if (patched) {
+                    logger.info("custom_icon flag patched in project map.");
+                } else {
+                    logger.warning("Could not patch custom_icon flag: project not found for sc_id=" + scId);
+                }
             } catch (Exception e) {
                 Log.w(TAG, "Could not patch custom_icon flag", e);
                 logger.warning("Could not patch custom_icon flag: " + e.getMessage());
@@ -582,7 +627,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             // Prebuilt .so files, preserving ABI folders (arm64-v8a, armeabi-v7a, etc).
             // NOTE: target folder name follows the spec (files/native_libs/), which
             // differs from this importer's previous "jniLibs" naming — flagged as a
-            // naming mismatch against Sketchware Neo's own convention; verify before
+            // naming mismatch against Sketchware Neo's own convention; this could not
+            // be confirmed or refuted from the files available during this audit
+            // (see AS_Importer_Deep_Audit_Report.md, Section 10) — verify before
             // relying on this if native libs still don't load after import.
             File jniLibsSrc = new File(srcMain, "jniLibs");
             if (jniLibsSrc.exists()) {
@@ -935,6 +982,153 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
     }
 
     // ── Custom manifest builder ───────────────────────────────────────────────
+
+    /**
+     * Finds the Sketchware fileName of the launcher screen, for
+     * data/Injection/androidmanifest/activity_launcher.txt.
+     *
+     * Preference order: (1) the ClassifiedSource matching whichever manifest
+     * activity is flagged isLauncher, (2) the first ACTIVITY-kind source at all,
+     * (3) the literal fallback "main" (matches SketchwareWriter.WriteInput's own
+     * default, and Sketchware's own requirement that a "main" activity always exists
+     * — see LayoutImporter.buildFileData()'s hasMain fallback).
+     */
+    /**
+     * Builds the real data/logic content: for every ACTIVITY-kind screen with a real
+     * source file, runs JavaLogicConverter against it and assembles the confirmed
+     * section set. CUSTOM_VIEW-kind screens are skipped entirely — confirmed
+     * (sketchware-neo-swb-analysis-complete.md §5) that Custom Views get ZERO
+     * compiled Java in Sketchware Neo (getJavaName() returns "" for any non-ACTIVITY
+     * fileType), so there is no logic destination for them to convert into at all.
+     *
+     * Section-name prefixing: every section is written as "@<javaName>_<suffix>"
+     * (javaName = ProjectFileBean.getActivityName(fileName) + ".java"). This prefix
+     * convention is carried over from earlier eC.class/jC.java bytecode evidence —
+     * see the caveat on SketchwareWriter.buildLogicData()'s javadoc for exactly what
+     * is and isn't independently re-confirmed here.
+     */
+    private String buildFullLogicData(List<ClassifiedSource> sources, File baseLayoutDir) {
+        StringBuilder sb = new StringBuilder();
+        JavaLogicConverter converter = new JavaLogicConverter();
+
+        for (ClassifiedSource cs : sources) {
+            if (cs.kind != ClassifiedSource.Kind.ACTIVITY) continue;
+            if (cs.file == null || !cs.file.exists()) continue;
+
+            String fileName = cs.sketchwareFileName != null ? cs.sketchwareFileName
+                    : SourceClassifier.classNameToSketchwareFileName(cs.simpleClassName);
+            String activityJavaName = fileNameToActivityJavaName(fileName);
+
+            java.util.Set<String> knownViewIds = extractViewIds(baseLayoutDir, cs.associatedLayout);
+
+            String javaSource;
+            try {
+                javaSource = new String(java.nio.file.Files.readAllBytes(cs.file.toPath()), "UTF-8");
+            } catch (Exception e) {
+                logger.warning("Could not read " + cs.file.getName() + " for logic conversion: " + e.getMessage());
+                continue;
+            }
+
+            JavaLogicConverter.ConversionResult result;
+            try {
+                result = converter.convert(javaSource, knownViewIds);
+            } catch (Exception e) {
+                logger.warning("Logic conversion failed for " + cs.simpleClassName + ": " + e.getMessage()
+                        + " — original source is still preserved as copied, unconverted.");
+                Log.w(TAG, "JavaLogicConverter failed for " + cs.simpleClassName, e);
+                continue;
+            }
+
+            sb.append("@").append(activityJavaName).append("_components\n");
+            sb.append(result.componentsSection);
+            sb.append("@").append(activityJavaName).append("_events\n");
+            sb.append(result.eventsSection);
+            if (!result.varLines.isEmpty()) {
+                sb.append("@").append(activityJavaName).append("_var\n");
+                for (String v : result.varLines) sb.append(v).append("\n");
+            }
+            for (Map.Entry<String, String> section : result.sections.entrySet()) {
+                sb.append("@").append(activityJavaName).append("_").append(section.getKey()).append("\n");
+                sb.append(section.getValue());
+            }
+
+            if (!result.unsupported.isEmpty()) {
+                logger.warning(cs.simpleClassName + ": " + result.unsupported.size()
+                        + " statement(s)/method(s) not converted to native blocks (preserved as "
+                        + "addSourceDirectly or left in copied source only — see details below).");
+                for (String u : result.unsupported) {
+                    logger.info("  " + u);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /** ProjectFileBean.getActivityName(fileName) + ".java" — the same derivation SketchwareWriter uses. */
+    private String fileNameToActivityJavaName(String fileName) {
+        return ProjectFileBean.getActivityName(fileName) + ".java";
+    }
+
+    private static final java.util.regex.Pattern XML_ID_ATTR = java.util.regex.Pattern.compile(
+            "android:id=\"@\\+?(?:android:)?id/([A-Za-z_][A-Za-z0-9_]*)\"");
+
+    /** Scans a layout XML file for every android:id value present (regex, not a full XML parse —
+     *  sufficient here since we only need the set of ids, not structure). */
+    private java.util.Set<String> extractViewIds(File baseLayoutDir, String associatedLayout) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        if (associatedLayout == null || associatedLayout.isEmpty()) return ids;
+        File layoutFile = new File(baseLayoutDir, associatedLayout + ".xml");
+        if (!layoutFile.exists()) return ids;
+        try {
+            String xml = new String(java.nio.file.Files.readAllBytes(layoutFile.toPath()), "UTF-8");
+            java.util.regex.Matcher m = XML_ID_ATTR.matcher(xml);
+            while (m.find()) ids.add(m.group(1));
+        } catch (Exception e) {
+            Log.w(TAG, "Could not scan view ids from " + layoutFile.getName(), e);
+        }
+        return ids;
+    }
+
+    private String resolveLauncherFileName(List<ClassifiedSource> sources, ParsedManifest manifest) {
+        String launcherClassName = null;
+        for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+            if (entry.isLauncher) {
+                launcherClassName = entry.simpleClassName;
+                break;
+            }
+        }
+
+        if (launcherClassName != null) {
+            for (ClassifiedSource cs : sources) {
+                if (cs.kind == ClassifiedSource.Kind.ACTIVITY
+                        && launcherClassName.equals(cs.simpleClassName)
+                        && cs.sketchwareFileName != null) {
+                    return cs.sketchwareFileName;
+                }
+            }
+            logger.warning("Manifest launcher activity " + launcherClassName
+                    + " has no matching imported screen — falling back.");
+        }
+
+        for (ClassifiedSource cs : sources) {
+            if (cs.kind == ClassifiedSource.Kind.ACTIVITY && cs.sketchwareFileName != null) {
+                return cs.sketchwareFileName;
+            }
+        }
+
+        return "main";
+    }
+
+    /** Builds the data/permission JSON array from manifest &lt;uses-permission&gt; strings. */
+    private String buildPermissionsJson(List<String> permissions) {
+        if (permissions == null || permissions.isEmpty()) return "[]";
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < permissions.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append("\"").append(permissions.get(i).replace("\"", "\\\"")).append("\"");
+        }
+        return sb.append("]").toString();
+    }
 
     private String buildCustomManifest(ParsedManifest manifest) {
         Log.i(TAG, "NOTE: Permissions, services, and receivers from AndroidManifest.xml " +
