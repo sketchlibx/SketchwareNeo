@@ -731,6 +731,23 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         terminalSlidePanel.addView(column);
         terminalSlidePanel.setVisibility(View.INVISIBLE); // see class-level note below
+
+        // Real statusBars + navigationBars handling — not an edge-to-edge-forced assumption. If
+        // the window isn't edge-to-edge, the system already reserves space for these bars and
+        // these insets report 0 here, so this is a harmless no-op in that case. If it is
+        // edge-to-edge (opted-in, or forced on targetSdk 35+), this is what actually stops the
+        // panel's content and drag handle from drawing under the status/navigation bars.
+        // Deliberately NOT handling ime() here — NeoTerminalView's own applyImeAwarePadding()
+        // already owns IME padding internally; adding it here too would double-pad when the
+        // keyboard is open (this padding + NeoTerminalView's own delta padding stacking).
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(terminalSlidePanel, (v, insets) -> {
+            int statusTop = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top;
+            int navBottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom;
+            v.setPadding(0, statusTop, 0, navBottom);
+            return insets;
+        });
+        androidx.core.view.ViewCompat.requestApplyInsets(terminalSlidePanel);
+
         container.addView(terminalSlidePanel);
 
         toolbar.setOnTouchListener(new EdgeDragListener(true));

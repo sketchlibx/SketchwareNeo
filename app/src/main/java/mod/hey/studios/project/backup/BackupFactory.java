@@ -47,6 +47,7 @@ import mod.hey.studios.editor.manage.block.v2.BlockLoader;
 import mod.hey.studios.project.custom_blocks.CustomBlocksManager;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
+import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 
@@ -62,6 +63,8 @@ public class BackupFactory {
     File outPath;
     boolean backupLocalLibs;
     boolean backupCustomBlocks;
+    boolean backupCpp;
+    boolean backupGitHub;
     String error = "";
     boolean restoreSuccess = true;
     
@@ -83,6 +86,40 @@ public class BackupFactory {
     private static File getAllLocalLibsDir() {
         return new File(Environment.getExternalStorageDirectory(),
                 ".sketchware/libs/local_libs");
+    }
+
+    /**
+     * Returns true when the project has real C/C++
+     * Empty auto-created directories do not count.
+     */
+    public static boolean hasCppBackupContent(String sc_id) {
+        FilePathUtil fpu = new FilePathUtil();
+        return hasRealContent(new File(fpu.getPathCpp(sc_id)));
+    }
+
+    /**
+     * Returns true only when the project's Git workspace is an initialized Git repository.
+     */
+    public static boolean hasGitHubBackupContent(String sc_id) {
+        File workspace = new File(Environment.getExternalStorageDirectory(),
+                ".sketchware/data/" + sc_id + "/git_workspace");
+        File gitDir = new File(workspace, ".git");
+        return gitDir.exists() && gitDir.isDirectory();
+    }
+
+    private static boolean hasRealContent(File dir) {
+        if (!dir.exists() || !dir.isDirectory()) return false;
+
+        File[] children = dir.listFiles();
+        if (children == null) return false;
+
+        for (File child : children) {
+            if (".nomedia".equals(child.getName())) continue;
+            if (child.isFile()) return true;
+            if (child.isDirectory() && hasRealContent(child)) return true;
+        }
+
+        return false;
     }
 
     private static HashMap<String, Object> getProject(File file) {
@@ -317,6 +354,14 @@ public class BackupFactory {
         File dataF = new File(outFolder, "data");
         FileUtil.makeDir(dataF.getAbsolutePath());
         copySafe(getDataDir(), dataF);
+        
+        // Remove disabled optional C/C++ and Git trees before zipping the SWB.
+        if (!backupCpp) {
+            FileUtil.deleteFile(new File(dataF, "files/jni").getAbsolutePath());
+        }
+        if (!backupGitHub) {
+            FileUtil.deleteFile(new File(dataF, "git_workspace").getAbsolutePath());
+        }
 
         File resF = new File(outFolder, "resources");
         FileUtil.makeDir(resF.getAbsolutePath());
@@ -398,6 +443,14 @@ public class BackupFactory {
 
     public void setBackupCustomBlocks(boolean b) {
         backupCustomBlocks = b;
+    }
+
+    public void setBackupCpp(boolean b) {
+        backupCpp = b;
+    }
+
+    public void setBackupGitHub(boolean b) {
+        backupGitHub = b;
     }
 
     public void restore(File swbPath) {

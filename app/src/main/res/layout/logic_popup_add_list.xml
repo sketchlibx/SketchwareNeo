@@ -33,6 +33,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="40dp"
                 android:text="@string/logic_variable_type_map" />
+                
+            <RadioButton
+                android:id="@+id/rb_float"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:text="@string/logic_variable_type_float" />
         </RadioGroup>
 
         <com.google.android.material.textfield.TextInputLayout

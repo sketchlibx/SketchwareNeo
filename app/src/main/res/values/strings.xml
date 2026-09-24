@@ -1152,6 +1152,8 @@ Choosing a theme mode lets you personalize the app\'s appearance, notes:\n
     <string name="design_library_button_import_from_other_project">Import from the other project</string>
     <string name="design_library_description_admob">Use Google AdMob</string>
     <string name="design_library_description_appcompat_and_design">Drawer Layout, Floating Action Button</string>
+    <string name="design_library_title_native_tools">Native Tools (C / C++)</string>
+    <string name="design_library_description_native_tools">Compile native C/C++ libraries using NDK and CMake</string>
     <string name="design_library_description_firebase">Use Firebase Database and Authentication</string>
     <string name="design_library_description_google_map">Use Google Map</string>
     <string name="design_library_firebase_button_goto_firebase_authentication">Go To Firebase Authentication</string>
@@ -1515,6 +1517,7 @@ But, components should be added manually for working correctly."</string>
     <string name="logic_variable_type_list_number">List Number</string>
     <string name="logic_variable_type_list_string">List String</string>
     <string name="logic_variable_type_map">Map</string>
+    <string name="logic_variable_type_float">Float</string>
     <string name="logic_variable_type_number">Number</string>
     <string name="logic_variable_type_string">String</string>
     <string name="main_drawer_context_menu_title_slack_invitation">Get my invitation</string>

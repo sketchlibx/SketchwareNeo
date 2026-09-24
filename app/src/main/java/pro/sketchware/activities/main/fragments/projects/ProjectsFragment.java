@@ -21,7 +21,6 @@ import androidx.appcompat.widget.SearchView;
 import androidx.core.view.MenuProvider;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.widget.NestedScrollView;
-import androidx.recyclerview.widget.DiffUtil;
 
 import com.besome.sketch.adapters.ProjectsAdapter;
 import com.besome.sketch.design.DesignActivity;
@@ -56,6 +55,12 @@ public class ProjectsFragment extends DA {
     private final List<HashMap<String, Object>> projectsList = new ArrayList<>();
     private MyprojectsBinding binding;
     private ProjectsAdapter projectsAdapter;
+    
+    private boolean isFabExpanded = false;
+    private ExtendedFloatingActionButton fabToggle;
+    private ExtendedFloatingActionButton fabActionImport;
+    private ExtendedFloatingActionButton fabActionRestore;
+    private ExtendedFloatingActionButton fabActionNewProject;
     
     public final ActivityResultLauncher<Intent> openProjectSettings = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == Activity.RESULT_OK) {
@@ -123,24 +128,6 @@ public class ProjectsFragment extends DA {
         openProjectSettings.launch(intent);
     }
 
-    public void showImportRestoreDialog() {
-        String[] options = {
-                "Restore Sketchware Backup (.swb)",
-                "Import Android Studio Project (.zip)"
-        };
-
-        new MaterialAlertDialogBuilder(requireActivity())
-                .setTitle("Restore or Import")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        new BackupRestoreManager(getActivity(), this).restore();
-                    } else if (which == 1) {
-                        ASProjectImporter.showPicker(getActivity(), this);
-                    }
-                })
-                .show();
-    }
-
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup parent, Bundle savedInstanceState) {
         binding = MyprojectsBinding.inflate(inflater, parent, false);
@@ -150,6 +137,16 @@ public class ProjectsFragment extends DA {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        isFabExpanded = false;
+        if (fabToggle != null) fabToggle.setOnClickListener(null);
+        if (fabActionImport != null) fabActionImport.setOnClickListener(null);
+        if (fabActionRestore != null) fabActionRestore.setOnClickListener(null);
+        if (fabActionNewProject != null) fabActionNewProject.setOnClickListener(null);
+        
+        fabToggle = null;
+        fabActionImport = null;
+        fabActionRestore = null;
+        fabActionNewProject = null;
         binding = null; 
     }
 
@@ -157,16 +154,50 @@ public class ProjectsFragment extends DA {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         preference = new DB(requireContext(), "project");
 
-        ExtendedFloatingActionButton fab = requireActivity().findViewById(R.id.create_new_project);
-        fab.setOnClickListener((v) -> toProjectSettingsActivity());
-        Insetter.builder().margin(WindowInsetsCompat.Type.navigationBars()).applyToView(fab);
+        fabToggle = requireActivity().findViewById(R.id.create_new_project);
+        fabActionImport = requireActivity().findViewById(R.id.fab_action_import);
+        fabActionRestore = requireActivity().findViewById(R.id.fab_action_restore);
+        fabActionNewProject = requireActivity().findViewById(R.id.fab_action_new_project);
+        View fabGroup = requireActivity().findViewById(R.id.fab_group);
 
-        binding.swipeRefresh.setOnRefreshListener(this::refreshProjectsList);
+        if (fabToggle != null) {
+            fabToggle.setOnClickListener(v -> toggleFabMenu());
+        }
+        if (fabActionImport != null) {
+            fabActionImport.setOnClickListener(v -> {
+                ASProjectImporter.showPicker(getActivity(), this);
+                toggleFabMenu();
+            });
+        }
+        if (fabActionRestore != null) {
+            fabActionRestore.setOnClickListener(v -> {
+                new BackupRestoreManager(getActivity(), this).restore();
+                toggleFabMenu();
+            });
+        }
+        if (fabActionNewProject != null) {
+            fabActionNewProject.setOnClickListener(v -> {
+                toProjectSettingsActivity();
+                toggleFabMenu();
+            });
+        }
+
+        if (fabGroup != null) {
+            Insetter.builder().margin(WindowInsetsCompat.Type.navigationBars()).applyToView(fabGroup);
+        }
+
+        binding.swipeRefresh.setProgressViewOffset(false, -200, -200);
+
+        binding.swipeRefresh.setOnRefreshListener(() -> {
+            if (binding != null && binding.customRefreshIndicator != null) {
+                binding.customRefreshIndicator.setVisibility(View.VISIBLE);
+            }
+            refreshProjectsList();
+        });
 
         projectsAdapter = new ProjectsAdapter(this, projectsList);
         binding.myprojects.setAdapter(projectsAdapter);
         
-        // Show Loading Initially
         if (binding.loadingContainer != null) {
             binding.loadingContainer.setVisibility(View.VISIBLE);
             binding.myprojects.setVisibility(View.GONE);
@@ -175,30 +206,52 @@ public class ProjectsFragment extends DA {
 
         refreshProjectsList(); 
         
-        if (binding.specialActionContainer != null) {
-            UI.addSystemWindowInsetToPadding(binding.specialActionContainer, true, false, true, false);
-        }
         if (binding.titleContainer != null) {
             UI.addSystemWindowInsetToPadding(binding.titleContainer, true, false, true, false);
         }
 
         binding.nestedScroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            if (scrollY > oldScrollY) {
-                fab.shrink();
-            } else if (scrollY < oldScrollY) {
-                fab.extend();
+            int dy = scrollY - oldScrollY;
+            if (dy > 8) {
+                if (isFabExpanded) {
+                    toggleFabMenu();
+                } else if (fabToggle != null && fabToggle.isExtended()) {
+                    fabToggle.shrink();
+                }
+            } else if (dy < -8) { // Scrolling Up
+                if (!isFabExpanded && fabToggle != null && !fabToggle.isExtended()) {
+                    fabToggle.extend();
+                }
             }
         });
 
         if (binding.iconSort != null) {
             binding.iconSort.setOnClickListener(v -> showProjectSortingDialog());
         }
-        
-        if (binding.specialAction != null) {
-            binding.specialAction.getRoot().setOnClickListener(v -> showImportRestoreDialog());
-        }
 
         setupMenu();
+    }
+    
+    private void toggleFabMenu() {
+        isFabExpanded = !isFabExpanded;
+        if (isFabExpanded) {
+            if (fabActionImport != null) fabActionImport.show();
+            if (fabActionRestore != null) fabActionRestore.show();
+            if (fabActionNewProject != null) fabActionNewProject.show();
+            if (fabToggle != null) {
+                fabToggle.setIconResource(R.drawable.ic_mtrl_close);
+                fabToggle.setText("Close");
+                if (!fabToggle.isExtended()) fabToggle.extend();
+            }
+        } else {
+            if (fabActionImport != null) fabActionImport.hide();
+            if (fabActionRestore != null) fabActionRestore.hide();
+            if (fabActionNewProject != null) fabActionNewProject.hide();
+            if (fabToggle != null) {
+                fabToggle.setIconResource(R.drawable.ic_mtrl_add);
+                fabToggle.setText("Create & Import");
+            }
+        }
     }
     
     private void setupMenu() {
@@ -249,18 +302,20 @@ public class ProjectsFragment extends DA {
 
         if (!c()) {
             if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
+            if (binding.customRefreshIndicator != null) binding.customRefreshIndicator.setVisibility(View.GONE);
             ((MainActivity) requireActivity()).s(); 
             return;
         }
 
         executorService.execute(() -> {
             List<HashMap<String, Object>> loadedProjects = lC.a();
-            loadedProjects.sort(new ProjectComparator(preference.d("sortBy"),preference.a("pinnedProject", "-1")));
+            loadedProjects.sort(new ProjectComparator(preference.d("sortBy"), preference.a("pinnedProject", "-1")));
 
             requireActivity().runOnUiThread(() -> {
                 if (binding == null) return;
                 
                 if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
+                if (binding.customRefreshIndicator != null) binding.customRefreshIndicator.setVisibility(View.GONE);
                 
                 boolean isEmpty = loadedProjects.isEmpty();
                 

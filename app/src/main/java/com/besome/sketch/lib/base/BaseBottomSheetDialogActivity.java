@@ -30,8 +30,8 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
     public TextView dialogTitle;
     public ImageView dialogIcon;
     public TextView dialogDefaultButton;
-    public TextView r; // dialogPositiveButton
-    public TextView s; // dialogNegativeButton
+    public TextView r; 
+    public TextView s; 
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -40,8 +40,7 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
 
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.parseColor("#66000000"));
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        window.setStatusBarColor(Color.TRANSPARENT);
 
         overridePendingTransition(R.anim.design_bottom_sheet_slide_in, 0);
 
@@ -75,9 +74,7 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
         });
 
         dialogContainerView.setOnClickListener(v -> {
-            if (!mB.a()) {
-                finish();
-            }
+            if (!mB.a()) finish();
         });
         dialogIcon.setVisibility(View.GONE);
     }
@@ -90,9 +87,7 @@ public class BaseBottomSheetDialogActivity extends BaseAppCompatActivity {
     public void a(boolean var1) {
         if (var1) {
             dialogContainerView.setOnClickListener(v -> {
-                if (!mB.a()) {
-                    finish();
-                }
+                if (!mB.a()) finish();
             });
             return;
         }

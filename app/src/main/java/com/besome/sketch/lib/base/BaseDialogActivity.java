@@ -23,8 +23,8 @@ public class BaseDialogActivity extends BaseAppCompatActivity {
     public TextView dialogTitle;
     public ImageView dialogIcon;
     public TextView dialogDefaultButton;
-    public TextView r; // dialogPositiveButton
-    public TextView s; // dialogNegativeButton
+    public TextView r; //dialogPositiveButton
+    public TextView s; //dialogNegativeButton
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,11 +33,7 @@ public class BaseDialogActivity extends BaseAppCompatActivity {
 
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        window.setStatusBarColor(Color.parseColor("#66000000"));
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-
-        View decor = getWindow().getDecorView();
-        decor.setSystemUiVisibility(0);
+        window.setStatusBarColor(Color.TRANSPARENT);
 
         dialogIcon = findViewById(R.id.common_dialog_icon);
         dialogContainerView = findViewById(R.id.common_dialog_container);
@@ -49,9 +45,7 @@ public class BaseDialogActivity extends BaseAppCompatActivity {
         r = findViewById(R.id.common_dialog_ok_button);
         s = findViewById(R.id.common_dialog_cancel_button);
         dialogContainerView.setOnClickListener(v -> {
-            if (!mB.a()) {
-                finish();
-            }
+            if (!mB.a()) finish();
         });
         dialogIcon.setVisibility(View.GONE);
     }
@@ -64,9 +58,7 @@ public class BaseDialogActivity extends BaseAppCompatActivity {
     public void a(boolean var1) {
         if (var1) {
             dialogContainerView.setOnClickListener(v -> {
-                if (!mB.a()) {
-                    finish();
-                }
+                if (!mB.a()) finish();
             });
             return;
         }

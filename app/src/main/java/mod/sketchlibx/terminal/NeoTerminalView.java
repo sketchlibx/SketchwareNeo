@@ -26,12 +26,6 @@ import com.termux.view.TerminalView;
 
 import pro.sketchware.utility.SketchwareUtil;
 
-/**
- * Real PTY terminal widget with real multi-session tabs (Session 1, Session 2, ... + "+" to add).
- * All sessions share one {@link TerminalView} and one {@link NeoTerminalSessionClient} — switching
- * tabs re-attaches whichever {@link TerminalSession} is selected; the others keep running in the
- * background with their own cwd/process/scrollback untouched, exactly like a real terminal app.
- */
 public class NeoTerminalView extends LinearLayout {
 
     private static final String ISSUES_URL = "https://github.com/sketchlibx/SketchwareNeo/issues";
@@ -49,6 +43,7 @@ public class NeoTerminalView extends LinearLayout {
 
     private LinearLayout tabStrip;
     private TerminalSessionManager.Entry activeEntry;
+    private boolean initialSessionAttached = false;
 
     private TextView ctrlKeyView;
     private TextView altKeyView;
@@ -84,21 +79,30 @@ public class NeoTerminalView extends LinearLayout {
         addView(terminalView);
         addView(buildExtraKeysRow(context));
 
+        applyImeAwarePadding();
+    }
+
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (initialSessionAttached) return;
+
         if (getWidth() > 0 && getHeight() > 0) {
-            attachInitialSession(context);
+            initialSessionAttached = true;
+            attachInitialSession(getContext());
         } else {
             getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
                 public void onGlobalLayout() {
-                    if (getWidth() > 0 && getHeight() > 0) {
+                    if (getWidth() > 0 && getHeight() > 0 && !initialSessionAttached) {
+                        initialSessionAttached = true;
                         getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        attachInitialSession(context);
+                        attachInitialSession(getContext());
                     }
                 }
             });
         }
-
-        applyImeAwarePadding();
     }
 
     private void attachInitialSession(Context context) {
@@ -114,9 +118,6 @@ public class NeoTerminalView extends LinearLayout {
         terminalView.requestFocus();
     }
 
-    // ---------------------------------------------------------------------
-    // Tab strip — Session 1 / Session 2 / ... / +
-    // ---------------------------------------------------------------------
 
     private View buildTabStrip(Context context) {
         LinearLayout bar = new LinearLayout(context);
@@ -212,10 +213,6 @@ public class NeoTerminalView extends LinearLayout {
         return new RippleDrawable(android.content.res.ColorStateList.valueOf(Color.parseColor("#33FFFFFF")), null, mask);
     }
 
-    // ---------------------------------------------------------------------
-    // IME handling
-    // ---------------------------------------------------------------------
-
     private void applyImeAwarePadding() {
         ViewCompat.setOnApplyWindowInsetsListener(this, (v, insets) -> {
             int imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
@@ -225,10 +222,6 @@ public class NeoTerminalView extends LinearLayout {
             return insets;
         });
     }
-
-    // ---------------------------------------------------------------------
-    // Extra keys row
-    // ---------------------------------------------------------------------
 
     private View buildExtraKeysRow(Context context) {
         HorizontalScrollView scroller = new HorizontalScrollView(context);
@@ -332,12 +325,6 @@ public class NeoTerminalView extends LinearLayout {
         return scId;
     }
 
-    /**
-     * Detaches from the active session WITHOUT killing any session — all sessions for this
-     * project keep running in the background regardless of which UI surface (Tab / BottomSheet /
-     * Drawer) is currently showing them. Use {@link TerminalSessionManager#killSession} or
-     * {@link TerminalSessionManager#killAllSessions} for an explicit stop.
-     */
     public void destroy() {
     }
 }

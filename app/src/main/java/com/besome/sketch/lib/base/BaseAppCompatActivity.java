@@ -35,9 +35,13 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
 
     @Deprecated
     public Context e;
+
     public Activity parent;
+
     protected ProgressDialog progressDialog;
-    private LoadingDialog lottieDialog;
+
+    private LoadingDialog loadingDialog;
+
     private ArrayList<MA> taskList;
 
     public void a(MA var1) {
@@ -72,12 +76,11 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
 
     public void h() {
         try {
-            if (lottieDialog != null && lottieDialog.isShowing()) {
-                lottieDialog.dismiss();
+            if (loadingDialog != null && loadingDialog.isShowing()) {
+                loadingDialog.dismiss();
             }
-        } catch (Exception var2) {
-            lottieDialog = null;
-            lottieDialog = new LoadingDialog(this);
+        } catch (Exception ignored) {
+            loadingDialog = null;
         }
     }
 
@@ -86,15 +89,15 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
             if (progressDialog != null && progressDialog.isShowing()) {
                 progressDialog.dismiss();
             }
-        } catch (Exception var2) {
+        } catch (Exception ignored) {
             progressDialog = null;
             progressDialog = new ProgressDialog(this);
         }
-
     }
 
     public boolean isStoragePermissionGranted() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0 && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == 0;
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == 0
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == 0;
     }
 
     public boolean j() {
@@ -102,8 +105,18 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
     }
 
     public void k() {
-        if (lottieDialog != null && !lottieDialog.isShowing() && !isFinishing()) {
-            lottieDialog.show();
+        if (isFinishing() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed())) {
+            return;
+        }
+        try {
+            if (loadingDialog == null) {
+                loadingDialog = new LoadingDialog(this);
+            }
+            if (!loadingDialog.isShowing()) {
+                loadingDialog.show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -112,7 +125,6 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         e = getApplicationContext();
         taskList = new ArrayList<>();
-        lottieDialog = new LoadingDialog(this);
         lC.a(getApplicationContext(), false);
         progressDialog = new ProgressDialog(this);
         mAnalytics = FirebaseAnalytics.getInstance(this);
@@ -121,48 +133,22 @@ public abstract class BaseAppCompatActivity extends AppCompatActivity {
     @Override
     public void onDestroy() {
         g();
-        if (lottieDialog != null && lottieDialog.isShowing()) {
-            lottieDialog.cancelAnimation();
-        }
+        h();
         super.onDestroy();
     }
 
     @Override
-    public void onPause() {
-        if (lottieDialog != null && lottieDialog.isShowing()) {
-            lottieDialog.pauseAnimation();
-        }
-        super.onPause();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (lottieDialog != null && lottieDialog.isShowing()) {
-            lottieDialog.resumeAnimation();
-        }
-    }
-
-    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        if (parent != null) {
-            return parent.onCreateOptionsMenu(menu);
-        }
-        return true;
+        return parent == null || parent.onCreateOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (parent != null) {
-            return parent.onOptionsItemSelected(item);
-        }
-        return false;
+        return parent != null && parent.onOptionsItemSelected(item);
     }
 
     public void handleInsetts(View root) {
-        Insetter.builder()
-                .padding(WindowInsetsCompat.Type.navigationBars())
-                .applyToView(root);
+        Insetter.builder().padding(WindowInsetsCompat.Type.navigationBars()).applyToView(root);
     }
 
     protected void enableEdgeToEdgeNoContrast() {

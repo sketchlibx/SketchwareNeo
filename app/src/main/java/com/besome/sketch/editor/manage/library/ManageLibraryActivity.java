@@ -5,7 +5,6 @@ import static android.text.TextUtils.isEmpty;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.View;
 import android.widget.LinearLayout;
 
@@ -33,6 +32,7 @@ import a.a.a.MA;
 import a.a.a.jC;
 import a.a.a.mB;
 import dev.aldi.sayuti.editor.manage.ManageLocalLibraryActivity;
+import mod.hey.studios.activity.managers.cpp.NativeToolsActivity;
 import mod.hey.studios.activity.managers.nativelib.ManageNativelibsActivity;
 import mod.hey.studios.util.Helper;
 import mod.jbk.editor.manage.library.ExcludeBuiltInLibrariesActivity;
@@ -48,6 +48,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
     private final int REQUEST_CODE_GOOGLE_MAPS_ACTIVITY = 241;
     private final int REQUEST_CODE_MATERIAL3_ACTIVITY = 242;
     private final int REQUEST_CODE_CUSTOM_ITEM_LIBRARY_ACTIVITY = 243;
+    private final int REQUEST_CODE_NATIVE_TOOLS_ACTIVITY = 244;
 
     private String sc_id;
     private LinearLayout libraryItemLayout;
@@ -56,6 +57,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
     private ProjectLibraryBean compatLibraryBean;
     private ProjectLibraryBean admobLibraryBean;
     private ProjectLibraryBean googleMapLibraryBean;
+    private ProjectLibraryBean nativeToolsLibraryBean;
 
     private String originalFirebaseUseYn = "N";
     private String originalCompatUseYn = "N";
@@ -128,6 +130,8 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
                 case ProjectLibraryBean.PROJECT_LIB_TYPE_ADMOB -> admobLibraryBean = libraryBean;
                 case ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_MAP ->
                         googleMapLibraryBean = libraryBean;
+                case ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS ->
+                        nativeToolsLibraryBean = libraryBean;
             }
         }
 
@@ -188,6 +192,13 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
         startActivityForResult(intent, REQUEST_CODE_MATERIAL3_ACTIVITY);
     }
 
+    private void toNativeToolsActivity() {
+        Intent intent = new Intent(getApplicationContext(), NativeToolsActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.putExtra("sc_id", sc_id);
+        startActivityForResult(intent, REQUEST_CODE_NATIVE_TOOLS_ACTIVITY);
+    }
+
     private void launchActivity(Class<? extends Activity> toLaunch) {
         Intent intent = new Intent(getApplicationContext(), toLaunch);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -240,6 +251,14 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
                     initializeLibrary(null);
                     break;
 
+                case REQUEST_CODE_NATIVE_TOOLS_ACTIVITY:
+                    // NativeToolsActivity persists its own enabled flag directly (see its
+                    // javadoc for why) rather than returning a bean to save here — just
+                    // re-read the current state and refresh this row's ON/OFF text.
+                    nativeToolsLibraryBean.useYn = NativeToolsActivity.isEnabled(this, sc_id) ? "Y" : "N";
+                    initializeLibrary(nativeToolsLibraryBean);
+                    break;
+
                 default:
             }
         }
@@ -247,13 +266,31 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
 
     @Override
     public void onBackPressed() {
+        // Only show the loader and run the save task when something actually changed —
+        // tracked via the originalXUseYn fields already set in onPostCreate. Previously
+        // this ran an unconditional artificial 500ms delay (Handler().postDelayed(...,
+        // 500L)) before saving on EVERY back press, even when nothing was modified — a
+        // pointless loader for an operation that could complete instantly. Native Tools
+        // isn't included in this dirty-check: it persists itself immediately when toggled
+        // (see NativeToolsActivity), so it never needs to be part of this save/exit flow.
+        if (!hasUnsavedLibraryChanges()) {
+            super.onBackPressed();
+            return;
+        }
         k();
         try {
-            new Handler().postDelayed(() -> new SaveLibraryTask(this).execute(), 500L);
+            new SaveLibraryTask(this).execute();
         } catch (Exception e) {
             e.printStackTrace();
             h();
         }
+    }
+
+    private boolean hasUnsavedLibraryChanges() {
+        return !originalCompatUseYn.equals(compatLibraryBean.useYn)
+                || !originalFirebaseUseYn.equals(firebaseLibraryBean.useYn)
+                || !originalAdmobUseYn.equals(admobLibraryBean.useYn)
+                || !originalGoogleMapUseYn.equals(googleMapLibraryBean.useYn);
     }
 
     @Override
@@ -294,6 +331,10 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
 
                     case ProjectLibraryBean.PROJECT_LIB_TYPE_MATERIAL3:
                         toMaterial3Activity();
+                        break;
+
+                    case ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS:
+                        toNativeToolsActivity();
                 }
             }
         }
@@ -336,29 +377,48 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
         super.onPostCreate(savedInstanceState);
 
         if (savedInstanceState == null) {
-            compatLibraryBean = jC.c(sc_id).c();
-            if (compatLibraryBean == null) {
-                compatLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_COMPAT);
-            }
-            originalCompatUseYn = compatLibraryBean.useYn;
+            // jC.c(sc_id) does a real decrypt+file-read the first time it's called for this
+            // sc_id (confirmed against a.a.a-notimportant-classes.jar's a.a.a.iC — it's
+            // internally cached per sc_id by a.a.a.jC, so the repeated .c()/.d()/.b()/.e()
+            // calls below only pay that cost once). That one read+decrypt was previously
+            // done directly on the main thread during onPostCreate with no loading
+            // feedback — moved to a background thread; buildLibraryList() (which must
+            // touch views) still runs on the main thread, in the completion callback.
+            k();
+            new Thread(() -> {
+                ProjectLibraryBean loadedCompat = jC.c(sc_id).c();
+                if (loadedCompat == null) loadedCompat = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_COMPAT);
+                ProjectLibraryBean loadedFirebase = jC.c(sc_id).d();
+                if (loadedFirebase == null) loadedFirebase = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_FIREBASE);
+                ProjectLibraryBean loadedAdmob = jC.c(sc_id).b();
+                if (loadedAdmob == null) loadedAdmob = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_ADMOB);
+                ProjectLibraryBean loadedGoogleMap = jC.c(sc_id).e();
+                if (loadedGoogleMap == null) loadedGoogleMap = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_MAP);
+                boolean nativeToolsEnabled = NativeToolsActivity.isEnabled(this, sc_id);
 
-            firebaseLibraryBean = jC.c(sc_id).d();
-            if (firebaseLibraryBean == null) {
-                firebaseLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_FIREBASE);
-            }
-            originalFirebaseUseYn = firebaseLibraryBean.useYn;
+                ProjectLibraryBean finalCompat = loadedCompat;
+                ProjectLibraryBean finalFirebase = loadedFirebase;
+                ProjectLibraryBean finalAdmob = loadedAdmob;
+                ProjectLibraryBean finalGoogleMap = loadedGoogleMap;
 
-            admobLibraryBean = jC.c(sc_id).b();
-            if (admobLibraryBean == null) {
-                admobLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_ADMOB);
-            }
-            originalAdmobUseYn = admobLibraryBean.useYn;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return; // Activity gone — don't touch views
 
-            googleMapLibraryBean = jC.c(sc_id).e();
-            if (googleMapLibraryBean == null) {
-                googleMapLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_MAP);
-            }
-            originalGoogleMapUseYn = googleMapLibraryBean.useYn;
+                    compatLibraryBean = finalCompat;
+                    originalCompatUseYn = compatLibraryBean.useYn;
+                    firebaseLibraryBean = finalFirebase;
+                    originalFirebaseUseYn = firebaseLibraryBean.useYn;
+                    admobLibraryBean = finalAdmob;
+                    originalAdmobUseYn = admobLibraryBean.useYn;
+                    googleMapLibraryBean = finalGoogleMap;
+                    originalGoogleMapUseYn = googleMapLibraryBean.useYn;
+                    nativeToolsLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS);
+                    nativeToolsLibraryBean.useYn = nativeToolsEnabled ? "Y" : "N";
+
+                    buildLibraryList();
+                    h();
+                });
+            }).start();
         } else {
             firebaseLibraryBean = savedInstanceState.getParcelable("firebase");
             originalFirebaseUseYn = savedInstanceState.getString("originalFirebaseUseYn");
@@ -368,11 +428,22 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
             originalAdmobUseYn = savedInstanceState.getString("originalAdmobUseYn");
             googleMapLibraryBean = savedInstanceState.getParcelable("google_map");
             originalGoogleMapUseYn = savedInstanceState.getString("originalGoogleMapUseYn");
-        }
+            nativeToolsLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS);
+            nativeToolsLibraryBean.useYn = NativeToolsActivity.isEnabled(this, sc_id) ? "Y" : "N";
 
+            // Already in memory (configuration change / process restore) — no I/O needed,
+            // so this path stays fully synchronous with no loader, matching "do not show a
+            // pointless loader for operations that complete immediately."
+            buildLibraryList();
+        }
+    }
+
+    /** Builds the library list UI. Must run on the main thread (creates/attaches Views). */
+    private void buildLibraryList() {
         LibraryCategoryView basicCategory = addCategoryItem(null);
         addLibraryItem(compatLibraryBean, basicCategory);
         addCustomLibraryItem(ProjectLibraryBean.PROJECT_LIB_TYPE_MATERIAL3, basicCategory);
+        addLibraryItem(nativeToolsLibraryBean, basicCategory);
         addLibraryItem(firebaseLibraryBean, basicCategory);
         addLibraryItem(admobLibraryBean, basicCategory);
         addLibraryItem(googleMapLibraryBean, basicCategory, false);

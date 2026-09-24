@@ -54,6 +54,7 @@ public class ExtraMenuBean {
     public static final int VARIABLE_TYPE_BOOLEAN = 0;
     public static final int VARIABLE_TYPE_NUMBER = 1;
     public static final int VARIABLE_TYPE_MAP = 3;
+    public static final int VARIABLE_TYPE_FLOAT = 4;
     public static final int VARIABLE_TYPE_STRING = 2;
 
     public static final int LIST_TYPE_NUMBER = 1;

@@ -240,6 +240,10 @@
             android:label="C/C++ Manager"
             android:windowSoftInputMode="stateVisible" />
         <activity
+            android:name="mod.hey.studios.activity.managers.cpp.NativeToolsActivity"
+            android:label="Native Tools (C / C++)"
+            android:configChanges="orientation|screenSize" />
+        <activity
             android:name="mod.hey.studios.activity.managers.nativelib.ManageNativelibsActivity"
             android:configChanges="orientation|screenSize" />
         <activity

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,6 +14,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -35,14 +37,12 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Objects;
 
 import a.a.a.DB;
 import a.a.a.GB;
 import mod.hey.studios.project.backup.BackupFactory;
 import mod.hey.studios.project.backup.BackupRestoreManager;
 import mod.hey.studios.util.Helper;
-import mod.hilal.saif.activities.tools.ConfigActivity;
 import mod.tyron.backup.SingleCopyTask;
 import pro.sketchware.R;
 import pro.sketchware.activities.main.fragments.projects.ProjectsFragment;
@@ -60,6 +60,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     private DB u;
     private Snackbar storageAccessDenied;
     private MainBinding binding;
+    private float currentDrawerSlideOffset = 0f;
     private final OnBackPressedCallback closeDrawer = new OnBackPressedCallback(true) {
         @Override
         public void handleOnBackPressed() {
@@ -82,11 +83,9 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     }
 
     @Override
-    // onRequestPermissionsResult but for Storage access only, and only when granted
     public void g(int i) {
         if (i == 9501) {
             allFilesAccessCheck();
-
             if (activeFragment instanceof ProjectsFragment) {
                 projectsFragment.refreshProjectsList();
             }
@@ -122,17 +121,14 @@ public class MainActivity extends BasePermissionAppCompatActivity {
                 case 105:
                     DataResetter.a(this, data.getBooleanExtra("onlyConfig", true));
                     break;
-
                 case 111:
                     invalidateOptionsMenu();
                     break;
-
                 case 113:
                     if (data != null && data.getBooleanExtra("not_show_popup_anymore", false)) {
                         u.a("U1I2", (Object) false);
                     }
                     break;
-
                 case 212:
                     if (!(data.getStringExtra("save_as_new_id") == null ? "" : data.getStringExtra("save_as_new_id")).isEmpty() && isStoragePermissionGranted()) {
                         if (activeFragment instanceof ProjectsFragment) {
@@ -157,9 +153,13 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         enableEdgeToEdgeNoContrast();
 
         binding = MainBinding.inflate(getLayoutInflater());
-
         setContentView(binding.getRoot());
+        
+        // Search Toolbar acting as the primary Action Bar
         setSupportActionBar(binding.toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(null);
+        }
         
         binding.statusBarOverlapper.setMinimumHeight(UI.getStatusBarHeight(this));
         UI.addSystemWindowInsetToPadding(binding.appbar, true, false, true, false);
@@ -170,40 +170,47 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         if (u1I1 <= 0) {
             u.a("U1I1", System.currentTimeMillis());
         }
-        if (System.currentTimeMillis() - u1I1 > /* (a day) */ 1000 * 60 * 60 * 24) {
+        if (System.currentTimeMillis() - u1I1 > 1000 * 60 * 60 * 24) {
             u.a("U1I0", Integer.valueOf(u1I0 + 1));
         }
 
-        Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setTitle(null);
+        binding.drawerLayout.setScrimColor(Color.TRANSPARENT);
+        binding.drawerLayout.setDrawerElevation(0f);
 
-        drawerToggle = new ActionBarDrawerToggle(this, binding.drawerLayout, R.string.app_name, R.string.app_name);
+        binding.layoutCoordinator.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                float radius = SketchwareUtil.dpToPx(24) * currentDrawerSlideOffset;
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+            }
+        });
+        binding.layoutCoordinator.setClipToOutline(true);
+
+        // Bind the ActionBarDrawerToggle to the distinct nav_toolbar container
+        drawerToggle = new ActionBarDrawerToggle(this, binding.drawerLayout, binding.navToolbar, R.string.app_name, R.string.app_name);
         binding.drawerLayout.addDrawerListener(drawerToggle);
         binding.drawerLayout.addDrawerListener(new DrawerLayout.DrawerListener() {
             @Override
             public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {
+                currentDrawerSlideOffset = slideOffset;
+                binding.layoutCoordinator.setTranslationX(drawerView.getWidth() * slideOffset);
+                binding.layoutCoordinator.invalidateOutline();
             }
-
             @Override
             public void onDrawerOpened(@NonNull View drawerView) {
                 closeDrawer.setEnabled(true);
                 getOnBackPressedDispatcher().addCallback(closeDrawer);
             }
-
             @Override
-            public void onDrawerClosed(@NonNull View drawerView) {
-            }
-
+            public void onDrawerClosed(@NonNull View drawerView) {}
             @Override
-            public void onDrawerStateChanged(int newState) {
-            }
+            public void onDrawerStateChanged(int newState) {}
         });
 
         boolean hasStorageAccess = isStoragePermissionGranted();
         if (!hasStorageAccess) {
             showNoticeNeedStorageAccess();
-        }
-        if (hasStorageAccess) {
+        } else {
             allFilesAccessCheck();
         }
 
@@ -212,18 +219,13 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             if (data != null) {
                 new SingleCopyTask(this, new SingleCopyTask.CallBackTask() {
                     @Override
-                    public void onCopyPreExecute() {
-                    }
-
+                    public void onCopyPreExecute() {}
                     @Override
-                    public void onCopyProgressUpdate(int progress) {
-                    }
-
+                    public void onCopyProgressUpdate(int progress) {}
                     @Override
                     public void onCopyPostExecute(@NonNull String path, boolean wasSuccessful, @NonNull String reason) {
                         if (wasSuccessful) {
                             BackupRestoreManager manager = new BackupRestoreManager(MainActivity.this, projectsFragment);
-
                             if (BackupFactory.zipContainsFile(path, "local_libs")) {
                                 new MaterialAlertDialogBuilder(MainActivity.this)
                                         .setTitle("Warning")
@@ -235,8 +237,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
                             } else {
                                 manager.doRestore(path, true);
                             }
-
-                            // Clear intent so it doesn't duplicate
                             getIntent().setData(null);
                         } else {
                             SketchwareUtil.toastError("Failed to copy backup file to temporary location: " + reason, Toast.LENGTH_LONG);
@@ -265,25 +265,26 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             Fragment current = getFragmentForNavId(currentNavItemId);
             if (current instanceof ProjectsFragment) {
                 navigateToProjectsFragment();
-                if (projectsFragment != null) {
-                    projectsFragment.refreshProjectsList();
-                }
+                if (projectsFragment != null) projectsFragment.refreshProjectsList();
             } else if (current instanceof ProjectsStoreFragment) {
                 navigateToSketchubFragment();
             }
-
             return;
         }
 
         navigateToProjectsFragment();
     }
 
-    private Fragment getFragmentForNavId(int navItemId) {
-        if (navItemId == R.id.item_projects) {
-            return projectsFragment;
-        } else if (navItemId == R.id.item_sketchub) {
-            return projectsStoreFragment;
+    private void setFabGroupVisible(boolean visible) {
+        View fabGroup = findViewById(R.id.fab_group);
+        if (fabGroup != null) {
+            fabGroup.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
+    }
+
+    private Fragment getFragmentForNavId(int navItemId) {
+        if (navItemId == R.id.item_projects) return projectsFragment;
+        if (navItemId == R.id.item_sketchub) return projectsStoreFragment;
         throw new IllegalArgumentException();
     }
 
@@ -294,15 +295,12 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     }
 
     private void navigateToProjectsFragment() {
-        if (projectsFragment == null) {
-            projectsFragment = new ProjectsFragment();
-        }
-
+        if (projectsFragment == null) projectsFragment = new ProjectsFragment();
         boolean shouldShow = true;
         FragmentManager fm = getSupportFragmentManager();
         FragmentTransaction transaction = fm.beginTransaction();
-
-        binding.createNewProject.show();
+        
+        setFabGroupVisible(true);
         if (activeFragment != null) transaction.hide(activeFragment);
         if (fm.findFragmentByTag(PROJECTS_FRAGMENT_TAG) == null) {
             shouldShow = false;
@@ -316,15 +314,12 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     }
 
     private void navigateToSketchubFragment() {
-        if (projectsStoreFragment == null) {
-            projectsStoreFragment = new ProjectsStoreFragment();
-        }
-
+        if (projectsStoreFragment == null) projectsStoreFragment = new ProjectsStoreFragment();
         boolean shouldShow = true;
         FragmentManager fm = getSupportFragmentManager();
         FragmentTransaction transaction = fm.beginTransaction();
-
-        binding.createNewProject.hide();
+        
+        setFabGroupVisible(false);
         if (activeFragment != null) transaction.hide(activeFragment);
         if (fm.findFragmentByTag(PROJECTS_STORE_FRAGMENT_TAG) == null) {
             shouldShow = false;
@@ -339,11 +334,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (drawerToggle.onOptionsItemSelected(item)) {
-            return true;
-        } else {
-            return super.onOptionsItemSelected(item);
-        }
+        return drawerToggle.onOptionsItemSelected(item) || super.onOptionsItemSelected(item);
     }
 
     @Override
@@ -358,7 +349,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        /* Check if the device is running low on storage space */
         long freeMegabytes = GB.c();
         if (freeMegabytes < 100 && freeMegabytes > 0) {
             showNoticeNotEnoughFreeStorageSpace();
@@ -381,7 +371,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
                 MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(this);
                 dialog.setIcon(R.drawable.ic_expire_48dp);
                 dialog.setTitle("Android 11 storage access");
-                dialog.setMessage("Starting with Android 11, Sketchware Neo needs a new permission to avoid " + "taking ages to build projects. Don't worry, we can't do more to storage than " + "with current granted permissions.");
+                dialog.setMessage("Starting with Android 11, Sketchware Neo needs a new permission to avoid taking ages to build projects. Don't worry, we can't do more to storage than with current granted permissions.");
                 dialog.setPositiveButton(Helper.getResString(R.string.common_word_settings), (v, which) -> {
                     FileUtil.requestAllFilesAccessPermission(this);
                     v.dismiss();
@@ -392,7 +382,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
                         if (!optOutFile.createNewFile())
                             throw new IOException("Failed to create file " + optOutFile);
                     } catch (IOException e) {
-                        Log.e("MainActivity", "Error while trying to create " + "\"Don't show Android 11 hint\" dialog file: " + e.getMessage(), e);
+                        Log.e("MainActivity", "Error while trying to create Don't show Android 11 hint dialog file: " + e.getMessage(), e);
                     }
                     v.dismiss();
                 });
@@ -441,5 +431,4 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             storageAccessDenied.show();
         }
     }
-
 }

@@ -177,9 +177,6 @@ public class ProjectBuilder {
     }
 
     public void compileResources() throws Exception {
-        // NOTE: compileResources() is the earliest build step visible inside ProjectBuilder itself.
-        // If BuildTask (not yet reviewed) has an earlier true "build started" point (e.g. before
-        // ProjectBuilder is even constructed), move this call there instead.
         neo.sketchware.plugin.PluginManager.notifyBuildStarted(yq.sc_id);
 
         timestampResourceCompilationStarted = System.currentTimeMillis();
@@ -316,14 +313,6 @@ public class ProjectBuilder {
         }
 
         String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
-        // BUG FIX (Java 11/17 → "The type java.lang.invoke.LambdaMetafactory cannot be
-        // resolved"): this used to also exclude -source 11 and 17 from getting
-        // core-lambda-stubs.jar on the classpath. That's wrong — LambdaMetafactory needs to be
-        // resolvable on the compile-time classpath for ANY source level that has lambda syntax
-        // in the actual .java files being compiled (which is true for 11/17 same as 8/9/10);
-        // android.jar's stub deliberately excludes java.lang.invoke.* regardless of API level,
-        // which is exactly why core-lambda-stubs.jar exists as a separate file in the first
-        // place. Only -source 1.7 is correctly excluded — Java 7 has no lambda syntax at all.
         if (!javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_1_7)) {
             classpath.append(":").append(new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "core-lambda-stubs.jar").getAbsolutePath());
         }
@@ -539,16 +528,6 @@ public class ProjectBuilder {
             ArrayList<String> args = new ArrayList<>();
             String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
             
-            // Bug fix: --release N is an Oracle JDK flag that requires ct.sym
-            // (cross-compilation tables) at runtime. On Android, ct.sym is not
-            // bundled with the APK, so Eclipse JDT (ECJ) silently produces ZERO
-            // .class files when --release is passed, while globalErrorsCount stays 0.
-            // The result: compiledClassesDir is empty, DexCompiler skips adding
-            // programFiles, and D8 produces classes.dex with no project classes.
-            //
-            // Fix: use -source N -target N for all Java versions. ECJ supports
-            // -source/-target without needing ct.sym, and the behaviour is
-            // equivalent for Sketchware Neo's use case (Android app compilation).
             if (javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_17)) {
                 args.add("-source"); args.add("17");
                 args.add("-target"); args.add("17");
@@ -583,32 +562,10 @@ public class ProjectBuilder {
             org.eclipse.jdt.internal.compiler.batch.Main main = new org.eclipse.jdt.internal.compiler.batch.Main(outWriter, errWriter, false, null, null);
             LogUtil.d(TAG, "Running Eclipse compiler with these arguments: " + args);
 
-            // BUG FIX (Java 11/17 → empty classes.dex): main.compile()'s return value was being
-            // discarded entirely, and success was judged ONLY by globalErrorsCount == 0. ECJ's
-            // compile() returns false for CONFIGURATION-level failures (an unsupported -source/
-            // -target value for whatever ECJ/JDT batch-compiler version is bundled, a bad
-            // classpath entry, etc.) WITHOUT incrementing globalErrorsCount — that counter only
-            // tracks per-file semantic errors found while actually compiling a compilation unit,
-            // which never starts if argument validation fails first. Net effect: zero .class
-            // files are written, this method still logged "success", D8/Dx then had an empty
-            // input directory, and classes.dex silently ended up with no project classes at all
-            // — no error anywhere in the chain to point at. This reproduces specifically for
-            // Java 11/17 because those are exactly the two values passed via -source/-target
-            // above; 1.7/1.8/1.9/10 apparently don't hit whatever unsupported-value path this is.
             boolean compileSucceeded;
             try {
                 compileSucceeded = main.compile(args.toArray(new String[0]));
             } catch (LinkageError hostRuntimeMismatch) {
-                // BUG FIX (java.lang.NoClassDefFoundError: Ljava/lang/Runtime$Version; on
-                // Java 11/17): recent org.eclipse.jdt:ecj builds (3.34.0+, ~Eclipse 4.28,
-                // mid-2023 onward) internally require their OWN host JVM to be a real desktop
-                // Java 17 — see https://github.com/eclipse-jdt/eclipse.jdt.core/issues/886.
-                // That's unrelated to -source/-target (the requested compile target); it's ecj
-                // checking ITS OWN runtime, which Android's ART never satisfies (ART has no
-                // java.lang.Runtime$Version, and core library desugaring does not add it — it's
-                // not on Google's desugared-API list). The fix is pinning `ecj` to a
-                // pre-3.34.0 build (e.g. 3.33.0) in libs_versions.toml, not something fixable
-                // from this method. Fail loud and specific instead of an unexplained crash.
                 String diagnostic = "Java compiler crashed with a LinkageError (" + hostRuntimeMismatch.getMessage()
                         + ") instead of compiling. This means the bundled 'ecj' library version requires "
                         + "a real desktop JDK to run and is incompatible with Android's runtime — pin "
@@ -621,11 +578,6 @@ public class ProjectBuilder {
             LogUtil.d(TAG, "System.out of Eclipse compiler: " + outOutputStream.getOut());
 
             if (compileSucceeded && main.globalErrorsCount <= 0) {
-                // Second safety net: even a reported "success" with zero errors is worthless if
-                // it silently compiled nothing. Verify at least one .class file actually landed
-                // in compiledClassesPath before trusting this step — this is exactly the check
-                // that would have turned this bug into a loud, immediate build failure instead
-                // of a mysteriously classless APK discovered only after install.
                 if (!directoryContainsAnyFile(new File(yq.compiledClassesPath), ".class")) {
                     String diagnostic = "Java compiler reported success (0 errors) but produced NO .class files.\n"
                             + "This usually means ECJ rejected the -source/-target arguments for Java version '"
@@ -654,7 +606,6 @@ public class ProjectBuilder {
         }
     }
 
-    /** Recursively checks whether {@code dir} contains at least one file ending in {@code suffix}. */
     private static boolean directoryContainsAnyFile(File dir, String suffix) {
         File[] children = dir.listFiles();
         if (children == null) return false;
@@ -730,18 +681,22 @@ public class ProjectBuilder {
     public void getDexFilesReady() throws Exception {
         long savedTimeMillis = System.currentTimeMillis();
         ArrayList<File> dexes = new ArrayList<>();
+        
+        boolean isR8Running = proguard.isShrinkingEnabled() && proguard.isR8Enabled();
 
-        if (settings.getMinSdkVersion() < 21) {
-            dexes.add(BuiltInLibraries.getLibraryDexFile(BuiltInLibraries.ANDROIDX_MULTIDEX));
-        }
+        if (!isR8Running) {
+            if (settings.getMinSdkVersion() < 21) {
+                dexes.add(BuiltInLibraries.getLibraryDexFile(BuiltInLibraries.ANDROIDX_MULTIDEX));
+            }
 
-        if (!build_settings.getValue(BuildSettings.SETTING_NO_HTTP_LEGACY, ProjectSettings.SETTING_GENERIC_VALUE_FALSE)
-                .equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE)) {
-            dexes.add(BuiltInLibraries.getLibraryDexFile(BuiltInLibraries.HTTP_LEGACY_ANDROID));
-        }
+            if (!build_settings.getValue(BuildSettings.SETTING_NO_HTTP_LEGACY, ProjectSettings.SETTING_GENERIC_VALUE_FALSE)
+                    .equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE)) {
+                dexes.add(BuiltInLibraries.getLibraryDexFile(BuiltInLibraries.HTTP_LEGACY_ANDROID));
+            }
 
-        for (Jp builtInLibrary : builtInLibraryManager.getLibraries()) {
-            dexes.add(BuiltInLibraries.getLibraryDexFile(builtInLibrary.getName()));
+            for (Jp builtInLibrary : builtInLibraryManager.getLibraries()) {
+                dexes.add(BuiltInLibraries.getLibraryDexFile(builtInLibrary.getName()));
+            }
         }
 
         ArrayList<HashMap<String, Object>> list = mll.list;
@@ -881,26 +836,22 @@ public class ProjectBuilder {
     }
 
     private String getRJavaRules() {
-        StringBuilder sb = new StringBuilder("# R.java rules");
+        StringBuilder sb = new StringBuilder("# R.java rules\n");
         for (Jp jp : builtInLibraryManager.getLibraries()) {
             if (jp.hasResources() && !jp.getPackageName().isEmpty()) {
-                sb.append("\n");
-                sb.append("-keep class ");
-                sb.append(jp.getPackageName());
-                sb.append(".** { *; }");
+                sb.append("-keep class ").append(jp.getPackageName()).append(".R { *; }\n");
+                sb.append("-keep class ").append(jp.getPackageName()).append(".R$* { *; }\n");
             }
         }
         for (HashMap<String, Object> hashMap : mll.list) {
-            String obj = hashMap.get("name").toString();
-            if (hashMap.containsKey("packageName") && !proguard.libIsProguardFMEnabled(obj)) {
-                sb.append("\n");
-                sb.append("-keep class ");
-                sb.append(hashMap.get("packageName").toString());
-                sb.append(".** { *; }");
+            if (hashMap.containsKey("packageName")) {
+                String pkg = hashMap.get("packageName").toString();
+                sb.append("-keep class ").append(pkg).append(".R { *; }\n");
+                sb.append("-keep class ").append(pkg).append(".R$* { *; }\n");
             }
         }
-        sb.append("\n");
-        sb.append("-keep class ").append(yq.packageName).append(".R { *; }").append('\n');
+        sb.append("-keep class ").append(yq.packageName).append(".R { *; }\n");
+        sb.append("-keep class ").append(yq.packageName).append(".R$* { *; }\n");
         return sb.toString();
     }
     
@@ -934,8 +885,10 @@ public class ProjectBuilder {
             }
         }
         config.addAll(mll.getPgRules());
-        ArrayList<String> jars = new ArrayList<>();
-        
+
+        ArrayList<String> programJars = new ArrayList<>();
+        ArrayList<String> libraryJars = new ArrayList<>();
+
         File compiledClassesDir = new File(yq.compiledClassesPath);
         if (!compiledClassesDir.exists() || compiledClassesDir.list() == null || compiledClassesDir.list().length == 0) {
             throw new IOException("Compiled classes directory is empty or does not exist. Compilation might have failed silently.");
@@ -943,24 +896,57 @@ public class ProjectBuilder {
 
         try {
             JarBuilder.INSTANCE.generateJar(compiledClassesDir);
-            jars.add(yq.compiledClassesPath + ".jar");
+            programJars.add(yq.compiledClassesPath + ".jar");
         } catch (Exception e) {
             LogUtil.e(TAG, "Failed to build temp JAR for R8", e);
         }
 
+        for (Jp library : builtInLibraryManager.getLibraries()) {
+            programJars.add(BuiltInLibraries.getLibraryClassesJarPathString(library.getName()));
+        }
+
+        if (settings.getMinSdkVersion() < 21) {
+            programJars.add(BuiltInLibraries.getLibraryClassesJarPathString(BuiltInLibraries.ANDROIDX_MULTIDEX));
+        }
+
+        if (!build_settings.getValue(BuildSettings.SETTING_NO_HTTP_LEGACY, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE)) {
+            programJars.add(BuiltInLibraries.getLibraryClassesJarPathString(BuiltInLibraries.HTTP_LEGACY_ANDROID));
+        }
+
         for (HashMap<String, Object> hashMap : mll.list) {
-            String obj = hashMap.get("name").toString();
-            if (hashMap.containsKey("jarPath") && proguard.libIsProguardFMEnabled(obj)) {
-                jars.add(hashMap.get("jarPath").toString());
+            if (hashMap.containsKey("jarPath")) {
+                String name = hashMap.get("name").toString();
+                String jarPath = hashMap.get("jarPath").toString();
+                if (proguard.libIsProguardFMEnabled(name)) {
+                    programJars.add(jarPath);
+                } else {
+                    libraryJars.add(jarPath);
+                }
             }
+        }
+
+        libraryJars.add(androidJarPath);
+        String javaVer = build_settings.getValue(BuildSettings.SETTING_JAVA_VERSION, BuildSettings.SETTING_JAVA_VERSION_1_8);
+        if (!javaVer.equals(BuildSettings.SETTING_JAVA_VERSION_1_7)) {
+            libraryJars.add(new File(BuiltInLibraries.EXTRACTED_COMPILE_ASSETS_PATH, "core-lambda-stubs.jar").getAbsolutePath());
+        }
+
+        String extraCpPath = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + yq.sc_id + "/files/classpath/";
+        for (String jar : FileUtil.listFiles(extraCpPath, "jar")) {
+            libraryJars.add(jar);
+        }
+
+        String customCp = build_settings.getValue(BuildSettings.SETTING_CLASSPATH, "");
+        if (!customCp.isEmpty()) {
+            libraryJars.addAll(Arrays.asList(customCp.split(":")));
         }
 
         File argsFile = new File(yq.binDirectoryPath, "r8_args.obj");
         try (java.io.ObjectOutputStream oos = new java.io.ObjectOutputStream(new java.io.FileOutputStream(argsFile))) {
             oos.writeObject(rules);
             oos.writeObject(config.toArray(new String[0]));
-            oos.writeObject(getProguardClasspath().split(":"));
-            oos.writeObject(jars.toArray(new String[0]));
+            oos.writeObject(libraryJars.toArray(new String[0]));
+            oos.writeObject(programJars.toArray(new String[0]));
             oos.writeInt(settings.getMinSdkVersion());
             oos.writeBoolean(isMultiDexEnabled);
         } catch (Exception e) {
@@ -982,7 +968,7 @@ public class ProjectBuilder {
         
         int flags = 0;
         if (Build.VERSION.SDK_INT >= 33) {
-            flags = 4; // RECEIVER_NOT_EXPORTED
+            flags = 4;
         }
         
         if (Build.VERSION.SDK_INT >= 33) {

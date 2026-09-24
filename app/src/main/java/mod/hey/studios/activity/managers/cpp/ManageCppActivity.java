@@ -112,6 +112,13 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         setupSearch();
         refresh();
 
+        // Opened from the new per-project Native Tools dashboard's "Manage NDK & CMake
+        // Toolchain" button — reuses this Activity's own existing NDK dialog logic
+        // (showNdkManagerDialog()/showNdkInstallDialog()) rather than duplicating it.
+        if (getIntent().getBooleanExtra("openNdkManager", false)) {
+            if (InbuiltNdkManager.isNdkInstalled(this)) showNdkManagerDialog(); else showNdkInstallDialog();
+        }
+
         binding.filesListRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {

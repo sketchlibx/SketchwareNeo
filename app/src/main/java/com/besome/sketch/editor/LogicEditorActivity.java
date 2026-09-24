@@ -330,6 +330,8 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         i = 2;
                     } else if (checkedRadioButtonId == R.id.rb_map) {
                         i = 3;
+                    } else if (checkedRadioButtonId == R.id.rb_float) {
+                        i = 4;
                     }
                 }
 
@@ -359,6 +361,8 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     variableType = 2;
                 } else if (radioGroup.getCheckedRadioButtonId() == R.id.rb_map) {
                     variableType = 3;
+                } else if (radioGroup.getCheckedRadioButtonId() == R.id.rb_float) {
+                    variableType = 4;
                 }
             }
 

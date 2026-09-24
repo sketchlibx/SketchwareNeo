@@ -64,7 +64,6 @@ public class MainDrawer extends NavigationView {
         MaterialShapeDrawable background = new MaterialShapeDrawable(shapeModel);
         background.setFillColor(ColorStateList.valueOf(ThemeUtils.getColor(context, R.attr.colorSurfaceContainerLow)));
         setBackground(background);
-        setElevation(SketchwareUtil.dpToPx(2));
 
         ViewGroup headerView = (ViewGroup) LayoutInflater.from(context).inflate(R.layout.main_drawer_header, null);
         headerView.findViewById(R.id.status_bar_overlapper).setMinimumHeight(UI.getStatusBarHeight(context));
@@ -74,7 +73,6 @@ public class MainDrawer extends NavigationView {
         setNavigationItemSelectedListener(item -> {
             initializeSocialLinks(item.getItemId());
             initializeDrawerItems(item.getItemId());
-
             return false;
         });
     }
@@ -130,7 +128,6 @@ public class MainDrawer extends NavigationView {
         while (!(context instanceof Activity) && context instanceof ContextWrapper) {
             context = ((ContextWrapper) context).getBaseContext();
         }
-
         return (Activity) context;
     }
 }
