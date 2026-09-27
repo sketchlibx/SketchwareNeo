@@ -83,6 +83,7 @@
         android:layout_height="match_parent">
 
         <HorizontalScrollView
+            android:id="@+id/hsv_tree"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:fillViewport="true"
@@ -94,8 +95,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:minWidth="290dp"
-                android:paddingBottom="24dp"
-                android:paddingEnd="16dp" />
+                android:paddingBottom="24dp" />
         </HorizontalScrollView>
 
         <TextView

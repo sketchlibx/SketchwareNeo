@@ -55,6 +55,10 @@ public class ExtraMenuBean {
     public static final int VARIABLE_TYPE_NUMBER = 1;
     public static final int VARIABLE_TYPE_MAP = 3;
     public static final int VARIABLE_TYPE_FLOAT = 4;
+    // NOTE: 5 and 6 are already used internally for custom-variable storage
+    // (see the "menu 5 / typed 6" custom-variable lookups elsewhere in this
+    // class), so the new Int type has to be 7, not 5.
+    public static final int VARIABLE_TYPE_INT_NUM = 7;
     public static final int VARIABLE_TYPE_STRING = 2;
 
     public static final int LIST_TYPE_NUMBER = 1;
@@ -265,6 +269,16 @@ public class ExtraMenuBean {
             case "varMap":
                 title = logicEditor.getString(R.string.logic_editor_title_select_variable_map);
                 menus = getVarMenus(VARIABLE_TYPE_MAP);
+                break;
+
+            case "varFloat":
+                title = logicEditor.getString(R.string.logic_editor_title_select_variable_float);
+                menus = getVarMenus(VARIABLE_TYPE_FLOAT);
+                break;
+
+            case "varIntNum":
+                title = logicEditor.getString(R.string.logic_editor_title_select_variable_int_num);
+                menus = getVarMenus(VARIABLE_TYPE_INT_NUM);
                 break;
 
             case "listInt":

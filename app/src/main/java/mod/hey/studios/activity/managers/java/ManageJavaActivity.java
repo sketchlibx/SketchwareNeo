@@ -135,10 +135,10 @@ public class ManageJavaActivity extends BaseAppCompatActivity {
     }
 
     private void setupUI() {
-        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
         binding.topAppBar.setTitle("Java/Kotlin Manager");
         setSupportActionBar(binding.topAppBar);
-
+        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
+        
         binding.showOptionsButton.setOnClickListener(view -> hideShowOptionsButton(false));
         binding.closeButton.setOnClickListener(view -> hideShowOptionsButton(true));
         

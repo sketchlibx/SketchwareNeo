@@ -86,7 +86,7 @@ public class Fx {
     private boolean hasEmptySelectorParam(ArrayList<String> params, String spec) {
         var matcher = PARAM_PATTERN.matcher(spec);
         if (!matcher.find()) {
-            var paramMatcher = Pattern.compile("%[bdsm]").matcher(spec);
+            var paramMatcher = Pattern.compile("%[bdsmfi]").matcher(spec);
             int count = 0;
             ArrayList<Integer> selectorParamPositions = new ArrayList<>();
             while (paramMatcher.find()) {
@@ -167,6 +167,50 @@ public class Fx {
                 }
                 Integer.parseInt(param);
                 return param;
+            } catch (NumberFormatException e) {
+                return param;
+            }
+        } else if (type == 4) {
+            // Float variable literal: parsed the same way as type == 1 (double), but
+            // emits a Java float literal ("1.5f") instead of a double literal ("1.5d"),
+            // since an unsuffixed decimal literal defaults to double in Java and would
+            // fail to compile when assigned to a primitive float without an explicit cast.
+            try {
+                if (param.isEmpty()) {
+                    return "0f";
+                }
+                // Strip any literal suffix an upstream source (e.g. an imported "1.5f")
+                // may already carry, so it isn't doubled up below.
+                String literal = param;
+                if (literal.matches(".*[fFdD]$")) {
+                    literal = literal.substring(0, literal.length() - 1);
+                }
+                if (literal.contains(".")) {
+                    Float.parseFloat(literal);
+                    return literal + "f";
+                }
+                Integer.parseInt(literal);
+                return literal;
+            } catch (NumberFormatException e) {
+                return param;
+            }
+        } else if (type == 5) {
+            // Real int variable literal: a Java int literal never carries a decimal
+            // point or an f/d/l suffix, so this is stricter than type == 1 (double) /
+            // type == 4 (float).
+            try {
+                if (param.isEmpty()) {
+                    return "0";
+                }
+                String literal = param;
+                // Tolerate an accidentally-typed decimal ("5.0") by truncating to its
+                // integer part, since "5.0" alone is not a valid Java int literal.
+                int dot = literal.indexOf('.');
+                if (dot >= 0) {
+                    literal = literal.substring(0, dot);
+                }
+                Integer.parseInt(literal);
+                return literal;
             } catch (NumberFormatException e) {
                 return param;
             }
@@ -260,6 +304,10 @@ public class Fx {
                                 opcode += "true";
                             } else if (paramInfo.b("double")) {
                                 opcode += "0";
+                            } else if (paramInfo.b("float")) {
+                                opcode += "0f";
+                            } else if (paramInfo.b("int")) {
+                                opcode += "0";
                             } else if (paramInfo.b("String")) {
                                 hasStringParam = true;
                             }
@@ -285,7 +333,7 @@ public class Fx {
             case "getResStr":
                 opcode = "getString(R.string." + bean.spec + ")";
                 break;
-            case "setVarBoolean", "setVarInt", "setVarString":
+            case "setVarBoolean", "setVarInt", "setVarString", "setVarFloat", "setVarIntNum":
                 opcode = String.format("%s = %s;", params.get(0), params.get(1));
                 break;
             case "increaseInt":
@@ -1450,6 +1498,22 @@ public class Fx {
                     }
                     break;
 
+                case 4:
+                    if (parameterValue.isEmpty()) {
+                        parameters.add("0f");
+                    } else {
+                        parameters.add(a(parameterValue, getBlockType(blockBean, i), blockBean.opCode));
+                    }
+                    break;
+
+                case 5:
+                    if (parameterValue.isEmpty()) {
+                        parameters.add("0");
+                    } else {
+                        parameters.add(a(parameterValue, getBlockType(blockBean, i), blockBean.opCode));
+                    }
+                    break;
+
                 default:
                     if (parameterValue.isEmpty()) {
                         parameters.add("");
@@ -1504,6 +1568,10 @@ public class Fx {
             blockType = 1;
         } else if (paramClassInfo.b("String")) {
             blockType = 2;
+        } else if (paramClassInfo.b("float")) {
+            blockType = 4;
+        } else if (paramClassInfo.b("int")) {
+            blockType = 5;
         } else {
             blockType = 3;
         }

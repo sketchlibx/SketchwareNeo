@@ -1,6 +1,9 @@
 package mod.hey.studios.activity.managers.cpp;
 
 import android.annotation.SuppressLint;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -27,9 +30,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.progressindicator.LinearProgressIndicator;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -45,11 +45,6 @@ import dev.pranav.filepicker.FilePickerCallback;
 import dev.pranav.filepicker.FilePickerDialogFragment;
 import dev.pranav.filepicker.FilePickerOptions;
 import dev.pranav.filepicker.SelectionMode;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
-import mod.hey.studios.activity.managers.cpp.JniBridgeGenerator;
-import mod.hey.studios.activity.managers.cpp.JniValidator;
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.util.Helper;
 import mod.hilal.saif.activities.tools.ConfigActivity;
@@ -112,13 +107,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
         setupSearch();
         refresh();
 
-        // Opened from the new per-project Native Tools dashboard's "Manage NDK & CMake
-        // Toolchain" button — reuses this Activity's own existing NDK dialog logic
-        // (showNdkManagerDialog()/showNdkInstallDialog()) rather than duplicating it.
-        if (getIntent().getBooleanExtra("openNdkManager", false)) {
-            if (InbuiltNdkManager.isNdkInstalled(this)) showNdkManagerDialog(); else showNdkInstallDialog();
-        }
-
         binding.filesListRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -136,7 +124,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             return;
         }
         if (isTreeViewEnabled) {
-            finish();
             super.onBackPressed();
         } else {
             if (Objects.equals(
@@ -151,10 +138,10 @@ public class ManageCppActivity extends BaseAppCompatActivity {
     }
 
     private void setupUI() {
-        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
         binding.topAppBar.setTitle("C/C++ Manager");
         setSupportActionBar(binding.topAppBar);
-
+        binding.topAppBar.setNavigationOnClickListener(v -> onBackPressed());
+        
         binding.showOptionsButton.setOnClickListener(v -> hideShowOptionsButton(false));
         binding.closeButton.setOnClickListener(v -> hideShowOptionsButton(true));
 
@@ -197,11 +184,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        boolean ndkInstalled = InbuiltNdkManager.isNdkInstalled(this);
-        menu.add(Menu.NONE, 100, Menu.NONE, ndkInstalled ? "NDK Manager" : "Setup NDK")
-                .setIcon(R.drawable.ic_mtrl_file_download)
-                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-
         menu.add(Menu.NONE, 1, Menu.NONE, "Search")
                 .setIcon(R.drawable.ic_mtrl_search)
                 .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -219,9 +201,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case 100 -> {
-                if (InbuiltNdkManager.isNdkInstalled(this)) showNdkManagerDialog(); else showNdkInstallDialog();
-            }
             case 1 -> {
                 boolean visible = binding.searchLayout.getVisibility() == View.VISIBLE;
                 binding.searchLayout.setVisibility(visible ? View.GONE : View.VISIBLE);
@@ -242,142 +221,6 @@ public class ManageCppActivity extends BaseAppCompatActivity {
             case 5 -> showJniValidationReport();
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    // ── NDK Dialog & Installation Logic ──────────────────────────────────────────
-    private void showNdkManagerDialog() {
-        java.util.List<String> versions = InbuiltNdkManager.listInstalledNdkVersions(this);
-        String message = versions.isEmpty()
-                ? "No NDK installation detected."
-                : "Installed: " + String.join(", ", versions);
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("NDK Manager")
-                .setMessage(message)
-                .setPositiveButton("Install another version", (d, w) -> showNdkInstallDialog())
-                .setNeutralButton("Repair", (d, w) -> {
-                    for (String v : versions) InbuiltNdkManager.repairInstalledNdk(this, v);
-                    SketchwareUtil.toast("Repair finished");
-                })
-                .setNegativeButton("Delete...", (d, w) -> showNdkDeleteDialog(versions))
-                .show();
-    }
-
-    private void showNdkDeleteDialog(java.util.List<String> versions) {
-        if (versions.isEmpty()) return;
-        String[] items = versions.toArray(new String[0]);
-        boolean[] checked = new boolean[items.length];
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Delete NDK version")
-                .setMultiChoiceItems(items, checked, (d, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton("Delete selected", (d, w) -> {
-                    boolean any = false;
-                    for (int i = 0; i < items.length; i++) {
-                        if (checked[i]) {
-                            InbuiltNdkManager.deleteNdkVersion(this, items[i]);
-                            any = true;
-                        }
-                    }
-                    if (any) {
-                        SketchwareUtil.toast("Deleted");
-                        invalidateOptionsMenu();
-                    }
-                })
-                .setNeutralButton("Delete all", (d, w) -> {
-                    InbuiltNdkManager.deleteAllNdkVersions(this);
-                    SketchwareUtil.toast("All NDK versions deleted");
-                    invalidateOptionsMenu();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void showNdkInstallDialog() {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        int dp24 = SketchwareUtil.dpToPx(24);
-        int dp16 = SketchwareUtil.dpToPx(16);
-        layout.setPadding(dp24, dp16, dp24, dp16);
-
-        TextInputLayout til = new TextInputLayout(this);
-        til.setHint("Paste NDK Zip Link (aarch64)");
-
-        TextInputEditText et = new TextInputEditText(this);
-        // Default MrIkso AndroidIDE NDK URL
-        et.setText("https://github.com/MrIkso/AndroidIDE-NDK/releases/download/ndk/android-ndk-r26b-aarch64.zip");
-        til.addView(et);
-        layout.addView(til);
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Setup Inbuilt NDK")
-                .setMessage("To compile C/C++ offline natively on your device, download the NDK & CMake toolchain via a direct zip link.")
-                .setView(layout)
-                .setPositiveButton("Download", (dialog, which) -> {
-                    String url = et.getText().toString().trim();
-                    if (!url.isEmpty()) {
-                        startNdkDownload(url);
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void startNdkDownload(String url) {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        int dp24 = SketchwareUtil.dpToPx(24);
-        layout.setPadding(dp24, dp24, dp24, dp24);
-        layout.setGravity(android.view.Gravity.CENTER);
-
-        TextView statusText = new TextView(this);
-        statusText.setText("Initializing Download...");
-        statusText.setTextSize(14f);
-        statusText.setTypeface(Typeface.DEFAULT_BOLD);
-        statusText.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
-        statusText.setPadding(0, 0, 0, SketchwareUtil.dpToPx(16));
-
-        LinearProgressIndicator progressIndicator = new LinearProgressIndicator(this);
-        progressIndicator.setIndeterminate(true);
-
-        layout.addView(statusText);
-        layout.addView(progressIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        androidx.appcompat.app.AlertDialog progressDialog = new MaterialAlertDialogBuilder(this)
-                .setTitle("Setting up C/C++ compiler")
-                .setView(layout)
-                .setCancelable(false)
-                .show();
-
-        InbuiltNdkManager.installNdkAndCmake(this, url, new InbuiltNdkManager.InstallCallback() {
-            @Override
-            public void onProgress(String message, int progress, boolean isIndeterminate) {
-                statusText.setText(message);
-                if (isIndeterminate) {
-                    if (!progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(true);
-                } else {
-                    if (progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(false);
-                    progressIndicator.setProgressCompat(progress, true);
-                }
-            }
-
-            @Override
-            public void onSuccess() {
-                progressDialog.dismiss();
-                SketchwareUtil.toast("NDK and CMake installed successfully!");
-                invalidateOptionsMenu(); // Removes the download icon
-            }
-
-            @Override
-            public void onError(String error) {
-                progressDialog.dismiss();
-                new MaterialAlertDialogBuilder(ManageCppActivity.this)
-                        .setTitle("Installation Failed")
-                        .setMessage(error)
-                        .setPositiveButton("OK", null)
-                        .show();
-            }
-        });
     }
 
     private void showCreateDialog(String targetPath) {

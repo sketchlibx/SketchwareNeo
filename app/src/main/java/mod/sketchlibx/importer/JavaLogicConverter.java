@@ -22,8 +22,11 @@ import java.util.regex.Pattern;
  * HONEST SCOPE — what this DOES convert to native blocks:
  *   - finish()                                    -> finishActivity
  *   - startActivity(new Intent(ctx, X.class))     -> intent component + intentSetScreen + startActivity
- *   - simple field assignment (int/String/boolean field = literal or +-*\/ on
- *     numbers/other known fields)                  -> setVarInt/setVarString/setVarBoolean
+ *   - simple field assignment (int/String/boolean/float field = literal or +-*\/ on
+ *     numbers/other known fields)                  -> setVarIntNum/setVarString/setVarBoolean/setVarFloat
+ *     (NOTE: a Java "int" field now maps to Sketchware's own real int type (setVarIntNum),
+ *     not the legacy "Number" type (setVarInt, which is actually a double) — this changed
+ *     now that a real int type exists.)
  *   - if/else with a SIMPLE condition:
  *       numeric equality  a == b                   -> "=" opCode (only proven comparison op)
  *       string equality    a.equals(b)              -> stringEquals
@@ -193,14 +196,18 @@ public class JavaLogicConverter {
     // ── Field scanning (heuristic) ─────────────────────────────────────────────
 
     private static final Pattern FIELD_DECL = Pattern.compile(
-            "(?m)^\\s*(?:private|public|protected)?\\s*(int|boolean|String)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*(?:=[^;]*)?;");
+            "(?m)^\\s*(?:private|public|protected)?\\s*(int|boolean|String|float)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*(?:=[^;]*)?;");
 
     private void scanClassFields(String javaSource, ConversionResult result) {
         Matcher m = FIELD_DECL.matcher(javaSource);
         while (m.find()) {
             String type = m.group(1);
             String name = m.group(2);
-            int code = "int".equals(type) ? 1 : "boolean".equals(type) ? 0 : 2; // 2 = String
+            // NOTE: Java "int" used to be imported as Sketchware's Number(double) type
+            // (code 1) since there was no real int type. Now that one exists (code 7),
+            // int fields are routed there instead — this is a deliberate behavior change.
+            int code = "int".equals(type) ? 7 : "boolean".equals(type) ? 0
+                    : "float".equals(type) ? 4 : 2; // 2 = String
             knownScalarFields.put(name, code);
         }
     }
@@ -515,9 +522,12 @@ public class JavaLogicConverter {
             if (typeCode != null) {
                 String valueParam = buildScalarValueParam(rhs, typeCode);
                 if (valueParam != null) {
-                    String opCode = typeCode == 1 ? "setVarInt" : typeCode == 0 ? "setVarBoolean" : "setVarString";
+                    String opCode = typeCode == 1 ? "setVarInt" : typeCode == 0 ? "setVarBoolean"
+                            : typeCode == 4 ? "setVarFloat" : typeCode == 7 ? "setVarIntNum" : "setVarString";
                     String spec = typeCode == 1 ? "set %m.varInt to %d"
-                                : typeCode == 0 ? "set %m.varBool to %b" : "set %m.varStr to %s";
+                                : typeCode == 0 ? "set %m.varBool to %b"
+                                : typeCode == 4 ? "set %m.varFloat to %f"
+                                : typeCode == 7 ? "set %m.varIntNum to %i" : "set %m.varStr to %s";
                     section.addStatement(opCode, spec, new String[]{var, valueParam}, "");
                     return;
                 }
@@ -536,7 +546,7 @@ public class JavaLogicConverter {
                 + truncate(stmt, 80));
     }
 
-    /** Builds a value param for setVarInt/Bool/String: a literal, or "@ref" to another known var. */
+    /** Builds a value param for setVarInt/Bool/String/Float: a literal, or "@ref" to another known var. */
     private String buildScalarValueParam(String rhs, int typeCode) {
         rhs = rhs.trim();
         if (typeCode == 1) { // int
@@ -548,6 +558,23 @@ public class JavaLogicConverter {
             return null;
         } else if (typeCode == 0) { // boolean
             if (rhs.equals("true") || rhs.equals("false")) return rhs;
+            return null;
+        } else if (typeCode == 7) { // real int (Sketchware's own true int type)
+            if (rhs.matches("-?\\d+")) return rhs;
+            if (knownScalarFields.containsKey(rhs) && knownScalarFields.get(rhs) == 7) return "@" + rhs;
+            Matcher bin = Pattern.compile("^(.+?)\\s*([+\\-*/])\\s*(.+)$").matcher(rhs);
+            if (bin.matches()) return null; // composed math needs nested blocks — out of this method's scope
+            return null;
+        } else if (typeCode == 4) { // float
+            // Strip a Java float-literal suffix ("1.5f" / "1.5F") — the block param itself is
+            // stored as a plain numeric literal; Fx's setVarFloat codegen re-adds the "f"
+            // suffix (and handles the empty -> "0f" case) when the project is built.
+            String literal = rhs;
+            if (literal.endsWith("f") || literal.endsWith("F")) {
+                literal = literal.substring(0, literal.length() - 1);
+            }
+            if (literal.matches("-?\\d+(\\.\\d+)?")) return literal;
+            if (knownScalarFields.containsKey(rhs) && knownScalarFields.get(rhs) == 4) return "@" + rhs;
             return null;
         } else { // String
             if (rhs.startsWith("\"") && rhs.endsWith("\"")) return rhs.substring(1, rhs.length() - 1);

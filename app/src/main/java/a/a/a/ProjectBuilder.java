@@ -257,7 +257,17 @@ public class ProjectBuilder {
     }
 
     public void createDexFilesFromClasses() throws Exception {
-        FileUtil.makeDir(yq.binDirectoryPath + File.separator + "dex");
+        File dexOutputDir = new File(yq.binDirectoryPath, "dex");
+        if (dexOutputDir.exists()) {
+            File[] staleDexFiles = dexOutputDir.listFiles((dir, name) -> name.endsWith(".dex"));
+            if (staleDexFiles != null) {
+                for (File staleDexFile : staleDexFiles) {
+                    staleDexFile.delete();
+                }
+            }
+        } else {
+            dexOutputDir.mkdirs();
+        }
         if (proguard.isShrinkingEnabled() && proguard.isR8Enabled()) return;
 
         if (isD8Enabled()) {
@@ -697,6 +707,12 @@ public class ProjectBuilder {
             for (Jp builtInLibrary : builtInLibraryManager.getLibraries()) {
                 dexes.add(BuiltInLibraries.getLibraryDexFile(builtInLibrary.getName()));
             }
+        } else {
+            for (Jp builtInLibrary : builtInLibraryManager.getLibraries()) {
+                if (!builtInLibraryManager.isDirectlyRequired(builtInLibrary.getName())) {
+                    dexes.add(BuiltInLibraries.getLibraryDexFile(builtInLibrary.getName()));
+                }
+            }
         }
 
         ArrayList<HashMap<String, Object>> list = mll.list;
@@ -902,7 +918,12 @@ public class ProjectBuilder {
         }
 
         for (Jp library : builtInLibraryManager.getLibraries()) {
-            programJars.add(BuiltInLibraries.getLibraryClassesJarPathString(library.getName()));
+            String classesJarPath = BuiltInLibraries.getLibraryClassesJarPathString(library.getName());
+            if (builtInLibraryManager.isDirectlyRequired(library.getName())) {
+                programJars.add(classesJarPath);
+            } else {
+                libraryJars.add(classesJarPath);
+            }
         }
 
         if (settings.getMinSdkVersion() < 21) {

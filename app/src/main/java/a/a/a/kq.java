@@ -36,8 +36,9 @@ public class kq {
                  "getAtListMap", "setListMap", "containListMap", "addMapToList", "insertMapToList",
                  "getMapInList" -> harmonizeWithPrimary(context, 0xffcc5b22);
             case "setVarBoolean", "setVarInt", "increaseInt", "decreaseInt", "setVarString",
-                 "mapCreateNew", "mapPut", "mapGet", "mapContainKey", "mapRemoveKey", "mapSize",
-                 "mapIsEmpty", "mapClear", "mapGetAllKeys" ->
+                 "setVarFloat", "setVarIntNum", "mapCreateNew", "mapPut", "mapGet",
+                 "mapContainKey", "mapRemoveKey", "mapSize", "mapIsEmpty", "mapClear",
+                 "mapGetAllKeys" ->
                     harmonizeWithPrimary(context, 0xffee7d16);
             case "repeat", "forever", "break", "if", "ifElse" ->
                     harmonizeWithPrimary(context, 0xffe1a92a);
@@ -179,6 +180,8 @@ public class kq {
             case "varInt" -> "Number";
             case "varMap" -> "Map";
             case "varStr" -> "String";
+            case "varFloat" -> "Float";
+            case "varIntNum" -> "Int";
             case "searchview" -> "SearchView";
             case "firebase" -> "Firebase DB";
             case "bottomnavigation" -> "BottomNavigation";

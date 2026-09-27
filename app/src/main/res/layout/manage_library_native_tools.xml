@@ -39,6 +39,7 @@
             android:paddingBottom="24dp">
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_enable_tools"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
@@ -98,16 +99,18 @@
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
+                android:id="@+id/tv_project_location_header"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_marginBottom="8dp"
-                android:text="PROJECT LOCATION"
+                android:text="Project Location"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary"
                 android:textStyle="bold" />
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_project_location"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
@@ -196,11 +199,12 @@
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
+                android:id="@+id/tv_toolchain_status_header"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_marginBottom="8dp"
-                android:text="TOOLCHAIN STATUS"
+                android:text="Toolchain Status"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary"
                 android:textStyle="bold" />
@@ -322,6 +326,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_how_it_works"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
@@ -370,6 +375,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
+                android:id="@+id/tv_footer_warning"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"

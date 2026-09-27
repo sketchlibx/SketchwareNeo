@@ -27,6 +27,7 @@ import com.google.android.material.shape.ShapeAppearanceModel;
 import a.a.a.mB;
 import dev.chrisbanes.insetter.Insetter;
 import dev.chrisbanes.insetter.Side;
+import mod.hey.studios.activity.managers.cpp.NativeToolsActivity;
 import mod.hilal.saif.activities.tools.AppSettings;
 import pro.sketchware.R;
 import pro.sketchware.activities.about.AboutActivity;
@@ -113,6 +114,10 @@ public class MainDrawer extends NavigationView {
             activity.startActivity(intent);
         } else if (id == R.id.create_release_keystore) {
             Intent intent = new Intent(activity, NewKeyStoreActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(intent);
+        } else if (id == R.id.build_tools) {
+            Intent intent = new Intent(activity, NativeToolsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
         }

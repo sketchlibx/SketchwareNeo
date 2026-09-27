@@ -10,7 +10,7 @@ import com.besome.sketch.beans.ProjectLibraryBean;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import java.util.Objects;
+import java.util.HashMap;
 
 import mod.hey.studios.util.Helper;
 import pro.sketchware.R;
@@ -20,6 +20,8 @@ public class Material3LibraryActivity extends BaseAppCompatActivity {
 
     private ManageLibraryMaterial3Binding binding;
     private Material3LibraryManager material3LibraryManager;
+    private String scId;
+    private ProjectLibraryBean compatBean;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -32,9 +34,25 @@ public class Material3LibraryActivity extends BaseAppCompatActivity {
     }
 
     private void initialize() {
-        binding.toolbar.setNavigationOnClickListener(Helper.getBackPressedClickListener(this));
+        binding.toolbar.setNavigationOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
 
-        material3LibraryManager = new Material3LibraryManager((ProjectLibraryBean) Objects.requireNonNull(getIntent().getParcelableExtra("compat")));
+        scId = getIntent().getStringExtra("sc_id");
+        if (scId == null || scId.trim().isEmpty()) {
+            scId = com.besome.sketch.design.DesignActivity.sc_id;
+        }
+
+        if (scId != null && !scId.isEmpty()) {
+            compatBean = a.a.a.jC.c(scId).c();
+            material3LibraryManager = new Material3LibraryManager(scId);
+        } else {
+            compatBean = getIntent().getParcelableExtra("compat");
+            material3LibraryManager = new Material3LibraryManager(compatBean);
+        }
+
+        if (compatBean != null && compatBean.configurations == null) {
+            compatBean.configurations = new HashMap<>();
+        }
+
         if (!material3LibraryManager.isAppCompatEnabled()) {
             new MaterialAlertDialogBuilder(this)
                     .setIcon(R.drawable.ic_mtrl_warning)
@@ -48,51 +66,52 @@ public class Material3LibraryActivity extends BaseAppCompatActivity {
         binding.libSwitch.setChecked(material3LibraryManager.isMaterial3Enabled());
         binding.dynamicColorsSwitch.setChecked(material3LibraryManager.isDynamicColorsEnabled());
 
-        if (!material3LibraryManager.isMaterial3Enabled()) {
-            binding.toggleGroup.setEnabled(false);
-            binding.dynamicColorsSwitch.setEnabled(false);
-        }
+        binding.toggleGroup.setEnabled(binding.libSwitch.isChecked());
+        binding.dynamicColorsSwitch.setEnabled(binding.libSwitch.isChecked());
 
-        binding.libSwitch.setOnCheckedChangeListener(getOnCheckedChangeListener());
+        binding.libSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            binding.toggleGroup.setEnabled(isChecked);
+            binding.dynamicColorsSwitch.setEnabled(isChecked);
+        });
 
         binding.layoutSwitchLib.setOnClickListener(view -> binding.libSwitch.setChecked(!binding.libSwitch.isChecked()));
         binding.layoutSwitchDynamicColors.setOnClickListener(view -> {
-            if (binding.libSwitch.isChecked())
+            if (binding.libSwitch.isChecked()) {
                 binding.dynamicColorsSwitch.setChecked(!binding.dynamicColorsSwitch.isChecked());
+            }
         });
 
         switch (material3LibraryManager.getTheme()) {
-            case "DayNight" -> binding.selectDayNight.setChecked(true);
             case "Dark" -> binding.selectDark.setChecked(true);
             case "Light" -> binding.selectLight.setChecked(true);
+            default -> binding.selectDayNight.setChecked(true);
         }
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                material3LibraryManager.getAppCombatLibraryBean().configurations.put("material3", binding.libSwitch.isChecked());
-                material3LibraryManager.getAppCombatLibraryBean().configurations.put("dynamic_colors", binding.dynamicColorsSwitch.isChecked());
+                if (compatBean != null) {
+                    compatBean.configurations.put("material3", binding.libSwitch.isChecked());
+                    compatBean.configurations.put("dynamic_colors", binding.dynamicColorsSwitch.isChecked());
 
-                if (binding.selectDayNight.isChecked()) {
-                    material3LibraryManager.getAppCombatLibraryBean().configurations.put("theme", "DayNight");
-                } else if (binding.selectLight.isChecked()) {
-                    material3LibraryManager.getAppCombatLibraryBean().configurations.put("theme", "Light");
-                } else if (binding.selectDark.isChecked()) {
-                    material3LibraryManager.getAppCombatLibraryBean().configurations.put("theme", "Dark");
+                    if (binding.selectDark.isChecked()) {
+                        compatBean.configurations.put("theme", "Dark");
+                    } else if (binding.selectLight.isChecked()) {
+                        compatBean.configurations.put("theme", "Light");
+                    } else {
+                        compatBean.configurations.put("theme", "DayNight");
+                    }
+
+                    if (scId != null && !scId.isEmpty()) {
+                        a.a.a.jC.c(scId).l();
+                    }
                 }
 
                 Intent resultIntent = new Intent();
-                resultIntent.putExtra("compat", material3LibraryManager.getAppCombatLibraryBean());
+                resultIntent.putExtra("compat", compatBean);
                 setResult(RESULT_OK, resultIntent);
                 finish();
             }
         });
-    }
-
-    private CompoundButton.OnCheckedChangeListener getOnCheckedChangeListener() {
-        return (buttonView, isChecked) -> {
-            binding.toggleGroup.setEnabled(isChecked);
-            binding.dynamicColorsSwitch.setEnabled(isChecked);
-        };
     }
 }

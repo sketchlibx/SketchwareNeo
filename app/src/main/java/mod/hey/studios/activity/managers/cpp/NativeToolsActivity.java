@@ -4,6 +4,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -11,6 +15,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.io.File;
@@ -46,6 +51,7 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
         super.onCreate(savedInstanceState);
 
         sc_id = getIntent().getStringExtra("sc_id");
+        boolean isGlobalContext = (sc_id == null || sc_id.trim().isEmpty());
 
         binding = ManageLibraryNativeToolsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -65,25 +71,42 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
         binding.toolbar.setNavigationOnClickListener(v -> finishWithResult());
         setSupportActionBar(binding.toolbar);
 
-        MaterialSwitch switchWidget = (MaterialSwitch) binding.switchEnable.getRoot();
-        switchWidget.setChecked(isEnabled(this, sc_id));
-        binding.layoutSwitch.setOnClickListener(v -> {
-            boolean newState = !switchWidget.isChecked();
-            switchWidget.setChecked(newState);
-            setEnabled(newState);
+        if (isGlobalContext) {
+            binding.toolbar.setTitle("Build Tools");
+            binding.cardEnableTools.setVisibility(View.GONE);
+            binding.tvProjectLocationHeader.setVisibility(View.GONE);
+            binding.cardProjectLocation.setVisibility(View.GONE);
+            binding.tvFooterWarning.setVisibility(View.GONE);
+        } else {
+            MaterialSwitch switchWidget = (MaterialSwitch) binding.switchEnable.getRoot();
+            switchWidget.setChecked(isEnabled(this, sc_id));
+            binding.layoutSwitch.setOnClickListener(v -> {
+                boolean newState = !switchWidget.isChecked();
+                switchWidget.setChecked(newState);
+                setEnabled(newState);
+            });
+
+            binding.btnManageFiles.setOnClickListener(v -> openManageCpp(false));
+            refreshSourceInfo();
+        }
+
+        binding.btnManageToolchain.setOnClickListener(v -> {
+            if (InbuiltNdkManager.isNdkInstalled(this)) {
+                showNdkManagerDialog();
+            } else {
+                showNdkInstallDialog();
+            }
         });
 
-        binding.btnManageFiles.setOnClickListener(v -> openManageCpp(false));
-        binding.btnManageToolchain.setOnClickListener(v -> openManageCpp(true));
-
-        refreshSourceInfo();
         refreshToolchainStatus();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        refreshSourceInfo();
+        if (sc_id != null && !sc_id.trim().isEmpty()) {
+            refreshSourceInfo();
+        }
         refreshToolchainStatus();
     }
 
@@ -133,6 +156,140 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
         chip.setChipBackgroundColor(ColorStateList.valueOf(ThemeUtils.getColor(this, bgAttr)));
         chip.setTextColor(ThemeUtils.getColor(this, textAttr));
         chip.setChipStrokeWidth(0f);
+    }
+
+    private void showNdkManagerDialog() {
+        java.util.List<String> versions = InbuiltNdkManager.listInstalledNdkVersions(this);
+        String message = versions.isEmpty()
+                ? "No NDK installation detected."
+                : "Installed: " + String.join(", ", versions);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("NDK Manager")
+                .setMessage(message)
+                .setPositiveButton("Install another version", (d, w) -> showNdkInstallDialog())
+                .setNeutralButton("Repair", (d, w) -> {
+                    for (String v : versions) InbuiltNdkManager.repairInstalledNdk(this, v);
+                    SketchwareUtil.toast("Repair finished");
+                })
+                .setNegativeButton("Delete...", (d, w) -> showNdkDeleteDialog(versions))
+                .show();
+    }
+
+    private void showNdkDeleteDialog(java.util.List<String> versions) {
+        if (versions.isEmpty()) return;
+        String[] items = versions.toArray(new String[0]);
+        boolean[] checked = new boolean[items.length];
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete NDK version")
+                .setMultiChoiceItems(items, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("Delete selected", (d, w) -> {
+                    boolean any = false;
+                    for (int i = 0; i < items.length; i++) {
+                        if (checked[i]) {
+                            InbuiltNdkManager.deleteNdkVersion(this, items[i]);
+                            any = true;
+                        }
+                    }
+                    if (any) {
+                        SketchwareUtil.toast("Deleted");
+                        refreshToolchainStatus();
+                    }
+                })
+                .setNeutralButton("Delete all", (d, w) -> {
+                    InbuiltNdkManager.deleteAllNdkVersions(this);
+                    SketchwareUtil.toast("All NDK versions deleted");
+                    refreshToolchainStatus();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showNdkInstallDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int dp24 = SketchwareUtil.dpToPx(24);
+        int dp16 = SketchwareUtil.dpToPx(16);
+        layout.setPadding(dp24, dp16, dp24, dp16);
+
+        com.google.android.material.textfield.TextInputLayout til = new com.google.android.material.textfield.TextInputLayout(this);
+        til.setHint("Paste NDK Zip Link (aarch64)");
+
+        com.google.android.material.textfield.TextInputEditText et = new com.google.android.material.textfield.TextInputEditText(this);
+        et.setText("https://github.com/MrIkso/AndroidIDE-NDK/releases/download/ndk/android-ndk-r26b-aarch64.zip");
+        til.addView(et);
+        layout.addView(til);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Setup Inbuilt NDK")
+                .setMessage("To compile C/C++ offline natively on your device, download the NDK & CMake toolchain via a direct zip link.")
+                .setView(layout)
+                .setPositiveButton("Download", (dialog, which) -> {
+                    String url = et.getText().toString().trim();
+                    if (!url.isEmpty()) {
+                        startNdkDownload(url);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startNdkDownload(String url) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int dp24 = SketchwareUtil.dpToPx(24);
+        layout.setPadding(dp24, dp24, dp24, dp24);
+        layout.setGravity(android.view.Gravity.CENTER);
+
+        TextView statusText = new TextView(this);
+        statusText.setText("Initializing Download...");
+        statusText.setTextSize(14f);
+        statusText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        statusText.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
+        statusText.setPadding(0, 0, 0, SketchwareUtil.dpToPx(16));
+
+        com.google.android.material.progressindicator.LinearProgressIndicator progressIndicator = new com.google.android.material.progressindicator.LinearProgressIndicator(this);
+        progressIndicator.setIndeterminate(true);
+
+        layout.addView(statusText);
+        layout.addView(progressIndicator, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        androidx.appcompat.app.AlertDialog progressDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Setting up C/C++ compiler")
+                .setView(layout)
+                .setCancelable(false)
+                .show();
+
+        InbuiltNdkManager.installNdkAndCmake(this, url, new InbuiltNdkManager.InstallCallback() {
+            @Override
+            public void onProgress(String message, int progress, boolean isIndeterminate) {
+                statusText.setText(message);
+                if (isIndeterminate) {
+                    if (!progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(true);
+                } else {
+                    if (progressIndicator.isIndeterminate()) progressIndicator.setIndeterminate(false);
+                    progressIndicator.setProgressCompat(progress, true);
+                }
+            }
+
+            @Override
+            public void onSuccess() {
+                progressDialog.dismiss();
+                SketchwareUtil.toast("NDK and CMake installed successfully!");
+                refreshToolchainStatus();
+            }
+
+            @Override
+            public void onError(String error) {
+                progressDialog.dismiss();
+                new MaterialAlertDialogBuilder(NativeToolsActivity.this)
+                        .setTitle("Installation Failed")
+                        .setMessage(error)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
     }
 
     private void finishWithResult() {

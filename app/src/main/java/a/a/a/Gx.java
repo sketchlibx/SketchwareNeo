@@ -98,6 +98,14 @@ public class Gx {
                 classInfos = "Var.double";
                 break;
 
+            case "float":
+                classInfos = "Var.float";
+                break;
+
+            case "int":
+                classInfos = "Var.int";
+                break;
+
             case "String":
                 classInfos = "Var.String";
                 break;

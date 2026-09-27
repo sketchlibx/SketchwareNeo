@@ -22,6 +22,12 @@ public class mq {
             case "n":
                 return new Gx("double");
 
+            case "f":
+                return new Gx("float");
+
+            case "i":
+                return new Gx("int");
+
             case "s":
                 if (typeName != null && (typeName.equalsIgnoreCase("inputOnly") ||
                         typeName.equals("inputCode") || typeName.equals("import"))) {
@@ -148,6 +154,8 @@ public class mq {
             case "varInt" -> "double.SelectDouble";
             case "varStr" -> "String.SelectString";
             case "varMap" -> "Map";
+            case "varFloat" -> "float.SelectFloat";
+            case "varIntNum" -> "int.SelectInt";
             case "listInt" -> "ListInt";
             case "listStr" -> "ListString";
             case "listMap" -> "ListMap";
@@ -232,6 +240,8 @@ public class mq {
             case 1 -> "double";
             case 2 -> "String";
             case 3 -> "Map";
+            case 4 -> "float";
+            case 7 -> "int";
             default -> "";
         };
     }
@@ -758,6 +768,8 @@ public class mq {
     public static String e(String typeName) {
         return switch (typeName) {
             case "double", "double.SelectDouble" -> "double";
+            case "float", "float.SelectFloat" -> "float";
+            case "int", "int.SelectInt" -> "int";
             case "Map" -> "HashMap<String, Object>";
             case "ListInt" -> "ArrayList<Double>";
             case "ListString" -> "ArrayList<String>";

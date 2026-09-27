@@ -24,7 +24,7 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        enableEdgeToEdgeNoContrast(); // Ensure Material 3 full screen immersion
+        enableEdgeToEdgeNoContrast();
         super.onCreate(savedInstanceState);
         binding = ManageProguardBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -48,7 +48,7 @@ public class ManageProguardActivity extends BaseAppCompatActivity {
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Code Shrinking Manager");
+            getSupportActionBar().setTitle("Code Shrinker Manager");
         }
         binding.toolbar.setNavigationOnClickListener(view -> onBackPressed());
     }

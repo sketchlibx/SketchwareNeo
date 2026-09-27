@@ -25,6 +25,15 @@
         android:icon="@drawable/ic_mtrl_settings"
         android:title="Settings" />
 
+    <item android:title="Tools">
+        <menu>
+            <item
+                android:id="@+id/build_tools"
+                android:icon="@drawable/ic_mtrl_build_tools"
+                android:title="Build Tools" />
+        </menu>
+    </item>
+
     <item android:title="Related links">
         <menu>
             <item

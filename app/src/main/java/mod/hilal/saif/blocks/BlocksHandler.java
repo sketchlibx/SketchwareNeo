@@ -2610,7 +2610,9 @@ public class BlocksHandler {
             boolean isBoolUsed,
             boolean isIntUsed,
             boolean isStrUsed,
-            boolean isMapUsed) {
+            boolean isMapUsed,
+            boolean isFloatUsed,
+            boolean isIntNumUsed) {
         logicEditorActivity.a("Blocks", getTitleBgColor(logicEditorActivity));
         if (showAll() || isBoolUsed) {
             logicEditorActivity.a(" ", "setVarBoolean");
@@ -2622,6 +2624,12 @@ public class BlocksHandler {
         }
         if (showAll() || isStrUsed) {
             logicEditorActivity.a(" ", "setVarString");
+        }
+        if (showAll() || isFloatUsed) {
+            logicEditorActivity.a(" ", "setVarFloat");
+        }
+        if (showAll() || isIntNumUsed) {
+            logicEditorActivity.a(" ", "setVarIntNum");
         }
         if (showAll() || isMapUsed) {
             logicEditorActivity.a(" ", "mapCreateNew");

@@ -150,8 +150,8 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
             ImageView icon = new ImageView(parent.getContext());
             icon.setImageResource(R.drawable.ic_mtrl_code);
-            icon.setColorFilter(ThemeUtils.getColor(parent.getContext(), R.attr.colorOnSurfaceVariant));
-            container.addView(icon, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(24), SketchwareUtil.dpToPx(24)));
+            icon.setColorFilter(ThemeUtils.getColor(parent.getContext(), R.attr.colorPrimary));
+            container.addView(icon, new LinearLayout.LayoutParams(SketchwareUtil.dpToPx(28), SketchwareUtil.dpToPx(28)));
 
             LinearLayout textContainer = new LinearLayout(parent.getContext());
             textContainer.setOrientation(LinearLayout.VERTICAL);
@@ -161,18 +161,21 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
             TextView title = new TextView(parent.getContext());
             title.setTextSize(16f);
+            title.setTypeface(null, android.graphics.Typeface.BOLD);
             title.setTextColor(ThemeUtils.getColor(parent.getContext(), R.attr.colorOnSurface));
             textContainer.addView(title);
 
             TextView subtitle = new TextView(parent.getContext());
             subtitle.setTextSize(12f);
             subtitle.setTextColor(ThemeUtils.getColor(parent.getContext(), R.attr.colorOnSurfaceVariant));
+            subtitle.setPadding(0, SketchwareUtil.dpToPx(2), 0, 0);
             textContainer.addView(subtitle);
 
             root.addView(container);
 
             MaterialDivider divider = new MaterialDivider(parent.getContext());
-            divider.setDividerInsetStart(SketchwareUtil.dpToPx(56));
+            divider.setDividerInsetStart(SketchwareUtil.dpToPx(60));
+            divider.setDividerColor(ThemeUtils.getColor(parent.getContext(), com.google.android.material.R.attr.colorOutlineVariant));
             root.addView(divider);
 
             return new VH(root, container, title, subtitle, divider);

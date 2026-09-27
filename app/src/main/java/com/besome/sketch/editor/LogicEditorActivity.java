@@ -330,9 +330,13 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         i = 2;
                     } else if (checkedRadioButtonId == R.id.rb_map) {
                         i = 3;
-                    } else if (checkedRadioButtonId == R.id.rb_float) {
-                        i = 4;
                     }
+                    // NOTE: List<Float> and List<Int> are explicitly out of scope.
+                    // logic_popup_add_list.xml has no rb_float/rb_int_num radio buttons, so
+                    // there is intentionally no branch for them here. Do not re-add an
+                    // "i = 4" (Float) or "i = 7" (Int) branch for lists without first
+                    // implementing that list type end-to-end (layout, ExtraMenuBean
+                    // list-type constant, codegen, BlocksConverter, etc).
                 }
 
                 a(i, Helper.getText(editText));
@@ -363,6 +367,8 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     variableType = 3;
                 } else if (radioGroup.getCheckedRadioButtonId() == R.id.rb_float) {
                     variableType = 4;
+                } else if (radioGroup.getCheckedRadioButtonId() == R.id.rb_int_num) {
+                    variableType = 7;
                 }
             }
 
@@ -881,6 +887,14 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
                                         case "varStr":
                                             eC.f(javaName, ExtraMenuBean.VARIABLE_TYPE_STRING, parameter);
+                                            break;
+
+                                        case "varFloat":
+                                            eC.f(javaName, ExtraMenuBean.VARIABLE_TYPE_FLOAT, parameter);
+                                            break;
+
+                                        case "varIntNum":
+                                            eC.f(javaName, ExtraMenuBean.VARIABLE_TYPE_INT_NUM, parameter);
                                             break;
 
                                         case "listInt":

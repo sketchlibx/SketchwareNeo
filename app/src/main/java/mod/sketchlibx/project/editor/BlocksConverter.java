@@ -66,7 +66,7 @@ public final class BlocksConverter {
 
     // ── Pattern spec param type regex ──────────────────────────────────────────
     private static final Pattern SPEC_PARAM_PAT =
-            Pattern.compile("%s(?:\\.inputOnly)?|%b|%d|%m\\.\\w+");
+            Pattern.compile("%s(?:\\.inputOnly)?|%b|%d|%f|%i|%m\\.\\w+");
     // Detects a Java String.format specifier: %s, %1$s, %2$d, etc.
     private static final Pattern FMT_SPEC_PAT =
             Pattern.compile("%(([0-9]+)\\$)?([sdbf])");
@@ -140,6 +140,10 @@ public final class BlocksConverter {
      * %s / %s.inputOnly → STRING
      * %b                → BOOLEAN
      * %d                → NUMBER
+     * %f                → NUMBER (float-typed custom-block param; Fx applies the
+     *                     "1.5f" vs "1.5d" literal suffix later, based on opcode)
+     * %i                → NUMBER (real-int-typed custom-block param; Fx keeps it
+     *                     suffix-/decimal-free later, based on opcode)
      * %m.view etc.      → UNKNOWN (pass-through: strip binding. prefix only)
      */
     private static ExprType[] buildSpecParamTypes(String spec) {
@@ -150,6 +154,8 @@ public final class BlocksConverter {
             if (tok.startsWith("%s")) types.add(ExprType.STRING);
             else if (tok.startsWith("%b")) types.add(ExprType.BOOLEAN);
             else if (tok.startsWith("%d")) types.add(ExprType.NUMBER);
+            else if (tok.startsWith("%f")) types.add(ExprType.NUMBER);
+            else if (tok.startsWith("%i")) types.add(ExprType.NUMBER);
             else                           types.add(ExprType.UNKNOWN); // %m.*
         }
         return types.toArray(new ExprType[0]);
@@ -586,7 +592,12 @@ public final class BlocksConverter {
     private static final Pattern P_DEC = Pattern.compile("^(\\w+)--\\s*;?$");
 
     // Variable assignment: var = expr;
-    private static final Pattern P_ASSIGN_INT  = Pattern.compile("^(int|long|float|double)\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
+    private static final Pattern P_ASSIGN_INT  = Pattern.compile("^(long|double)\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
+    private static final Pattern P_ASSIGN_FLOAT = Pattern.compile("^float\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
+    // Real "int" now maps to Sketchware's own true int type (setVarIntNum), not the
+    // legacy "Number" type above (setVarInt, which is actually a double). long/double
+    // still fall through to P_ASSIGN_INT/Number, unchanged.
+    private static final Pattern P_ASSIGN_INT_NUM = Pattern.compile("^int\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
     private static final Pattern P_ASSIGN_STR  = Pattern.compile("^String\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
     private static final Pattern P_ASSIGN_BOOL = Pattern.compile("^boolean\\s+(\\w+)\\s*=\\s*(.+?)\\s*;?$");
     private static final Pattern P_ASSIGN      = Pattern.compile("^(\\w+)\\s*=\\s*(.+?)\\s*;?$");
@@ -834,6 +845,16 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "set int %m.varInt to %d", "setVarInt",
                     m.group(2), parseExpr(m.group(3).trim(), ExprType.NUMBER)); }
+
+        m = P_ASSIGN_FLOAT.matcher(line);
+        if (m.matches()) { recognizedCount++;
+            return stmt(newId(), "set float %m.varFloat to %f", "setVarFloat",
+                    m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
+
+        m = P_ASSIGN_INT_NUM.matcher(line);
+        if (m.matches()) { recognizedCount++;
+            return stmt(newId(), "set int %m.varIntNum to %i", "setVarIntNum",
+                    m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
         m = P_ASSIGN_STR.matcher(line);
         if (m.matches()) { recognizedCount++;

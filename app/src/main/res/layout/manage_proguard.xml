@@ -11,9 +11,7 @@
         android:id="@+id/appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        app:elevation="0dp"
-        app:liftOnScroll="true">
+        android:fitsSystemWindows="true">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
@@ -38,15 +36,12 @@
             android:paddingHorizontal="16dp"
             android:paddingTop="16dp">
 
-            <!-- Hero Banner Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                app:cardBackgroundColor="?attr/colorPrimaryContainer"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeWidth="0dp">
+                android:layout_marginBottom="16dp"
+                style="?attr/materialCardViewFilledStyle"
+                app:cardBackgroundColor="?attr/colorPrimaryContainer">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -88,15 +83,11 @@
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary" />
 
-            <!-- General Settings Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                style="?attr/materialCardViewFilledStyle"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -107,13 +98,13 @@
                         android:id="@+id/row_pg_enabled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -148,7 +139,7 @@
                             android:id="@+id/sw_pg_enabled"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp" />
+                            android:layout_marginStart="8dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -160,13 +151,13 @@
                         android:id="@+id/row_pg_debug"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -201,7 +192,7 @@
                             android:id="@+id/sw_pg_debug"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp" />
+                            android:layout_marginStart="8dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -213,13 +204,13 @@
                         android:id="@+id/row_keep_line_numbers"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -254,7 +245,7 @@
                             android:id="@+id/sw_keep_line_numbers"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp" />
+                            android:layout_marginStart="8dp" />
                     </LinearLayout>
 
                 </LinearLayout>
@@ -263,7 +254,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"
                 android:layout_marginStart="8dp"
                 android:orientation="vertical">
@@ -284,15 +275,11 @@
                     android:textColor="?attr/colorError" />
             </LinearLayout>
 
-            <!-- Advanced Options Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                style="?attr/materialCardViewFilledStyle"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -303,13 +290,13 @@
                         android:id="@+id/row_r8_enabled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -344,7 +331,7 @@
                             android:id="@+id/r8_enabled"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp" />
+                            android:layout_marginStart="8dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -356,13 +343,13 @@
                         android:id="@+id/ln_pg_rules"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -410,13 +397,13 @@
                         android:id="@+id/ln_pg_fm"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -461,7 +448,7 @@
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"
                 android:layout_marginStart="8dp"
                 android:text="Tools"
@@ -471,11 +458,8 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                style="?attr/materialCardViewFilledStyle"
+                app:cardBackgroundColor="?attr/colorSurfaceContainer">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -486,13 +470,13 @@
                         android:id="@+id/ln_keep_rule_template"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"
@@ -540,13 +524,13 @@
                         android:id="@+id/ln_analyze_libraries"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackground"
+                        android:background="?selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="14dp">
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="12dp">
 
                         <ImageView
                             android:layout_width="24dp"

@@ -169,6 +169,11 @@ public class ExtraPaletteBlock {
             logicEditor.a(numberVariables.get(i), "d", "getVar").setTag(numberVariables.get(i));
         }
 
+        // NOTE: 5 and 6 are already the simple/typed custom-variable lists (see below),
+        // so the new Int type has to be 7, not 5.
+        ArrayList<String> floatVariables = jC.a(sc_id).e(javaName, 4);
+        ArrayList<String> intNumVariables = jC.a(sc_id).e(javaName, 7);
+
         ArrayList<String> stringVariables = jC.a(sc_id).e(javaName, 2);
         for (int i = 0; i < stringVariables.size(); i++) {
             if (i == 0) logicEditor.a("String", getTitleBgColor());
@@ -181,6 +186,24 @@ public class ExtraPaletteBlock {
             if (i == 0) logicEditor.a("Map", getTitleBgColor());
 
             logicEditor.a(mapVariables.get(i), "a", "getVar").setTag(mapVariables.get(i));
+        }
+
+        for (int i = 0; i < floatVariables.size(); i++) {
+            if (i == 0) logicEditor.a("Float", getTitleBgColor());
+
+            // Use "d" (Number's) shape/type-char here, not "f": the block renderer has
+            // no shape mapping for "f" and was showing this as a broken stack-block
+            // instead of a value pill (see analysis). Codegen is unaffected either way —
+            // Fx's "getVar" case emits the raw variable name regardless of this char.
+            logicEditor.a(floatVariables.get(i), "d", "getVar").setTag(floatVariables.get(i));
+        }
+
+        for (int i = 0; i < intNumVariables.size(); i++) {
+            if (i == 0) logicEditor.a("Int", getTitleBgColor());
+
+            // Same fix as Float above: "i" has no shape mapping either (was rendering as
+            // plain text, not even a block). Use "d".
+            logicEditor.a(intNumVariables.get(i), "d", "getVar").setTag(intNumVariables.get(i));
         }
 
         ArrayList<String> customVariables = jC.a(sc_id).e(javaName, 5);
@@ -203,11 +226,18 @@ public class ExtraPaletteBlock {
             String variableType = CustomVariableUtil.getVariableType(variable);
             String variableName = CustomVariableUtil.getVariableName(variable);
             if (variableType != null && variableName != null) {
+                // NOTE: float/Float/int/Integer render their getVar chip with the same
+                // "d" shape/type-char as double/long/short — "f"/"i" have no shape
+                // mapping in the block renderer (see analysis: they showed up as a
+                // broken stack-block / plain text instead of a value pill). Codegen
+                // still distinguishes them correctly elsewhere (Fx/mq/BlocksConverter
+                // key off the variable's declared Java type and its own set-block
+                // opcode, not off this palette-chip type-char).
                 String type = switch (variableType) {
                     case "boolean", "Boolean" -> "b";
                     case "String" -> "s";
-                    case "double", "Double", "int", "Integer", "float", "Float", "long", "Long",
-                         "short", "Short" -> "d";
+                    case "double", "Double", "float", "Float", "int", "Integer",
+                         "long", "Long", "short", "Short" -> "d";
                     default -> "v";
                 };
                 logicEditor.a(variableName, type, variableType, "getVar").setTag(variable);
@@ -220,7 +250,9 @@ public class ExtraPaletteBlock {
                 extraBlocks.isVariableUsed(0),
                 extraBlocks.isVariableUsed(1),
                 extraBlocks.isVariableUsed(2),
-                extraBlocks.isVariableUsed(3)
+                extraBlocks.isVariableUsed(3),
+                extraBlocks.isVariableUsed(4),
+                extraBlocks.isVariableUsed(7)
         );
         blockCustomViews();
         blockDrawer();

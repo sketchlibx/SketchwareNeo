@@ -92,7 +92,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
     }
 
     public static String getBackupFileName() {
-        return DataStore.getInstance().getString(SETTING_BACKUP_FILENAME, "$projectName v$versionName ($pkgName, $versionCode) $time(yyyy-MM-dd'T'HHmmss)");
+        return DataStore.getInstance().getString(SETTING_BACKUP_FILENAME, "$projectName v$versionName ($pkgName, $versionCode)$time(yyyy-MM-dd'T'HHmmss)");
     }
 
     public static boolean isSettingEnabled(String keyName) {
@@ -250,22 +250,18 @@ public class ConfigActivity extends BaseAppCompatActivity {
         tv.setTextSize(14f);
         tv.setTypeface(null, Typeface.BOLD);
         tv.setTextColor(ThemeUtils.getColor(this, R.attr.colorPrimary));
-        int padLeft = SketchwareUtil.dpToPx(32);
+        int padLeft = SketchwareUtil.dpToPx(24);
         tv.setPadding(padLeft, SketchwareUtil.dpToPx(16), padLeft, SketchwareUtil.dpToPx(8));
         return tv;
     }
 
     private MaterialCardView createPreferenceCard(View... items) {
-        MaterialCardView card = new MaterialCardView(this);
+        MaterialCardView card = new MaterialCardView(this, null, com.google.android.material.R.attr.materialCardViewFilledStyle);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardParams.setMargins(SketchwareUtil.dpToPx(16), 0, SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(8));
+        cardParams.setMargins(SketchwareUtil.dpToPx(16), 0, SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(16));
         card.setLayoutParams(cardParams);
         
-        card.setRadius(SketchwareUtil.dpToPx(16));
-        card.setCardElevation(0); 
-        card.setStrokeWidth(SketchwareUtil.dpToPx(1));
-        card.setStrokeColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
-        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceContainerLow)); 
+        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceContainer)); 
         card.setClipChildren(true);
 
         LinearLayout cardContent = new LinearLayout(this);
@@ -277,7 +273,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
             if (i < items.length - 1) {
                 View divider = new View(this);
                 LinearLayout.LayoutParams divParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, SketchwareUtil.dpToPx(1));
-                divParams.setMargins(SketchwareUtil.dpToPx(56), 0, SketchwareUtil.dpToPx(16), 0);
+                divParams.setMargins(SketchwareUtil.dpToPx(56), 0, 0, 0);
                 divider.setLayoutParams(divParams);
                 divider.setBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
                 cardContent.addView(divider);
@@ -406,7 +402,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
     }
 
     private void showBackupNameDialog() {
-        String hint = "Variables: $projectName, $versionCode, $versionName, $pkgName, $timeInMs";
+        String hint = "Variables: $projectName, $versionCode,$versionName, $pkgName,$timeInMs";
         showInputDialog("Backup Filename Format", hint, getBackupFileName(), text -> {
             DataStore.getInstance().putString(SETTING_BACKUP_FILENAME, text);
         });

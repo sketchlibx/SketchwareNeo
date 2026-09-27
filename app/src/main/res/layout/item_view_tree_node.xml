@@ -2,61 +2,67 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root_layout"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingVertical="6dp"
-    android:paddingEnd="16dp">
+    android:minHeight="44dp"
+    android:orientation="horizontal">
 
     <FrameLayout
         android:id="@+id/view_indent_container"
         android:layout_width="wrap_content"
         android:layout_height="match_parent" />
 
-    <ImageView
-        android:id="@+id/img_expand"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_marginEnd="4dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:clickable="true"
-        android:focusable="true"
-        android:padding="4dp"
-        android:src="@drawable/ic_mtrl_arrow_right"
-        app:tint="?attr/colorOnSurfaceVariant" />
-
-    <ImageView
-        android:id="@+id/img_icon"
-        android:layout_width="18dp"
-        android:layout_height="18dp"
-        android:layout_marginEnd="10dp"
-        android:src="@drawable/ic_mtrl_devices"
-        app:tint="?attr/colorOnSurfaceVariant" />
-
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tv_title"
+    <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="linear1"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:textColor="?attr/colorOnSurface"
-        android:textStyle="bold" />
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingEnd="16dp">
 
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tv_subtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="LinearLayout"
-        android:textAppearance="?attr/textAppearanceBodySmall"
-        android:textColor="?attr/colorOnSurfaceVariant" />
+        <ImageView
+            android:id="@+id/img_expand"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="4dp"
+            android:src="@drawable/ic_mtrl_arrow_right"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <ImageView
+            android:id="@+id/img_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginEnd="10dp"
+            android:src="@drawable/ic_mtrl_devices"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="linear1"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurface"
+            android:textStyle="bold" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="LinearLayout"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
 
 </LinearLayout>

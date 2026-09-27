@@ -21,6 +21,8 @@ public class BuiltInLibraryManager {
     private final ArrayList<Jp> libraries = new ArrayList<>();
     private final List<BuiltInLibraries.BuiltInLibrary> excludedLibraries;
 
+    private final ArrayList<String> directlyRequestedLibraryNames = new ArrayList<>();
+
     public BuiltInLibraryManager(String projectId) {
         excludedLibraries = ExcludeBuiltInLibrariesActivity.getExcludedLibraries(projectId);
     }
@@ -33,8 +35,22 @@ public class BuiltInLibraryManager {
      * @param libraryName The built-in library's name, e.g. material-1.0.0
      */
     public void addLibrary(String libraryName) {
+        addLibrary(libraryName, true);
+    }
+
+    /**
+     * @param libraryName    The built-in library's name, e.g. material-1.0.0
+     * @param isDirectRequest true when this call originates from an explicit selection
+     *                        condition (a public {@link #addLibrary(String)} call site);
+     *                        false when it originates from {@link #addDependencies(String)}
+     *                        resolving another library's own transitive dependency.
+     */
+    private void addLibrary(String libraryName, boolean isDirectRequest) {
+        if (isDirectRequest && !directlyRequestedLibraryNames.contains(libraryName)) {
+            directlyRequestedLibraryNames.add(libraryName);
+        }
+
         Optional<BuiltInLibraries.BuiltInLibrary> library = BuiltInLibraries.BuiltInLibrary.ofName(libraryName);
-        //noinspection SimplifyOptionalCallChains because #isEmpty() isn't available on Android.
         if (!library.isPresent() || !excludedLibraries.contains(library.get())) {
             if (!libraryNames.contains(libraryName)) {
                 Log.d(ProjectBuilder.TAG, "Added built-in library \"" + libraryName + "\" to project's dependencies");
@@ -53,13 +69,16 @@ public class BuiltInLibraryManager {
 
     private void addDependencies(String libraryName) {
         for (String libraryDependency : BuiltInLibraryUtils.getKnownDependencies(libraryName)) {
-            addLibrary(libraryDependency);
+            addLibrary(libraryDependency, false);
         }
+    }
+
+    public boolean isDirectlyRequired(String libraryName) {
+        return directlyRequestedLibraryNames.contains(libraryName);
     }
 
     public boolean containsLibrary(String libraryName) {
         Optional<BuiltInLibraries.BuiltInLibrary> library = BuiltInLibraries.BuiltInLibrary.ofName(libraryName);
-        //noinspection SimplifyOptionalCallChains because #isEmpty() isn't available on Android.
         if (!library.isPresent()) {
             return false;
         }

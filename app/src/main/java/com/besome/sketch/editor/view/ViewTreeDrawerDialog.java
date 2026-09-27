@@ -23,6 +23,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -63,6 +64,7 @@ public class ViewTreeDrawerDialog extends DialogFragment {
     private TreeAdapter adapter;
     private String searchQuery = "";
     private RecyclerView recyclerView;
+    private HorizontalScrollView hsvTree;
     private TextView tvNoResults;
 
     public ViewTreeDrawerDialog(ArrayList<ViewBean> views, OnViewSelectedListener listener, @Nullable String selectedViewId) {
@@ -115,6 +117,7 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         TextView tvCountBadge = root.findViewById(R.id.tv_count_badge);
         EditText etSearch = root.findViewById(R.id.et_search);
         recyclerView = root.findViewById(R.id.recycler_view);
+        hsvTree = root.findViewById(R.id.hsv_tree);
         tvNoResults = root.findViewById(R.id.tv_no_results);
 
         tvCountBadge.setText(String.valueOf(currentViews.size()));
@@ -145,7 +148,8 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         };
         recyclerView.setLayoutManager(layoutManager);
         recyclerView.setItemViewCacheSize(30);
-        recyclerView.setHasFixedSize(true);
+        // HasFixedSize must be false because row widths vary drastically based on depth and wrap_content layout
+        recyclerView.setHasFixedSize(false);
         
         buildTree();
         rebuildDisplayList();
@@ -274,7 +278,16 @@ public class ViewTreeDrawerDialog extends DialogFragment {
         for (int i = 0; i < displayNodes.size(); i++) {
             if (selectedViewId.equals(displayNodes.get(i).viewBean.id)) {
                 int finalI = i;
-                recyclerView.post(() -> recyclerView.smoothScrollToPosition(finalI));
+                TreeNode node = displayNodes.get(finalI);
+                
+                recyclerView.post(() -> {
+                    recyclerView.smoothScrollToPosition(finalI);
+                    
+                    if (hsvTree != null) {
+                        int targetX = node.depth * SketchwareUtil.dpToPx(20) - SketchwareUtil.dpToPx(32);
+                        hsvTree.smoothScrollTo(Math.max(targetX, 0), 0);
+                    }
+                });
                 break;
             }
         }
@@ -291,10 +304,10 @@ public class ViewTreeDrawerDialog extends DialogFragment {
             super(context);
             paint = new Paint();
             paint.setColor(ThemeUtils.getColor(context, R.attr.colorOutlineVariant));
-            paint.setStrokeWidth(SketchwareUtil.dpToPx(1.5f));
+            paint.setStrokeWidth(SketchwareUtil.dpToPx(1f));
             paint.setStyle(Paint.Style.STROKE);
             paint.setAntiAlias(true);
-            indentWidth = SketchwareUtil.dpToPx(24); 
+            indentWidth = SketchwareUtil.dpToPx(20); 
         }
 
         public void bind(int depth, boolean isLastChild, List<Boolean> parentIsLastList) {
@@ -324,7 +337,7 @@ public class ViewTreeDrawerDialog extends DialogFragment {
                     if (!isLastChild) {
                         canvas.drawLine(x, halfH, x, h, paint);
                     }
-                    canvas.drawLine(x, halfH, x + w / 2, halfH, paint);
+                    canvas.drawLine(x, halfH, i * w + w, halfH, paint);
                 } else {
                     if (parentIsLastList.size() > i && !parentIsLastList.get(i)) {
                         canvas.drawLine(x, 0, x, h, paint);
