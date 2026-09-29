@@ -1,35 +1,20 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/README.md",
-      "selection": {
-        "end": {
-          "column": 3,
-          "index": 7771,
-          "line": 185
-        },
-        "start": {
-          "column": 3,
-          "index": 7771,
-          "line": 185
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/LICENSE.md",
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/gradle.properties",
       "selection": {
         "end": {
           "column": 0,
-          "index": 0,
-          "line": 0
+          "index": 291,
+          "line": 9
         },
         "start": {
           "column": 0,
-          "index": 0,
-          "line": 0
+          "index": 291,
+          "line": 9
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/README.md"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/gradle.properties"
 }
