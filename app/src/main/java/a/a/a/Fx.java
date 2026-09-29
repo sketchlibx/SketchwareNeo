@@ -333,13 +333,20 @@ public class Fx {
             case "getResStr":
                 opcode = "getString(R.string." + bean.spec + ")";
                 break;
-            case "setVarBoolean", "setVarInt", "setVarString", "setVarFloat", "setVarIntNum":
+            case "setVarBoolean", "setVarInt", "setVarString":
                 opcode = String.format("%s = %s;", params.get(0), params.get(1));
                 break;
-            case "increaseInt":
+            case "setVarFloat":
+                // value slot is a Number (%d) socket -> double-typed; explicit cast keeps it compilable
+                opcode = String.format("%s = (float) (%s);", params.get(0), params.get(1));
+                break;
+            case "setVarIntNum":
+                opcode = String.format("%s = (int) (%s);", params.get(0), params.get(1));
+                break;
+            case "increaseInt", "increaseFloatNum", "increaseIntNum":
                 opcode = String.format("%s++;", params.get(0));
                 break;
-            case "decreaseInt":
+            case "decreaseInt", "decreaseFloatNum", "decreaseIntNum":
                 opcode = String.format("%s--;", params.get(0));
                 break;
             case "mapCreateNew":

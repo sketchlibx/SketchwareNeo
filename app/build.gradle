@@ -2,6 +2,7 @@ def secrets = System.getenv("GOOGLE_SERVICES_JSON")
 
 apply plugin: "com.android.application"
 apply plugin: "kotlin-android"
+apply plugin: "org.jetbrains.kotlin.plugin.compose"
 apply plugin: "com.google.gms.google-services"
 apply plugin: "com.google.firebase.crashlytics"
 
@@ -74,6 +75,7 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+        compose = true
     }
 
     configurations.implementation {
@@ -135,11 +137,13 @@ dependencies {
 
     implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
 
-    // Real PTY terminal (Termux terminal-view / terminal-emulator) — resolved via the
-    // JitPack repo already declared in settings.gradle. Building straight from termux-app's
-    // own terminal-view/terminal-emulator subprojects, not a Maven Central release.
     implementation 'com.github.termux.termux-app:terminal-view:v0.118.0'
     implementation 'com.github.termux.termux-app:terminal-emulator:v0.118.0'
+    
+    implementation platform(libs.compose.bom)
+    implementation libs.androidx.compose.ui
+    implementation libs.androidx.compose.material3
+    implementation libs.androidx.activity.compose
 
     coreLibraryDesugaring libs.desugar.jdk.libs.nio
 }

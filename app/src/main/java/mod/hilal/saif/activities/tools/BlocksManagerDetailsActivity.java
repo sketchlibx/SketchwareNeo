@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Parcelable;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -22,17 +24,23 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
+import androidx.core.view.MenuItemCompat;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.gson.JsonParseException;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import dev.pranav.filepicker.FilePickerCallback;
@@ -56,11 +64,16 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
     private String pallet_path = "";
     private int palette = 0;
     private Parcelable listViewSavedState;
+    private String searchQuery = "";
 
     private Toolbar toolbar;
     private ListView block_list;
     private LinearLayout background;
     private com.google.android.material.floatingactionbutton.FloatingActionButton fab_button;
+    private CircularProgressIndicator loadingIndicator;
+    private TextView emptySearchState;
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -70,6 +83,8 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         background = findViewById(R.id.background);
         block_list = findViewById(R.id.block_list);
         fab_button = findViewById(R.id.fab_button);
+        loadingIndicator = findViewById(R.id.loadingIndicator);
+        emptySearchState = findViewById(R.id.emptySearchState);
 
         initialize();
         _receive_intents();
@@ -162,6 +177,40 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         menu.clear();
         if (Integer.parseInt(getIntent().getStringExtra("position")) != -1) {
             if (mode.equals("normal")) {
+                MenuItem searchItem = menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Search");
+                searchItem.setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_search));
+                searchItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+                SearchView searchView = new SearchView(this);
+                searchView.setQueryHint("Search blocks");
+                searchView.setQuery(searchQuery, false);
+                searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                    @Override
+                    public boolean onQueryTextSubmit(String query) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onQueryTextChange(String newText) {
+                        searchQuery = newText == null ? "" : newText;
+                        applySearchableFilter();
+                        return true;
+                    }
+                });
+                MenuItemCompat.setOnActionExpandListener(searchItem, new MenuItemCompat.OnActionExpandListener() {
+                    @Override
+                    public boolean onMenuItemActionExpand(MenuItem item) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onMenuItemActionCollapse(MenuItem item) {
+                        searchQuery = "";
+                        applySearchableFilter();
+                        return true;
+                    }
+                });
+                MenuItemCompat.setActionView(searchItem, searchView);
+
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Swap").setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_swap_vertical)).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Import");
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Export");
@@ -180,6 +229,12 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 if (mode.equals("normal")) {
                     mode = "editor";
                     fabButtonVisibility(false);
+                    if (!searchQuery.isEmpty()) {
+                        // Up/down reordering indexes filtered_list/reference_list
+                        // positionally, so it must operate on the full, unfiltered palette.
+                        searchQuery = "";
+                        applySearchableFilter();
+                    }
                 } else {
                     mode = "normal";
                     fabButtonVisibility(true);
@@ -198,8 +253,22 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
             case "Export":
                 Object paletteName = pallet_list.get(palette - 9).get("name");
                 if (paletteName instanceof String) {
+                    // Export always covers the whole palette, regardless of an active
+                    // search filter — search is a display-only concern.
+                    ArrayList<HashMap<String, Object>> exportList = new ArrayList<>();
+                    for (HashMap<String, Object> block : all_blocks_list) {
+                        Object blockPalette = block.get("palette");
+                        if (blockPalette instanceof String) {
+                            try {
+                                if (Integer.parseInt((String) blockPalette) == palette) {
+                                    exportList.add(block);
+                                }
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                    }
                     String exportTo = new File(BLOCK_EXPORT_PATH, paletteName + ".json").getAbsolutePath();
-                    FileUtil.writeFile(exportTo, getGson().toJson(filtered_list));
+                    FileUtil.writeFile(exportTo, getGson().toJson(exportList));
                     SketchwareUtil.toast("Successfully exported blocks to:\n" + exportTo, Toast.LENGTH_LONG);
                 } else {
                     SketchwareUtil.toastError("Invalid name of palette #" + (palette - 9));
@@ -216,18 +285,116 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         palette = Integer.parseInt(getIntent().getStringExtra("position"));
         pallet_path = getIntent().getStringExtra("dirP");
         blocks_path = getIntent().getStringExtra("dirB");
-        _refreshLists();
         if (palette == -1) {
             getSupportActionBar().setTitle("Recycle Bin");
             fab_button.setVisibility(View.GONE);
-        } else {
-            Object paletteName = pallet_list.get(palette - 9).get("name");
+        }
+        loadDataAsync();
+    }
 
+    /**
+     * Async replacement for the initial _refreshLists() call — the one that ran on
+     * onCreate/_receive_intents and froze the UI while reading potentially large
+     * palette/block JSON files. _refreshLists() itself is left untouched for its many
+     * other (post-edit/delete/import/swap) call sites, which are small in-memory refreshes
+     * already triggered from the main thread by user actions.
+     */
+    private void loadDataAsync() {
+        loadingIndicator.setVisibility(View.VISIBLE);
+        block_list.setVisibility(View.GONE);
+        emptySearchState.setVisibility(View.GONE);
+
+        ioExecutor.execute(() -> {
+            String paletteFileContent = FileUtil.readFile(pallet_path);
+            String blocksFileContent = FileUtil.readFile(blocks_path);
+            mainHandler.post(() -> applyLoadedData(paletteFileContent, blocksFileContent));
+        });
+    }
+
+    private void applyLoadedData(String paletteFileContent, String blocksFileContent) {
+        if (isFinishing() || isDestroyed()) return;
+
+        if (paletteFileContent.isEmpty()) {
+            FileUtil.writeFile(pallet_path, "[]");
+            paletteFileContent = "[]";
+        }
+        if (blocksFileContent.isEmpty()) {
+            FileUtil.writeFile(blocks_path, "[]");
+            blocksFileContent = "[]";
+        }
+
+        try {
+            ArrayList<HashMap<String, Object>> parsed = getGson().fromJson(paletteFileContent, Helper.TYPE_MAP_LIST);
+            pallet_list = parsed != null ? parsed : new ArrayList<>();
+        } catch (JsonParseException e) {
+            SketchwareUtil.showFailedToParseJsonDialog(this, new File(pallet_path), "Custom Block Palettes", v -> loadDataAsync());
+            pallet_list = new ArrayList<>();
+        }
+
+        try {
+            ArrayList<HashMap<String, Object>> parsed = getGson().fromJson(blocksFileContent, Helper.TYPE_MAP_LIST);
+            all_blocks_list = parsed != null ? parsed : new ArrayList<>();
+        } catch (JsonParseException e) {
+            SketchwareUtil.showFailedToParseJsonDialog(this, new File(blocks_path), "Custom Blocks", v -> loadDataAsync());
+            all_blocks_list = new ArrayList<>();
+        }
+
+        if (palette != -1) {
+            Object paletteName = palette - 9 < pallet_list.size() ? pallet_list.get(palette - 9).get("name") : null;
             if (paletteName instanceof String) {
                 getSupportActionBar().setTitle("Manage Block");
                 getSupportActionBar().setSubtitle((String) paletteName);
             }
         }
+
+        applySearchableFilter();
+
+        loadingIndicator.setVisibility(View.GONE);
+        block_list.setVisibility(View.VISIBLE);
+    }
+
+    /** Rebuilds filtered_list/reference_list from all_blocks_list: palette membership AND
+     *  (if searchQuery is set) a name/spec match — the same invariant _refreshLists() keeps,
+     *  just with the extra text condition, so every existing position-based operation
+     *  (edit/delete/swap/export via reference_list) keeps resolving correctly. */
+    private void applySearchableFilter() {
+        filtered_list.clear();
+        reference_list.clear();
+        String q = searchQuery.trim().toLowerCase(Locale.getDefault());
+
+        for (int i = 0; i < all_blocks_list.size(); i++) {
+            HashMap<String, Object> block = all_blocks_list.get(i);
+            Object blockPalette = block.get("palette");
+            if (!(blockPalette instanceof String)) continue;
+            try {
+                if (Integer.parseInt((String) blockPalette) != palette) continue;
+            } catch (NumberFormatException e) {
+                SketchwareUtil.toastError("Invalid palette entry in block #" + (i + 1));
+                continue;
+            }
+            if (q.isEmpty() || matchesBlockSearch(block, q)) {
+                reference_list.add(i);
+                filtered_list.add(block);
+            }
+        }
+
+        Parcelable savedState = block_list.onSaveInstanceState();
+        block_list.setAdapter(new Adapter(filtered_list));
+        ((BaseAdapter) block_list.getAdapter()).notifyDataSetChanged();
+        block_list.onRestoreInstanceState(savedState);
+
+        boolean noResults = !q.isEmpty() && filtered_list.isEmpty();
+        emptySearchState.setVisibility(noResults ? View.VISIBLE : View.GONE);
+        block_list.setVisibility(noResults ? View.GONE : View.VISIBLE);
+    }
+
+    private boolean matchesBlockSearch(HashMap<String, Object> block, String lowerCaseQuery) {
+        Object name = block.get("name");
+        if (name instanceof String && ((String) name).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery)) return true;
+        Object spec = block.get("spec");
+        if (spec instanceof String && ((String) spec).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery)) return true;
+        Object typeName = block.get("typeName");
+        return typeName instanceof String && ((String) typeName).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery);
     }
 
     private void _refreshLists() {

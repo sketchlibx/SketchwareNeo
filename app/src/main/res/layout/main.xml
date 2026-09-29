@@ -37,7 +37,6 @@
                 android:gravity="center_vertical"
                 app:layout_scrollFlags="scroll|enterAlways|snap">
 
-                <!-- Distinct Menu Button Container -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="56dp"
                     android:layout_height="56dp"
@@ -55,7 +54,6 @@
                         app:contentInsetStartWithNavigation="0dp" />
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Distinct Search Bar Container -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="56dp"
@@ -90,7 +88,7 @@
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/fab_group"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -98,74 +96,13 @@
             android:layout_marginEnd="16dp"
             android:layout_marginBottom="96dp"
             android:clipChildren="false"
-            android:clipToPadding="false"
-            android:gravity="end"
-            android:orientation="vertical">
+            android:clipToPadding="false">
 
-            <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/fab_action_import"
+            <androidx.compose.ui.platform.ComposeView
+                android:id="@+id/compose_view_fab"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="Import Android Studio Project"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:backgroundTint="?attr/colorPrimaryContainer"
-                app:cornerRadius="16dp"
-                app:elevation="3dp"
-                app:icon="@drawable/ic_mtrl_folder_code"
-                app:iconTint="?attr/colorOnPrimaryContainer"
-                android:visibility="gone"
-                tools:ignore="ContentDescription" />
-
-            <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/fab_action_restore"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="Restore Sketchware Backup"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:backgroundTint="?attr/colorPrimaryContainer"
-                app:cornerRadius="16dp"
-                app:elevation="3dp"
-                app:icon="@drawable/ic_mtrl_history"
-                app:iconTint="?attr/colorOnPrimaryContainer"
-                android:visibility="gone"
-                tools:ignore="ContentDescription" />
-
-            <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/fab_action_new_project"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:text="New project"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:backgroundTint="?attr/colorPrimaryContainer"
-                app:cornerRadius="16dp"
-                app:elevation="3dp"
-                app:icon="@drawable/ic_mtrl_add"
-                app:iconTint="?attr/colorOnPrimaryContainer"
-                android:visibility="gone"
-                tools:ignore="ContentDescription" />
-
-            <!-- Main Toggle FAB -->
-            <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-                android:id="@+id/create_new_project"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Create &amp; Import"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                app:backgroundTint="?attr/colorPrimaryContainer"
-                app:cornerRadius="16dp"
-                app:elevation="3dp"
-                app:icon="@drawable/ic_mtrl_add"
-                app:iconTint="?attr/colorOnPrimaryContainer"
-                tools:ignore="ContentDescription" />
-
-        </LinearLayout>
+                android:layout_height="wrap_content" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

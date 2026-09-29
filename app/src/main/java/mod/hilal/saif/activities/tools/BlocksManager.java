@@ -9,6 +9,8 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Vibrator;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -21,8 +23,11 @@ import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.graphics.Insets;
+import androidx.core.view.MenuItemCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -43,8 +48,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import mod.hey.studios.editor.manage.block.v2.BlockLoader;
 import mod.hey.studios.util.Helper;
@@ -68,10 +76,18 @@ public class BlocksManager extends BaseAppCompatActivity {
     private int newPos;
     private Activity activity;
     private ArrayList<HashMap<String, Object>> pallet_listmap = new ArrayList<>();
+    // Maps a position in the currently-displayed (possibly search-filtered) adapter data
+    // back to its real index in pallet_listmap. When no search is active this is simply
+    // [0, 1, 2, ...]. All position-dependent operations (open details, edit, delete,
+    // insert) must resolve through this instead of assuming display position == real index.
+    private final ArrayList<Integer> pallet_reference_list = new ArrayList<>();
+    private String searchQuery = "";
     private ItemTouchHelper itemTouchHelper;
     private ActivityBlocksManagerBinding binding;
     private DialogPaletteBinding dialogBinding;
     private Vibrator vibrator;
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate(Bundle _savedInstanceState) {
@@ -106,16 +122,17 @@ public class BlocksManager extends BaseAppCompatActivity {
 
         binding.toolbar.setNavigationOnClickListener(view -> getOnBackPressedDispatcher().onBackPressed());
         binding.paletteRecycler.setLayoutManager(new LinearLayoutManager(this));
-        binding.paletteRecycler.setAdapter(new PaletteAdapter(pallet_listmap));
+        binding.paletteRecycler.setAdapter(new PaletteAdapter());
         binding.fab.setOnClickListener(v -> showPaletteDialog(false, null, null, "#ffffff", null));
 
-        readSettings();
-        refreshList();
         recycleBin(binding.recycleBinCard);
+        loadDataAsync();
 
         itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                if (!searchQuery.isEmpty()) return false;
+
                 oldPos = viewHolder.getBindingAdapterPosition();
                 newPos = target.getBindingAdapterPosition();
 
@@ -180,6 +197,39 @@ public class BlocksManager extends BaseAppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        MenuItem searchItem = menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Search");
+        searchItem.setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_search));
+        searchItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+        SearchView searchView = new SearchView(this);
+        searchView.setQueryHint("Search palettes");
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                searchQuery = newText == null ? "" : newText;
+                applyFilter();
+                return true;
+            }
+        });
+        MenuItemCompat.setOnActionExpandListener(searchItem, new MenuItemCompat.OnActionExpandListener() {
+            @Override
+            public boolean onMenuItemActionExpand(MenuItem item) {
+                return true;
+            }
+
+            @Override
+            public boolean onMenuItemActionCollapse(MenuItem item) {
+                searchQuery = "";
+                applyFilter();
+                return true;
+            }
+        });
+        MenuItemCompat.setActionView(searchItem, searchView);
+
         menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Settings").setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_settings)).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
         return true;
     }
@@ -198,9 +248,7 @@ public class BlocksManager extends BaseAppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        readSettings();
-        refreshList();
-        refreshCount();
+        loadDataAsync();
     }
 
     private void showBlockConfigurationDialog() {
@@ -245,8 +293,7 @@ public class BlocksManager extends BaseAppCompatActivity {
         dialog.setMessage(R.string.common_message_confirm);
         dialog.setPositiveButton(R.string.common_word_yes, (v, which) -> {
             pallet_listmap.remove(position);
-            Objects.requireNonNull(binding.paletteRecycler.getAdapter()).notifyItemRemoved(position);
-            Objects.requireNonNull(binding.paletteRecycler.getAdapter()).notifyItemChanged(position);
+            applyFilter();
             draggedView = null;
             moveRelatedBlocksToRecycleBin(position + 9);
             removeRelatedBlocks(position + 9);
@@ -257,6 +304,116 @@ public class BlocksManager extends BaseAppCompatActivity {
         });
         dialog.setNegativeButton(R.string.common_word_cancel, null);
         dialog.show();
+    }
+
+    /**
+     * Async replacement for the initial readSettings()+refreshList() sequence, used only
+     * for onCreate/onResume — the moment that previously froze the UI on large block/palette
+     * files. File reading happens off the main thread; parsing (fast) and any error dialog
+     * stay on the main thread since Gson parsing of these files is not the slow part and
+     * SketchwareUtil.showFailedToParseJsonDialog must not be called off the main thread.
+     * readSettings()/refreshList() themselves are left exactly as-is for their many other
+     * (post-edit/delete/swap) call sites, which are small, already-in-memory refreshes.
+     */
+    private void loadDataAsync() {
+        binding.loadingIndicator.setVisibility(View.VISIBLE);
+        binding.paletteRecycler.setVisibility(View.GONE);
+        binding.emptySearchState.setVisibility(View.GONE);
+
+        String resolvedPalletDir = FileUtil.getExternalStorageDir() + ConfigActivity.getStringSettingValueOrSetAndGet(ConfigActivity.SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH,
+                (String) ConfigActivity.getDefaultValue(ConfigActivity.SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH));
+        String resolvedBlocksDir = FileUtil.getExternalStorageDir() + ConfigActivity.getStringSettingValueOrSetAndGet(ConfigActivity.SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH,
+                (String) ConfigActivity.getDefaultValue(ConfigActivity.SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH));
+        pallet_dir = resolvedPalletDir;
+        blocks_dir = resolvedBlocksDir;
+
+        ioExecutor.execute(() -> {
+            String blocksContent = FileUtil.isExistFile(resolvedBlocksDir) ? FileUtil.readFile(resolvedBlocksDir) : "";
+            String paletteContent = FileUtil.isExistFile(resolvedPalletDir) ? FileUtil.readFile(resolvedPalletDir) : "";
+            mainHandler.post(() -> applyLoadedData(blocksContent, paletteContent));
+        });
+    }
+
+    private void applyLoadedData(String blocksContent, String paletteContent) {
+        if (isFinishing() || isDestroyed()) return;
+
+        if (!blocksContent.isEmpty() && isValidJson(blocksContent)) {
+            try {
+                ArrayList<HashMap<String, Object>> parsed = getGson().fromJson(blocksContent, Helper.TYPE_MAP_LIST);
+                if (parsed != null) {
+                    all_blocks_list = parsed;
+                } else {
+                    SketchwareUtil.showFailedToParseJsonDialog(this, new File(blocks_dir), "Custom Blocks", v -> loadDataAsync());
+                }
+            } catch (JsonParseException e) {
+                SketchwareUtil.showFailedToParseJsonDialog(this, new File(blocks_dir), "Custom Blocks", v -> loadDataAsync());
+            }
+        }
+
+        if (!paletteContent.isEmpty()) {
+            try {
+                ArrayList<HashMap<String, Object>> parsed = getGson().fromJson(paletteContent, Helper.TYPE_MAP_LIST);
+                if (parsed != null) {
+                    pallet_listmap = parsed;
+                } else {
+                    SketchwareUtil.showFailedToParseJsonDialog(this, new File(pallet_dir), "Custom Block Palettes", v -> loadDataAsync());
+                    pallet_listmap = new ArrayList<>();
+                }
+            } catch (JsonParseException e) {
+                SketchwareUtil.showFailedToParseJsonDialog(this, new File(pallet_dir), "Custom Block Palettes", v -> loadDataAsync());
+                pallet_listmap = new ArrayList<>();
+            }
+        } else {
+            pallet_listmap = new ArrayList<>();
+        }
+
+        applyFilter();
+        binding.recycleSub.setText("Blocks: " + (long) getN(-1));
+        refreshCount();
+
+        binding.loadingIndicator.setVisibility(View.GONE);
+        binding.paletteRecycler.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Rebuilds pallet_reference_list from pallet_listmap, applying searchQuery (palette name,
+     * case-insensitive) if one is active. This is the single source of truth the adapter reads
+     * through — never index pallet_listmap by adapter position directly.
+     */
+    private void applyFilter() {
+        pallet_reference_list.clear();
+        String q = searchQuery.trim().toLowerCase(Locale.getDefault());
+        for (int i = 0; i < pallet_listmap.size(); i++) {
+            if (q.isEmpty() || matchesPaletteSearch(pallet_listmap.get(i), q)) {
+                pallet_reference_list.add(i);
+            }
+        }
+        Objects.requireNonNull(binding.paletteRecycler.getAdapter()).notifyDataSetChanged();
+
+        boolean noResults = !q.isEmpty() && pallet_reference_list.isEmpty();
+        binding.emptySearchState.setVisibility(noResults ? View.VISIBLE : View.GONE);
+        binding.paletteRecycler.setVisibility(noResults ? View.GONE : View.VISIBLE);
+    }
+
+    private boolean matchesPaletteSearch(HashMap<String, Object> palette, String lowerCaseQuery) {
+        Object name = palette.get("name");
+        if (name instanceof String && ((String) name).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery)) {
+            return true;
+        }
+        // Also match if any block belonging to this palette has a matching name/spec, so
+        // searching "json" finds the right palette even if the palette itself isn't named that.
+        int paletteId = pallet_listmap.indexOf(palette) + 9;
+        if (all_blocks_list == null) return false;
+        for (HashMap<String, Object> block : all_blocks_list) {
+            Object p = block.get("palette");
+            if (p != null && String.valueOf(paletteId).equals(p.toString())) {
+                Object bName = block.get("name");
+                Object bSpec = block.get("spec");
+                if (bName instanceof String && ((String) bName).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery)) return true;
+                if (bSpec instanceof String && ((String) bSpec).toLowerCase(Locale.getDefault()).contains(lowerCaseQuery)) return true;
+            }
+        }
+        return false;
     }
 
     private void readSettings() {
@@ -311,7 +468,7 @@ public class BlocksManager extends BaseAppCompatActivity {
             pallet_listmap = new ArrayList<>();
         }
 
-        binding.paletteRecycler.setAdapter(new PaletteAdapter(pallet_listmap));
+        applyFilter();
         binding.recycleSub.setText("Blocks: " + (long) getN(-1));
         refreshCount();
     }
@@ -488,14 +645,14 @@ public class BlocksManager extends BaseAppCompatActivity {
                     if (insertAtPosition == null) {
                         pallet_listmap.add(map);
                         FileUtil.writeFile(pallet_dir, getGson().toJson(pallet_listmap));
-                        Objects.requireNonNull(binding.paletteRecycler.getAdapter()).notifyItemInserted(pallet_listmap.size() - 1);
                         readSettings();
+                        applyFilter();
                     } else {
                         pallet_listmap.add(insertAtPosition, map);
                         FileUtil.writeFile(pallet_dir, getGson().toJson(pallet_listmap));
                         readSettings();
-                        Objects.requireNonNull(binding.paletteRecycler.getAdapter()).notifyItemInserted(insertAtPosition);
                         insertBlocksAt(insertAtPosition + 9);
+                        applyFilter();
                     }
                 } else {
                     pallet_listmap.get(oldPosition).put("name", nameInput);
@@ -545,13 +702,6 @@ public class BlocksManager extends BaseAppCompatActivity {
 
     public class PaletteAdapter extends RecyclerView.Adapter<PaletteAdapter.ViewHolder> {
 
-        private final ArrayList<HashMap<String, Object>> palettes;
-
-        public PaletteAdapter(ArrayList<HashMap<String, Object>> palettes) {
-            this.palettes = palettes;
-
-        }
-
         @NonNull
         @Override
         public PaletteAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -562,15 +712,24 @@ public class BlocksManager extends BaseAppCompatActivity {
         @SuppressLint("ClickableViewAccessibility")
         @Override
         public void onBindViewHolder(@NonNull PaletteAdapter.ViewHolder holder, int position) {
-            String paletteColorValue = (String) palettes.get(position).get("color");
+            // Always resolve the real pallet_listmap index through pallet_reference_list —
+            // "position" is only meaningful within the currently displayed (possibly
+            // search-filtered) subset.
+            int realIndex = pallet_reference_list.get(position);
+            HashMap<String, Object> paletteEntry = pallet_listmap.get(realIndex);
+
+            String paletteColorValue = (String) paletteEntry.get("color");
             assert paletteColorValue != null;
             int backgroundColor = PropertiesUtil.parseColor(paletteColorValue);
 
             holder.itemView.setVisibility(View.VISIBLE);
-            holder.itemBinding.title.setText(Objects.requireNonNull(pallet_listmap.get(position).get("name")).toString());
-            holder.itemBinding.sub.setText("Blocks: " + (long) getN(position + 9));
+            holder.itemBinding.title.setText(Objects.requireNonNull(paletteEntry.get("name")).toString());
+            holder.itemBinding.sub.setText("Blocks: " + (long) getN(realIndex + 9));
             holder.itemBinding.color.setBackgroundColor(backgroundColor);
-            holder.itemBinding.dragHandler.setVisibility(View.VISIBLE);
+            // Reordering by drag only makes sense against the unfiltered list, so it's
+            // disabled while a search is active (existing drag/reorder behavior is fully
+            // preserved when not searching).
+            holder.itemBinding.dragHandler.setVisibility(searchQuery.isEmpty() ? View.VISIBLE : View.GONE);
             binding.recycleSub.setText("Blocks: " + (long) getN(-1));
 
             holder.itemBinding.backgroundCard.setOnLongClickListener(v -> {
@@ -582,9 +741,9 @@ public class BlocksManager extends BaseAppCompatActivity {
                 Menu menu = popup.getMenu();
                 menu.add(edit);
                 menu.add(delete);
-                menu.add(insert);
+                if (searchQuery.isEmpty()) menu.add(insert); // insert-at-position is ambiguous while filtered
                 popup.setOnMenuItemClickListener(item -> {
-                    int pos = holder.getAbsoluteAdapterPosition();
+                    int pos = pallet_reference_list.get(holder.getAbsoluteAdapterPosition());
                     switch (Objects.requireNonNull(item.getTitle()).toString()) {
                         case edit:
                             showPaletteDialog(true, pos,
@@ -597,27 +756,27 @@ public class BlocksManager extends BaseAppCompatActivity {
                                     .setTitle(Objects.requireNonNull(pallet_listmap.get(pos).get("name")).toString())
                                     .setMessage("Remove all blocks related to this palette?")
                                     .setPositiveButton("Remove permanently", (dialog, which) -> {
-                                        palettes.remove(pos);
-                                        notifyItemRemoved(pos);
+                                        pallet_listmap.remove(pos);
                                         FileUtil.writeFile(pallet_dir, getGson().toJson(pallet_listmap));
                                         removeRelatedBlocks(pos + 9);
                                         readSettings();
+                                        applyFilter();
                                         refreshCount();
                                     })
                                     .setNegativeButton(R.string.common_word_cancel, null)
                                     .setNeutralButton(R.string.block_move_to_bin, (dialog, which) -> {
-                                        moveRelatedBlocksToRecycleBin(position + 9);
-                                        palettes.remove(pos);
-                                        notifyItemRemoved(pos);
+                                        moveRelatedBlocksToRecycleBin(pos + 9);
+                                        pallet_listmap.remove(pos);
                                         FileUtil.writeFile(pallet_dir, getGson().toJson(pallet_listmap));
                                         removeRelatedBlocks(pos + 9);
                                         readSettings();
+                                        applyFilter();
                                         refreshCount();
                                     }).show();
                             break;
 
                         case insert:
-                            showPaletteDialog(false, null, null, null, position);
+                            showPaletteDialog(false, null, null, null, pos);
                             break;
 
                         default:
@@ -638,8 +797,9 @@ public class BlocksManager extends BaseAppCompatActivity {
             });
 
             holder.itemBinding.backgroundCard.setOnClickListener(v -> {
+                int clickedRealIndex = pallet_reference_list.get(holder.getAbsoluteAdapterPosition());
                 Intent intent = new Intent(getApplicationContext(), BlocksManagerDetailsActivity.class);
-                intent.putExtra("position", String.valueOf((long) (holder.getAbsoluteAdapterPosition() + 9)));
+                intent.putExtra("position", String.valueOf((long) (clickedRealIndex + 9)));
                 intent.putExtra("dirB", blocks_dir);
                 intent.putExtra("dirP", pallet_dir);
                 startActivity(intent);
@@ -649,7 +809,7 @@ public class BlocksManager extends BaseAppCompatActivity {
 
         @Override
         public int getItemCount() {
-            return palettes.size();
+            return pallet_reference_list.size();
         }
 
         public static class ViewHolder extends RecyclerView.ViewHolder {

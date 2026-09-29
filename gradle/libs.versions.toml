@@ -48,6 +48,9 @@ googleApiServicesDrive = "v3-rev20230822-2.0.0"
 googleHttpClientGson = "1.43.3"
 workManager = "2.9.0"
 
+composeBom = "2024.10.01"
+composeMaterial3 = "1.4.0-alpha02"
+
 [libraries]
 androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
@@ -123,6 +126,10 @@ google-api-services-drive = { module = "com.google.apis:google-api-services-driv
 google-http-client-gson = { module = "com.google.http-client:google-http-client-gson", version.ref = "googleHttpClientGson" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workManager" }
 
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "composeMaterial3" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity" }
 
 [bundles]
 ui = ["androidx-activity", "androidx-appcompat", "androidx-splashscreen", "androidx-recyclerview",

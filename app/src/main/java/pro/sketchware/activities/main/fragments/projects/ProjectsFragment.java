@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SearchView;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.core.view.MenuProvider;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.widget.NestedScrollView;
@@ -27,7 +28,6 @@ import com.besome.sketch.design.DesignActivity;
 import com.besome.sketch.editor.manage.library.ProjectComparator;
 import com.besome.sketch.projects.MyProjectSettingActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.transition.MaterialFadeThrough;
 
 import java.util.ArrayList;
@@ -56,11 +56,8 @@ public class ProjectsFragment extends DA {
     private MyprojectsBinding binding;
     private ProjectsAdapter projectsAdapter;
     
-    private boolean isFabExpanded = false;
-    private ExtendedFloatingActionButton fabToggle;
-    private ExtendedFloatingActionButton fabActionImport;
-    private ExtendedFloatingActionButton fabActionRestore;
-    private ExtendedFloatingActionButton fabActionNewProject;
+    private ComposeView composeViewFab;
+    private FloatingActionButtonMenuHost.MenuController fabMenuController;
     
     public final ActivityResultLauncher<Intent> openProjectSettings = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == Activity.RESULT_OK) {
@@ -137,16 +134,8 @@ public class ProjectsFragment extends DA {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        isFabExpanded = false;
-        if (fabToggle != null) fabToggle.setOnClickListener(null);
-        if (fabActionImport != null) fabActionImport.setOnClickListener(null);
-        if (fabActionRestore != null) fabActionRestore.setOnClickListener(null);
-        if (fabActionNewProject != null) fabActionNewProject.setOnClickListener(null);
-        
-        fabToggle = null;
-        fabActionImport = null;
-        fabActionRestore = null;
-        fabActionNewProject = null;
+        fabMenuController = null;
+        composeViewFab = null;
         binding = null; 
     }
 
@@ -154,32 +143,17 @@ public class ProjectsFragment extends DA {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         preference = new DB(requireContext(), "project");
 
-        fabToggle = requireActivity().findViewById(R.id.create_new_project);
-        fabActionImport = requireActivity().findViewById(R.id.fab_action_import);
-        fabActionRestore = requireActivity().findViewById(R.id.fab_action_restore);
-        fabActionNewProject = requireActivity().findViewById(R.id.fab_action_new_project);
         View fabGroup = requireActivity().findViewById(R.id.fab_group);
+        composeViewFab = requireActivity().findViewById(R.id.compose_view_fab);
 
-        if (fabToggle != null) {
-            fabToggle.setOnClickListener(v -> toggleFabMenu());
-        }
-        if (fabActionImport != null) {
-            fabActionImport.setOnClickListener(v -> {
-                ASProjectImporter.showPicker(getActivity(), this);
-                toggleFabMenu();
-            });
-        }
-        if (fabActionRestore != null) {
-            fabActionRestore.setOnClickListener(v -> {
-                new BackupRestoreManager(getActivity(), this).restore();
-                toggleFabMenu();
-            });
-        }
-        if (fabActionNewProject != null) {
-            fabActionNewProject.setOnClickListener(v -> {
-                toProjectSettingsActivity();
-                toggleFabMenu();
-            });
+        // Safely map Java Actions to Compose
+        if (composeViewFab != null) {
+            fabMenuController = FloatingActionButtonMenuHost.setupFabMenu(
+                    composeViewFab,
+                    this::toProjectSettingsActivity,
+                    () -> new BackupRestoreManager(getActivity(), this).restore(),
+                    () -> ASProjectImporter.showPicker(getActivity(), this)
+            );
         }
 
         if (fabGroup != null) {
@@ -187,7 +161,6 @@ public class ProjectsFragment extends DA {
         }
 
         binding.swipeRefresh.setProgressViewOffset(false, -200, -200);
-
         binding.swipeRefresh.setOnRefreshListener(() -> {
             if (binding != null && binding.customRefreshIndicator != null) {
                 binding.customRefreshIndicator.setVisibility(View.VISIBLE);
@@ -212,15 +185,20 @@ public class ProjectsFragment extends DA {
 
         binding.nestedScroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
             int dy = scrollY - oldScrollY;
-            if (dy > 8) {
-                if (isFabExpanded) {
-                    toggleFabMenu();
-                } else if (fabToggle != null && fabToggle.isExtended()) {
-                    fabToggle.shrink();
-                }
-            } else if (dy < -8) { // Scrolling Up
-                if (!isFabExpanded && fabToggle != null && !fabToggle.isExtended()) {
-                    fabToggle.extend();
+            if (fabGroup != null) {
+                if (dy > 8) { // Scrolling down
+                    if (fabMenuController != null && fabMenuController.isExpanded()) {
+                        fabMenuController.collapse();
+                    }
+                    if (fabGroup.getVisibility() == View.VISIBLE) {
+                        fabGroup.animate().translationY(250f).alpha(0f).setDuration(200)
+                            .withEndAction(() -> fabGroup.setVisibility(View.GONE)).start();
+                    }
+                } else if (dy < -8) { // Scrolling up
+                    if (fabGroup.getVisibility() == View.GONE) {
+                        fabGroup.setVisibility(View.VISIBLE);
+                        fabGroup.animate().translationY(0f).alpha(1f).setDuration(200).start();
+                    }
                 }
             }
         });
@@ -230,28 +208,6 @@ public class ProjectsFragment extends DA {
         }
 
         setupMenu();
-    }
-    
-    private void toggleFabMenu() {
-        isFabExpanded = !isFabExpanded;
-        if (isFabExpanded) {
-            if (fabActionImport != null) fabActionImport.show();
-            if (fabActionRestore != null) fabActionRestore.show();
-            if (fabActionNewProject != null) fabActionNewProject.show();
-            if (fabToggle != null) {
-                fabToggle.setIconResource(R.drawable.ic_mtrl_close);
-                fabToggle.setText("Close");
-                if (!fabToggle.isExtended()) fabToggle.extend();
-            }
-        } else {
-            if (fabActionImport != null) fabActionImport.hide();
-            if (fabActionRestore != null) fabActionRestore.hide();
-            if (fabActionNewProject != null) fabActionNewProject.hide();
-            if (fabToggle != null) {
-                fabToggle.setIconResource(R.drawable.ic_mtrl_add);
-                fabToggle.setText("Create & Import");
-            }
-        }
     }
     
     private void setupMenu() {

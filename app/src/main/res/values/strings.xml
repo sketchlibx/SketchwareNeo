@@ -126,7 +126,11 @@
     <string name="block_crop_bitmap_center_body_3">height</string>
     <string name="block_crop_bitmap_center_head">crop image center from path</string>
     <string name="block_crop_bitmap_center_tail" />
+    <string name="block_decrease_float_num_head" />
+    <string name="block_decrease_float_num_tail">decrease 1</string>
     <string name="block_decrease_int_head" />
+    <string name="block_decrease_int_num_head" />
+    <string name="block_decrease_int_num_tail">decrease 1</string>
     <string name="block_decrease_int_tail">decrease 1</string>
     <string name="block_delete_list_body_1">of</string>
     <string name="block_delete_list_head">delete at</string>
@@ -316,7 +320,11 @@
     <string name="block_if_else_tail">then</string>
     <string name="block_if_head">if</string>
     <string name="block_if_tail">then</string>
+    <string name="block_increase_float_num_head" />
+    <string name="block_increase_float_num_tail">increase 1</string>
     <string name="block_increase_int_head" />
+    <string name="block_increase_int_num_head" />
+    <string name="block_increase_int_num_tail">increase 1</string>
     <string name="block_increase_int_tail">increase 1</string>
     <string name="block_indexof_list_int_body_1">in</string>
     <string name="block_indexof_list_int_head">index</string>
@@ -736,8 +744,14 @@
     <string name="block_set_var_bool_body_1">to</string>
     <string name="block_set_var_bool_head">set</string>
     <string name="block_set_var_bool_tail" />
+    <string name="block_set_var_float_body_1">to</string>
+    <string name="block_set_var_float_head">set</string>
+    <string name="block_set_var_float_tail" />
     <string name="block_set_var_int_body_1">to</string>
     <string name="block_set_var_int_head">set</string>
+    <string name="block_set_var_int_num_body_1">to</string>
+    <string name="block_set_var_int_num_head">set</string>
+    <string name="block_set_var_int_num_tail" />
     <string name="block_set_var_int_tail" />
     <string name="block_set_var_str_body_1">to</string>
     <string name="block_set_var_str_head">set</string>
@@ -2137,7 +2151,7 @@ Please try again later"</string>
     <string name="title_compatible_chrome_browser">Chrome Browser Required</string>
     <string name="title_discord_community">Discord</string>
     <string name="title_telegram_community">Telegram</string>
-    <string name="title_sketchware">Sketchware Pro</string>
+    <string name="title_sketchware">Sketchware Neo</string>
     <string name="view_panel_title_layouts">Layouts</string>
     <string name="view_panel_title_properties">Properties</string>
     <string name="view_panel_title_widgets">Widgets</string>
@@ -2239,7 +2253,7 @@ Please try again later"</string>
     <string name="assets_manager_rename">Rename</string>
 
     <!--  about the team screen  -->
-    <string name="about_title">About Sketchware Pro</string>
+    <string name="about_title">About Sketchware Neo</string>
     <string name="about_team_title">The team</string>
     <string name="about_specialthanks_title">Special Thanks</string>
     <string name="about_changelog_title">Changelog</string>

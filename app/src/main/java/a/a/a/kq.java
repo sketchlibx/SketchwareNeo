@@ -36,7 +36,8 @@ public class kq {
                  "getAtListMap", "setListMap", "containListMap", "addMapToList", "insertMapToList",
                  "getMapInList" -> harmonizeWithPrimary(context, 0xffcc5b22);
             case "setVarBoolean", "setVarInt", "increaseInt", "decreaseInt", "setVarString",
-                 "setVarFloat", "setVarIntNum", "mapCreateNew", "mapPut", "mapGet",
+                 "setVarFloat", "setVarIntNum", "increaseFloatNum", "decreaseFloatNum",
+                 "increaseIntNum", "decreaseIntNum", "mapCreateNew", "mapPut", "mapGet",
                  "mapContainKey", "mapRemoveKey", "mapSize", "mapIsEmpty", "mapClear",
                  "mapGetAllKeys" ->
                     harmonizeWithPrimary(context, 0xffee7d16);

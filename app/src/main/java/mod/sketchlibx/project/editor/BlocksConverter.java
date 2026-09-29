@@ -848,12 +848,12 @@ public final class BlocksConverter {
 
         m = P_ASSIGN_FLOAT.matcher(line);
         if (m.matches()) { recognizedCount++;
-            return stmt(newId(), "set float %m.varFloat to %f", "setVarFloat",
+            return stmt(newId(), "set float %m.varFloat to %d", "setVarFloat",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
         m = P_ASSIGN_INT_NUM.matcher(line);
         if (m.matches()) { recognizedCount++;
-            return stmt(newId(), "set int %m.varIntNum to %i", "setVarIntNum",
+            return stmt(newId(), "set int %m.varIntNum to %d", "setVarIntNum",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
         m = P_ASSIGN_STR.matcher(line);

@@ -915,6 +915,8 @@ public class ProjectBuilder {
             programJars.add(yq.compiledClassesPath + ".jar");
         } catch (Exception e) {
             LogUtil.e(TAG, "Failed to build temp JAR for R8", e);
+            throw new IOException("Failed to package the project's own compiled classes for R8. " +
+                    "R8 cannot run without this input.", e);
         }
 
         for (Jp library : builtInLibraryManager.getLibraries()) {

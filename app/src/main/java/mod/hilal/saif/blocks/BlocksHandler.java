@@ -2627,9 +2627,13 @@ public class BlocksHandler {
         }
         if (showAll() || isFloatUsed) {
             logicEditorActivity.a(" ", "setVarFloat");
+            logicEditorActivity.a(" ", "increaseFloatNum");
+            logicEditorActivity.a(" ", "decreaseFloatNum");
         }
         if (showAll() || isIntNumUsed) {
             logicEditorActivity.a(" ", "setVarIntNum");
+            logicEditorActivity.a(" ", "increaseIntNum");
+            logicEditorActivity.a(" ", "decreaseIntNum");
         }
         if (showAll() || isMapUsed) {
             logicEditorActivity.a(" ", "mapCreateNew");

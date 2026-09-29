@@ -526,8 +526,8 @@ public class JavaLogicConverter {
                             : typeCode == 4 ? "setVarFloat" : typeCode == 7 ? "setVarIntNum" : "setVarString";
                     String spec = typeCode == 1 ? "set %m.varInt to %d"
                                 : typeCode == 0 ? "set %m.varBool to %b"
-                                : typeCode == 4 ? "set %m.varFloat to %f"
-                                : typeCode == 7 ? "set %m.varIntNum to %i" : "set %m.varStr to %s";
+                                : typeCode == 4 ? "set %m.varFloat to %d"
+                                : typeCode == 7 ? "set %m.varIntNum to %d" : "set %m.varStr to %s";
                     section.addStatement(opCode, spec, new String[]{var, valueParam}, "");
                     return;
                 }
