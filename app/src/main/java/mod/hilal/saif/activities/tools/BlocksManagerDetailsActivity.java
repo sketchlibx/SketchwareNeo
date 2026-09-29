@@ -7,15 +7,20 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcelable;
+import android.text.InputType;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.PopupMenu;
@@ -30,26 +35,39 @@ import androidx.cardview.widget.CardView;
 import androidx.core.view.MenuItemCompat;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.gson.JsonParseException;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 import dev.pranav.filepicker.FilePickerCallback;
 import dev.pranav.filepicker.FilePickerDialogFragment;
 import dev.pranav.filepicker.FilePickerOptions;
 import mod.hey.studios.util.Helper;
+import neo.sketchware.ai.AiResponseCallback;
+import neo.sketchware.ai.MultiBlockGenTask;
 import pro.sketchware.R;
 import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.PropertiesUtil;
 import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.ThemeUtils;
+import a.a.a.kq;
 
 public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
 
@@ -142,6 +160,263 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         dialog.show(getSupportFragmentManager(), "filePickerDialog");
     }
 
+    private static final Set<String> VALID_BLOCK_TYPES = new HashSet<>(java.util.Arrays.asList(
+            "regular", "c", "e", "s", "b", "d", "v", "a", "f", "l", "p", "h"));
+    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
+    private static final Pattern BARE_PERCENT_M = Pattern.compile("%m(?!\\.[A-Za-z]+)");
+    // kq.a() returns this exact color for any opcode it does not recognize as a reserved
+    // built-in name; anything else means the name collides with a real built-in block.
+    private static final int KQ_UNRECOGNIZED_COLOR = 0xff8a55d7;
+
+    private void showAiMultiBlockPromptDialog() {
+        int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
+        int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
+        int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp24, dp24, dp24, dp8);
+
+        TextView title = new TextView(this);
+        title.setText("Generate Blocks with AI");
+        title.setTextSize(20);
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        root.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Describe an SDK/API/library or a group of related operations. AI can generate several related blocks at once (e.g. init/load/show + callbacks) - you'll review and pick which ones to import next.");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
+        subParams.setMargins(0, dp8, 0, dp16);
+        subtitle.setLayoutParams(subParams);
+        root.addView(subtitle);
+
+        EditText topicInput = new EditText(this);
+        topicInput.setHint("Library/SDK/API name (optional), e.g. Unity Ads");
+        topicInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        LinearLayout.LayoutParams topicParams = new LinearLayout.LayoutParams(-1, -2);
+        topicParams.setMargins(0, 0, 0, dp8);
+        topicInput.setLayoutParams(topicParams);
+        root.addView(topicInput);
+
+        MaterialCardView card = new MaterialCardView(this);
+        card.setCardElevation(0);
+        card.setRadius(dp8);
+        card.setStrokeWidth((int) (1 * getResources().getDisplayMetrics().density));
+        card.setStrokeColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+
+        EditText promptInput = new EditText(this);
+        promptInput.setHint("e.g. blocks to initialize, load, and show a Unity interstitial ad, with load/show callbacks");
+        promptInput.setBackground(null);
+        promptInput.setPadding(dp16, dp16, dp16, dp16);
+        promptInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        promptInput.setMinLines(4);
+        promptInput.setMaxLines(10);
+        promptInput.setGravity(Gravity.TOP | Gravity.START);
+        promptInput.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        promptInput.setHintTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
+        card.addView(promptInput, new ViewGroup.LayoutParams(-1, -2));
+        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
+
+        new MaterialAlertDialogBuilder(this)
+                .setView(root)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Generate", (dialog, which) -> {
+                    String prompt = promptInput.getText() == null ? "" : promptInput.getText().toString().trim();
+                    if (prompt.isEmpty()) {
+                        SketchwareUtil.toastError("Describe what you need first.");
+                        return;
+                    }
+                    String topic = topicInput.getText() == null ? "" : topicInput.getText().toString().trim();
+                    runMultiBlockGeneration(topic, prompt);
+                })
+                .show();
+    }
+
+    private void runMultiBlockGeneration(String topic, String prompt) {
+        androidx.appcompat.app.AlertDialog loadingDialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Generating blocks")
+                .setMessage("Asking AI to design the blocks...")
+                .setCancelable(false)
+                .show();
+
+        StringBuilder existingNames = new StringBuilder();
+        if (all_blocks_list != null) {
+            for (HashMap<String, Object> block : all_blocks_list) {
+                Object name = block.get("name");
+                if (name instanceof String) {
+                    if (existingNames.length() > 0) existingNames.append(", ");
+                    existingNames.append((String) name);
+                }
+            }
+        }
+
+        MultiBlockGenTask.generate(this, existingNames.toString(), topic, prompt, new AiResponseCallback() {
+            @Override
+            public void onSuccess(String responseText) {
+                loadingDialog.dismiss();
+                try {
+                    handleAiMultiBlockResponse(responseText);
+                } catch (Exception e) {
+                    SketchwareUtil.toastError("Couldn't process the AI response: " + e.getMessage());
+                }
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                loadingDialog.dismiss();
+                SketchwareUtil.toastError("AI generation failed: " + errorMessage);
+            }
+        });
+    }
+
+    /**
+     * Parses {"blocks":[...]}, validates every entry against the real block.json schema,
+     * drops (and reports) invalid/duplicate ones without touching existing data, converts
+     * fields to the exact on-disk shape addBlock()/insertBlockAt() already use, then hands
+     * the surviving valid blocks to the EXISTING _importBlocks() accept/reject checklist -
+     * that dialog IS the preview/accept-reject step, reused rather than rebuilt.
+     */
+    private void handleAiMultiBlockResponse(String responseText) {
+        String jsonText = responseText.trim();
+        int start = jsonText.indexOf('{');
+        int end = jsonText.lastIndexOf('}');
+        if (start == -1 || end == -1 || end < start) {
+            SketchwareUtil.toastError("AI response wasn't valid JSON.");
+            return;
+        }
+        jsonText = jsonText.substring(start, end + 1);
+
+        JSONObject root;
+        JSONArray blocksArray;
+        try {
+            root = new JSONObject(jsonText);
+            blocksArray = root.getJSONArray("blocks");
+        } catch (JSONException e) {
+            SketchwareUtil.toastError("AI response didn't match the expected {\"blocks\":[...]} shape.");
+            return;
+        }
+
+        if (blocksArray.length() == 0) {
+            SketchwareUtil.toastError("AI didn't generate any blocks.");
+            return;
+        }
+
+        Set<String> existingNames = new HashSet<>();
+        if (all_blocks_list != null) {
+            for (HashMap<String, Object> block : all_blocks_list) {
+                Object name = block.get("name");
+                if (name instanceof String) existingNames.add((String) name);
+            }
+        }
+
+        ArrayList<HashMap<String, Object>> validBlocks = new ArrayList<>();
+        ArrayList<String> errors = new ArrayList<>();
+        Set<String> namesInThisBatch = new HashSet<>();
+
+        for (int i = 0; i < blocksArray.length(); i++) {
+            JSONObject b;
+            try {
+                b = blocksArray.getJSONObject(i);
+            } catch (JSONException e) {
+                errors.add("Block #" + (i + 1) + ": not a JSON object");
+                continue;
+            }
+            String label = "Block #" + (i + 1) + " (" + b.optString("name", "unnamed") + ")";
+            String error = validateGeneratedBlock(b, existingNames, namesInThisBatch);
+            if (error != null) {
+                errors.add(label + ": " + error);
+                continue;
+            }
+
+            String name = b.getString("name");
+            namesInThisBatch.add(name);
+
+            HashMap<String, Object> map = new HashMap<>();
+            map.put("name", name);
+            String type = b.optString("type", "regular");
+            map.put("type", type.isEmpty() || type.equals("regular") ? " " : type);
+            map.put("typeName", b.optString("typeName", ""));
+            map.put("spec", b.optString("spec", ""));
+            if ("e".equals(type)) {
+                map.put("spec2", b.optString("spec2", ""));
+            }
+            String color = b.optString("color", "");
+            map.put("color", HEX_COLOR_PATTERN.matcher(color).matches() ? color : "#F0F0F0");
+            String imports = b.optString("imports", "");
+            if (!TextUtils.isEmpty(imports)) {
+                map.put("imports", imports);
+            }
+            map.put("code", b.optString("code", ""));
+            // palette is intentionally NOT set here - _importBlocks() always assigns the
+            // currently open palette to every block it imports, matching "inherit the
+            // currently selected palette unless the user explicitly requests another".
+            validBlocks.add(map);
+        }
+
+        if (!errors.isEmpty()) {
+            String message = (validBlocks.isEmpty()
+                    ? "No blocks could be imported:\n\n"
+                    : validBlocks.size() + " of " + blocksArray.length() + " blocks are valid. Skipped:\n\n")
+                    + TextUtils.join("\n", errors);
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Validation results")
+                    .setMessage(message)
+                    .setPositiveButton(validBlocks.isEmpty() ? "OK" : "Review valid blocks", (d, w) -> {
+                        if (!validBlocks.isEmpty()) _importBlocks(validBlocks);
+                    })
+                    .setNegativeButton(validBlocks.isEmpty() ? null : "Cancel", null)
+                    .show();
+        } else {
+            _importBlocks(validBlocks);
+        }
+    }
+
+    /** Returns null if valid, otherwise a short human-readable reason. */
+    private String validateGeneratedBlock(JSONObject b, Set<String> existingNames, Set<String> namesInThisBatch) {
+        String name = b.optString("name", "");
+        if (name.isEmpty()) return "missing \"name\"";
+        if (!IDENTIFIER_PATTERN.matcher(name).matches()) return "\"name\" must be a plain identifier (letters/digits/underscore, not starting with a digit)";
+        if (namesInThisBatch.contains(name)) return "duplicate \"name\" within this AI response";
+        if (existingNames.contains(name)) return "a block named \"" + name + "\" already exists";
+        try {
+            if (kq.a(name, " ") != KQ_UNRECOGNIZED_COLOR) {
+                return "\"" + name + "\" collides with a reserved built-in block name";
+            }
+        } catch (Exception ignored) {
+            // If the reserved-name check itself fails for some reason, don't block import over it.
+        }
+
+        String type = b.optString("type", "regular");
+        if (!VALID_BLOCK_TYPES.contains(type)) {
+            return "invalid \"type\": \"" + type + "\"";
+        }
+
+        String spec = b.optString("spec", "");
+        if (spec.isEmpty()) return "missing \"spec\"";
+        if (BARE_PERCENT_M.matcher(spec).find()) return "\"spec\" has a bare %m not followed by .kind";
+
+        if ("e".equals(type)) {
+            String spec2 = b.optString("spec2", "");
+            if (spec2.isEmpty()) return "type is 'e' (if-else) but \"spec2\" is missing";
+            if (BARE_PERCENT_M.matcher(spec2).find()) return "\"spec2\" has a bare %m not followed by .kind";
+        }
+
+        String color = b.optString("color", "");
+        if (!color.isEmpty() && !HEX_COLOR_PATTERN.matcher(color).matches()) {
+            return "\"color\" isn't a valid hex color (e.g. #4A90D9)";
+        }
+
+        String code = b.optString("code", "");
+        if (code.trim().isEmpty()) return "missing \"code\"";
+
+        return null;
+    }
+
     @Override
     public void onStop() {
         super.onStop();
@@ -214,6 +489,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Swap").setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_swap_vertical)).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Import");
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Export");
+                menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Generate Blocks with AI");
             } else {
                 menu.add(Menu.NONE, Menu.NONE, Menu.NONE, "Swap").setIcon(AppCompatResources.getDrawable(this, R.drawable.ic_mtrl_save)).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
             }
@@ -248,6 +524,10 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
 
             case "Import":
                 openFileExplorerImport();
+                break;
+
+            case "Generate Blocks with AI":
+                showAiMultiBlockPromptDialog();
                 break;
 
             case "Export":
