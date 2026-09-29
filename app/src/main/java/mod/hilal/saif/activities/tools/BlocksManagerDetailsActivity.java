@@ -165,8 +165,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
     private static final Pattern BARE_PERCENT_M = Pattern.compile("%m(?!\\.[A-Za-z]+)");
-    // kq.a() returns this exact color for any opcode it does not recognize as a reserved
-    // built-in name; anything else means the name collides with a real built-in block.
+
     private static final int KQ_UNRECOGNIZED_COLOR = 0xff8a55d7;
 
     private void showAiMultiBlockPromptDialog() {
@@ -333,7 +332,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 continue;
             }
 
-            String name = b.getString("name");
+            String name = b.optString("name", "");
             namesInThisBatch.add(name);
 
             HashMap<String, Object> map = new HashMap<>();
@@ -352,9 +351,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 map.put("imports", imports);
             }
             map.put("code", b.optString("code", ""));
-            // palette is intentionally NOT set here - _importBlocks() always assigns the
-            // currently open palette to every block it imports, matching "inherit the
-            // currently selected palette unless the user explicitly requests another".
+
             validBlocks.add(map);
         }
 
@@ -533,8 +530,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
             case "Export":
                 Object paletteName = pallet_list.get(palette - 9).get("name");
                 if (paletteName instanceof String) {
-                    // Export always covers the whole palette, regardless of an active
-                    // search filter — search is a display-only concern.
+
                     ArrayList<HashMap<String, Object>> exportList = new ArrayList<>();
                     for (HashMap<String, Object> block : all_blocks_list) {
                         Object blockPalette = block.get("palette");
