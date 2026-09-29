@@ -1,12 +1,8 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
 package pro.sketchware.activities.main.fragments.projects
 
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
@@ -20,20 +16,18 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import pro.sketchware.R
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 object FloatingActionButtonMenuHost {
     
+    // Exposes safe state controls to the Java Fragment
     class MenuController(private val expandedState: MutableState<Boolean>) {
         fun isExpanded(): Boolean = expandedState.value
         fun collapse() { expandedState.value = false }
@@ -54,7 +48,7 @@ object FloatingActionButtonMenuHost {
             val context = LocalContext.current
             val isDark = isSystemInDarkTheme()
             
-            // Seamlessly match Sketchware's M3 View theme
+
             val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             } else {
@@ -62,6 +56,7 @@ object FloatingActionButtonMenuHost {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
+                // Intercept back button when the menu is open
                 BackHandler(enabled = expandedState.value) {
                     expandedState.value = false
                 }
@@ -74,13 +69,11 @@ object FloatingActionButtonMenuHost {
                             checked = expandedState.value,
                             onCheckedChange = { expandedState.value = !expandedState.value }
                         ) {
-                            val imageVector by remember {
-                                derivedStateOf {
-                                    if (checkedProgress > 0.5f) Icons.Filled.Close else Icons.Filled.Add
-                                }
-                            }
+                            val showClose = checkedProgress > 0.5f
+                            val iconRes = if (showClose) R.drawable.ic_mtrl_close else R.drawable.ic_mtrl_add
+                            
                             Icon(
-                                painter = rememberVectorPainter(imageVector),
+                                painter = painterResource(id = iconRes),
                                 contentDescription = if (expandedState.value) "Close menu" else "Create and Import",
                                 modifier = Modifier.animateIcon({ checkedProgress })
                             )
