@@ -107,6 +107,8 @@ import mod.hey.studios.activity.managers.cpp.ManageCppActivity;
 import mod.hey.studios.activity.managers.java.ManageJavaActivity;
 import mod.hey.studios.code.SrcCodeEditor;
 import mod.hey.studios.project.ProjectSettings;
+import mod.sketchlibx.importer.GradleParser;
+import mod.sketchlibx.importer.ParsedGradle;
 import mod.hey.studios.compiler.kotlin.KotlinCompilerBridge;
 import mod.hey.studios.project.custom_blocks.CustomBlocksDialog;
 import mod.hey.studios.project.proguard.ManageProguardActivity;
@@ -136,6 +138,7 @@ import pro.sketchware.activities.editor.view.ViewCodeEditorActivity;
 import pro.sketchware.activities.resourceseditor.ResourcesEditorActivity;
 import pro.sketchware.dialogs.BuildSettingsBottomSheet;
 import pro.sketchware.utility.FileUtil;
+import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.apk.ApkSignatures;
@@ -1391,6 +1394,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             try {
                 var q = activity.q;
                 var sc_id = DesignActivity.sc_id;
+                applyCustomGradleConfiguration(sc_id);
                 onProgress("Deleting temporary files...", 1);
                 FileUtil.deleteFile(q.projectMyscPath);
                 q.c(activity.getApplicationContext());
@@ -1508,6 +1512,23 @@ if (canceled) return;
                 neo.sketchware.plugin.PluginManager.notifyBuildError(sc_id, Log.getStackTraceString(tr));
             } finally {
                 activity.runOnUiThread(this::onPostExecute);
+            }
+        }
+        
+        private static void applyCustomGradleConfiguration(String sc_id) {
+            boolean customGradleEnabled = new ProjectSettings(sc_id)
+                    .getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_GRADLE, "false")
+                    .equals("true");
+            if (!customGradleEnabled) return;
+
+            try {
+                File appBuildGradle = new File(new FilePathUtil().getPathCustomGradle(sc_id), "app_build.gradle");
+                GradleParser parser = new GradleParser();
+                ParsedGradle parsed = parser.parseFile(appBuildGradle, null);
+                parser.applyToProjectBuildSettings(parsed, sc_id);
+            } catch (Exception e) {
+                LogUtil.e("DesignActivity$BuildTask", "Failed to apply custom Gradle configuration; build will use the project's existing settings", e);
+                SketchwareUtil.toastError("Custom Gradle configuration could not be applied; using existing project settings");
             }
         }
         

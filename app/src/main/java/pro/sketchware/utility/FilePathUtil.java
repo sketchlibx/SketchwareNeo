@@ -61,6 +61,10 @@ public class FilePathUtil {
         return new File(SKETCHWARE_DATA, sc_id + "/local_library").getAbsolutePath();
     }
 
+    public String getPathCustomGradle(String sc_id) {
+        return new File(SKETCHWARE_DATA, sc_id + "/custom_gradle").getAbsolutePath();
+    }
+
     public String getJarPathLocalLibrary(String libraryName) {
         return new File(SKETCHWARE_LOCAL_LIBS, libraryName + "/classes.jar").getAbsolutePath();
     }

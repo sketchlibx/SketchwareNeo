@@ -9,6 +9,9 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import mod.hey.studios.build.BuildSettings;
+import mod.hey.studios.project.ProjectSettings;
+
 /**
  * Parses build.gradle (Groovy DSL) and build.gradle.kts (Kotlin DSL).
  *
@@ -56,14 +59,33 @@ public class GradleParser {
      * @param appModuleDir  The app module folder (contains build.gradle or build.gradle.kts).
      */
     public ParsedGradle parse(File appModuleDir) {
-        ParsedGradle result = new ParsedGradle();
-
         File gradle    = new File(appModuleDir, "build.gradle");
         File gradleKts = new File(appModuleDir, "build.gradle.kts");
 
-        String content = null;
-        if (gradle.exists())          content = readFile(gradle);
-        else if (gradleKts.exists())  content = readFile(gradleKts);
+        File target = null;
+        if (gradle.exists())          target = gradle;
+        else if (gradleKts.exists())  target = gradleKts;
+
+        return parseFile(target, appModuleDir);
+    }
+
+    /**
+     * Parses a specific Gradle build file directly, instead of resolving it
+     * from a conventional module folder. Used for standalone files that don't
+     * follow the build.gradle / build.gradle.kts module-folder convention
+     * (e.g. Sketchware Neo's per-project custom Gradle scripts).
+     *
+     * @param buildGradleFile  The Gradle file to parse. May not exist.
+     * @param appModuleDir     The real app module folder, used to resolve
+     *                         proguard/native/local-library paths relative to
+     *                         it. Pass null when there is no such folder
+     *                         (those fields are simply left at their defaults).
+     */
+    public ParsedGradle parseFile(File buildGradleFile, File appModuleDir) {
+        ParsedGradle result = new ParsedGradle();
+
+        String content = buildGradleFile != null && buildGradleFile.exists()
+                ? readFile(buildGradleFile) : null;
 
         if (content == null) {
             Log.w(TAG, "No build.gradle found. Using safe defaults.");
@@ -80,23 +102,34 @@ public class GradleParser {
         result.namespace     = extractStringOrNull(content, P_NAMESPACE);
         result.javaVersion   = extractString(content, P_JAVA_VERSION, result.javaVersion);
 
+        if (isPresent(content, P_MIN_SDK))        result.explicitFields.add(ParsedGradle.FIELD_MIN_SDK);
+        if (isPresent(content, P_TARGET_SDK))     result.explicitFields.add(ParsedGradle.FIELD_TARGET_SDK);
+        if (isPresent(content, P_COMPILE_SDK))    result.explicitFields.add(ParsedGradle.FIELD_COMPILE_SDK);
+        if (isPresent(content, P_JAVA_VERSION))   result.explicitFields.add(ParsedGradle.FIELD_JAVA_VERSION);
+
         // ── viewBinding / dataBinding / multiDex ───────────────────────────────
         String buildFeatures = extractNamedBlock(content, "buildFeatures");
         if (buildFeatures != null) {
             result.viewBindingEnabled = buildFeatures.contains("viewBinding") && !buildFeatures.matches("(?s).*viewBinding\\s*=?\\s*false.*");
             result.dataBindingEnabled = buildFeatures.contains("dataBinding") && !buildFeatures.matches("(?s).*dataBinding\\s*=?\\s*false.*");
+            result.explicitFields.add(ParsedGradle.FIELD_VIEW_BINDING);
         }
+        boolean multiDexMentioned = content.contains("multiDexEnabled")
+                || content.contains("androidx.multidex:multidex");
         result.multiDexEnabled = content.contains("multiDexEnabled true")
                 || content.contains("multiDexEnabled = true")
                 || content.contains("androidx.multidex:multidex");
+        if (multiDexMentioned) result.explicitFields.add(ParsedGradle.FIELD_MULTIDEX);
 
         // ── Proguard / consumer rules ──────────────────────────────────────────
-        result.proguardRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_PROGUARD_FILE));
-        if (result.proguardRulesPath == null) {
-            File defaultProguard = new File(appModuleDir, "proguard-rules.pro");
-            if (defaultProguard.exists()) result.proguardRulesPath = defaultProguard.getAbsolutePath();
+        if (appModuleDir != null) {
+            result.proguardRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_PROGUARD_FILE));
+            if (result.proguardRulesPath == null) {
+                File defaultProguard = new File(appModuleDir, "proguard-rules.pro");
+                if (defaultProguard.exists()) result.proguardRulesPath = defaultProguard.getAbsolutePath();
+            }
+            result.consumerRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_CONSUMER_RULES));
         }
-        result.consumerRulesPath = resolveRelativePath(appModuleDir, extractStringOrNull(content, P_CONSUMER_RULES));
 
         String releaseBlock = extractNamedBlock(content, "buildTypes");
         result.minifyEnabledInRelease = releaseBlock != null
@@ -136,29 +169,31 @@ public class GradleParser {
         }
 
         // ── Native lib detection ───────────────────────────────────────────────
-        boolean hasCMake = content.contains("cmake {") || new File(appModuleDir, "CMakeLists.txt").exists()
-                || new File(appModuleDir, "src/main/cpp/CMakeLists.txt").exists();
-        boolean hasNdkBuild = content.contains("ndkBuild {") || new File(appModuleDir, "src/main/jni/Android.mk").exists()
-                || new File(appModuleDir, "jni/Android.mk").exists();
+        if (appModuleDir != null) {
+            boolean hasCMake = content.contains("cmake {") || new File(appModuleDir, "CMakeLists.txt").exists()
+                    || new File(appModuleDir, "src/main/cpp/CMakeLists.txt").exists();
+            boolean hasNdkBuild = content.contains("ndkBuild {") || new File(appModuleDir, "src/main/jni/Android.mk").exists()
+                    || new File(appModuleDir, "jni/Android.mk").exists();
 
-        result.hasNativeLibs = hasCMake || hasNdkBuild
-                || content.contains("externalNativeBuild")
-                || new File(appModuleDir, "src/main/jniLibs").exists();
+            result.hasNativeLibs = hasCMake || hasNdkBuild
+                    || content.contains("externalNativeBuild")
+                    || new File(appModuleDir, "src/main/jniLibs").exists();
 
-        result.nativeBuildSystem = hasCMake ? ParsedGradle.NativeBuildSystem.CMAKE
-                : hasNdkBuild ? ParsedGradle.NativeBuildSystem.NDK_BUILD
-                : ParsedGradle.NativeBuildSystem.NONE;
+            result.nativeBuildSystem = hasCMake ? ParsedGradle.NativeBuildSystem.CMAKE
+                    : hasNdkBuild ? ParsedGradle.NativeBuildSystem.NDK_BUILD
+                    : ParsedGradle.NativeBuildSystem.NONE;
 
-        // ── Local .aar / .jar detection ───────────────────────────────────────
-        File libsDir = new File(appModuleDir, "libs");
-        if (libsDir.exists() && libsDir.isDirectory()) {
-            File[] libFiles = libsDir.listFiles();
-            if (libFiles != null) {
-                for (File f : libFiles) {
-                    String name = f.getName().toLowerCase();
-                    if (name.endsWith(".aar") || name.endsWith(".jar")) {
-                        result.localLibPaths.add(f.getAbsolutePath());
-                        Log.d(TAG, "Local lib found: " + f.getName());
+            // ── Local .aar / .jar detection ───────────────────────────────────
+            File libsDir = new File(appModuleDir, "libs");
+            if (libsDir.exists() && libsDir.isDirectory()) {
+                File[] libFiles = libsDir.listFiles();
+                if (libFiles != null) {
+                    for (File f : libFiles) {
+                        String name = f.getName().toLowerCase();
+                        if (name.endsWith(".aar") || name.endsWith(".jar")) {
+                            result.localLibPaths.add(f.getAbsolutePath());
+                            Log.d(TAG, "Local lib found: " + f.getName());
+                        }
                     }
                 }
             }
@@ -168,6 +203,50 @@ public class GradleParser {
                 + " vCode=" + result.versionCode
                 + " minSdk=" + result.minSdk);
         return result;
+    }
+
+    private boolean isPresent(String content, Pattern p) {
+        return p.matcher(content).find();
+    }
+
+    /**
+     * Applies the fields that were actually found in a parsed custom Gradle
+     * script onto this project's existing settings — the same
+     * {@link ProjectSettings}/{@link BuildSettings} keys that
+     * {@link a.a.a.ProjectBuilder} already reads for every build. Fields not
+     * present in {@link ParsedGradle#explicitFields} are left untouched, so a
+     * script that only overrides one value never resets the rest back to
+     * struct defaults.
+     *
+     * Dependency management (built-in libraries, local .aar/.jar, Firebase/
+     * AdMob/Maps toggles) is intentionally never touched here — that remains
+     * entirely owned by {@code ManageLocalLibrary} / {@code BuiltInLibraryManager}.
+     */
+    public void applyToProjectBuildSettings(ParsedGradle parsed, String sc_id) {
+        ProjectSettings projectSettings = new ProjectSettings(sc_id);
+
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_MIN_SDK)) {
+            projectSettings.setValue(ProjectSettings.SETTING_MINIMUM_SDK_VERSION, String.valueOf(parsed.minSdk));
+        }
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_TARGET_SDK)) {
+            projectSettings.setValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(parsed.targetSdk));
+        }
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_COMPILE_SDK)) {
+            projectSettings.setValue(ProjectSettings.SETTING_COMPILE_SDK_VERSION, String.valueOf(parsed.compileSdk));
+        }
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_VIEW_BINDING)) {
+            projectSettings.setValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING,
+                    parsed.viewBindingEnabled ? ProjectSettings.SETTING_GENERIC_VALUE_TRUE : ProjectSettings.SETTING_GENERIC_VALUE_FALSE);
+        }
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_MULTIDEX)) {
+            projectSettings.setValue("multidex",
+                    parsed.multiDexEnabled ? ProjectSettings.SETTING_GENERIC_VALUE_TRUE : ProjectSettings.SETTING_GENERIC_VALUE_FALSE);
+        }
+
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_JAVA_VERSION)) {
+            BuildSettings buildSettings = new BuildSettings(sc_id);
+            buildSettings.setValue(BuildSettings.SETTING_JAVA_VERSION, parsed.javaVersion);
+        }
     }
 
     // ── Dependencies block extraction ─────────────────────────────────────────

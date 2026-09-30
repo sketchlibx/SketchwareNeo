@@ -1,13 +1,29 @@
 package mod.sketchlibx.importer;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Holds all data extracted from build.gradle / build.gradle.kts.
  * No logic here — pure data carrier.
  */
 public class ParsedGradle {
+
+    public static final String FIELD_MIN_SDK = "minSdk";
+    public static final String FIELD_TARGET_SDK = "targetSdk";
+    public static final String FIELD_COMPILE_SDK = "compileSdk";
+    public static final String FIELD_VIEW_BINDING = "viewBinding";
+    public static final String FIELD_JAVA_VERSION = "javaVersion";
+    public static final String FIELD_MULTIDEX = "multiDex";
+
+    /**
+     * Which fields were actually found written in the parsed file, as opposed
+     * to falling back to this class's struct defaults. Only fields present in
+     * this set are safe to apply on top of existing project settings.
+     */
+    public final Set<String> explicitFields = new HashSet<>();
 
     // ── App identity ──────────────────────────────────────────────────────────
 
