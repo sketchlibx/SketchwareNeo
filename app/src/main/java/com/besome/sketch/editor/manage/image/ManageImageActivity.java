@@ -5,12 +5,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentPagerAdapter;
@@ -19,7 +17,6 @@ import androidx.viewpager.widget.ViewPager;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 
 import a.a.a.MA;
 import a.a.a.Op;
@@ -28,18 +25,12 @@ import a.a.a.mB;
 import a.a.a.pu;
 import pro.sketchware.R;
 import pro.sketchware.databinding.ManageImageBinding;
-import pro.sketchware.utility.SketchwareUtil;
 
 public class ManageImageActivity extends BaseAppCompatActivity implements ViewPager.OnPageChangeListener {
     private String sc_id;
     private pu projectImagesFragment;
     private fu collectionImagesFragment;
     private ManageImageBinding binding;
-
-    private ArrayList<String> pendingNames = new ArrayList<>();
-    private ArrayList<String> pendingPaths = new ArrayList<>();
-    private int pendingColor = 0;
-    private String pendingColorHex = "";
 
     public static int getImageGridColumnCount(Context context) {
         var displayMetrics = context.getResources().getDisplayMetrics();
@@ -107,10 +98,6 @@ public class ManageImageActivity extends BaseAppCompatActivity implements ViewPa
             sc_id = getIntent().getStringExtra("sc_id");
         } else {
             sc_id = savedInstanceState.getString("sc_id");
-            pendingNames = savedInstanceState.getStringArrayList("pendingNames");
-            pendingPaths = savedInstanceState.getStringArrayList("pendingPaths");
-            pendingColor = savedInstanceState.getInt("pendingColor");
-            pendingColorHex = savedInstanceState.getString("pendingColorHex");
         }
 
         PagerAdapter pagerAdapter = new PagerAdapter(getSupportFragmentManager());
@@ -120,57 +107,6 @@ public class ManageImageActivity extends BaseAppCompatActivity implements ViewPa
         binding.tabLayout.setupWithViewPager(binding.viewPager);
         
         binding.fab.show();
-        
-        if (pendingNames != null && pendingPaths != null && !pendingNames.isEmpty()) {
-            processImportQueue(0, pendingNames, pendingPaths, pendingColor, pendingColorHex, 0, Activity.RESULT_OK);
-        }
-    }
-
-    private void processImportQueue(int index, ArrayList<String> names, ArrayList<String> paths, int color, String colorHex, int requestCode, int resultCode) {
-        if (index >= names.size()) {
-            pendingNames.clear();
-            pendingPaths.clear();
-            SketchwareUtil.toast("All images imported successfully.");
-            return;
-        }
-
-        Intent singleIntent = new Intent();
-        singleIntent.putExtra("iconName", names.get(index));
-        singleIntent.putExtra("iconPath", paths.get(index));
-        singleIntent.putExtra("iconColor", color);
-        singleIntent.putExtra("iconColorHex", colorHex);
-        
-        super.onActivityResult(requestCode, resultCode, singleIntent);
-
-        if (!pendingNames.isEmpty()) pendingNames.remove(0);
-        if (!pendingPaths.isEmpty()) pendingPaths.remove(0);
-
-        new Handler(Looper.getMainLooper()).postDelayed(() -> 
-            processImportQueue(0, pendingNames, pendingPaths, color, colorHex, requestCode, resultCode), 600L);
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if (resultCode == Activity.RESULT_OK && data != null && data.hasExtra("iconNames")) {
-            ArrayList<String> names = data.getStringArrayListExtra("iconNames");
-            ArrayList<String> paths = data.getStringArrayListExtra("iconPaths");
-
-            if (names != null && paths != null && names.size() > 1) {
-                int color = data.getIntExtra("iconColor", 0);
-                String colorHex = data.getStringExtra("iconColorHex");
-
-                // Save to pending list for safety
-                pendingNames = new ArrayList<>(names);
-                pendingPaths = new ArrayList<>(paths);
-                pendingColor = color;
-                pendingColorHex = colorHex;
-
-                processImportQueue(0, pendingNames, pendingPaths, pendingColor, pendingColorHex, requestCode, resultCode);
-                return;
-            }
-        }
-        
-        super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
@@ -182,12 +118,6 @@ public class ManageImageActivity extends BaseAppCompatActivity implements ViewPa
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putString("sc_id", sc_id);
-        
-        if (pendingNames != null) outState.putStringArrayList("pendingNames", pendingNames);
-        if (pendingPaths != null) outState.putStringArrayList("pendingPaths", pendingPaths);
-        outState.putInt("pendingColor", pendingColor);
-        outState.putString("pendingColorHex", pendingColorHex);
-        
         super.onSaveInstanceState(outState);
     }
 

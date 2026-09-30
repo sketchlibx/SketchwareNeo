@@ -71,19 +71,41 @@ public class pu extends qA {
     private final ActivityResultLauncher<Intent> openImportIconActivity = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == Activity.RESULT_OK) {
             var data = result.getData();
-            assert data != null;
-            ProjectResourceBean icon = new ProjectResourceBean(
-                    ProjectResourceBean.PROJECT_RES_TYPE_FILE,
-                    data.getStringExtra("iconName"), data.getStringExtra("iconPath")
-            );
-            icon.savedPos = 2;
-            icon.isNew = true;
+            if (data == null) return;
 
+            ArrayList<String> names = data.getStringArrayListExtra("iconNames");
+            ArrayList<String> paths = data.getStringArrayListExtra("iconPaths");
             int selectedColor = data.getIntExtra("iconColor", -1);
             String selectedColorHex = data.getStringExtra("iconColorHex");
-            addNewColorFilterInfo(selectedColorHex, selectedColor, images.size());
 
-            addImage(icon);
+            if (names != null && paths != null && names.size() == paths.size() && !names.isEmpty()) {
+                // Multi-icon Import Processing
+                for (int i = 0; i < names.size(); i++) {
+                    ProjectResourceBean icon = new ProjectResourceBean(
+                            ProjectResourceBean.PROJECT_RES_TYPE_FILE,
+                            names.get(i), paths.get(i)
+                    );
+                    icon.savedPos = 2;
+                    icon.isNew = true;
+                    
+                    addNewColorFilterInfo(selectedColorHex, selectedColor, images.size());
+                    images.add(icon);
+                }
+            } else if (data.hasExtra("iconName") && data.hasExtra("iconPath")) {
+                // Fallback Single-icon Import Processing
+                ProjectResourceBean icon = new ProjectResourceBean(
+                        ProjectResourceBean.PROJECT_RES_TYPE_FILE,
+                        data.getStringExtra("iconName"), data.getStringExtra("iconPath")
+                );
+                icon.savedPos = 2;
+                icon.isNew = true;
+
+                addNewColorFilterInfo(selectedColorHex, selectedColor, images.size());
+                images.add(icon);
+            }
+
+            adapter.notifyDataSetChanged();
+            updateGuideVisibility();
             bB.a(requireActivity(), getString(R.string.design_manager_message_add_complete), bB.TOAST_NORMAL).show();
         }
     });
@@ -466,7 +488,6 @@ public class pu extends qA {
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             ProjectResourceBean image = images.get(position);
 
-            // 🚀 BUG FIX: Clear old views properly to stop Recycling Glitch
             Glide.with(requireActivity()).clear(holder.binding.img);
             holder.binding.img.setImageDrawable(null);
             holder.binding.img.clearColorFilter();
@@ -477,7 +498,6 @@ public class pu extends qA {
             holder.binding.chkSelect.setChecked(image.isSelected);
             holder.binding.tvImageName.setText(image.resName);
 
-            // 🚀 UI UPGRADE: Dim image when selected for better visibility
             holder.binding.img.setAlpha(image.isSelected ? 0.5f : 1.0f);
 
             if (colorMap.get(position) != null) {

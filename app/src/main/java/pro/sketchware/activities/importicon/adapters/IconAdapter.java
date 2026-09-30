@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.util.Pair;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -16,8 +17,11 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
+import pro.sketchware.R;
 import pro.sketchware.databinding.ImportIconListItemBinding;
+import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.SvgUtils;
+import pro.sketchware.utility.ThemeUtils;
 
 public class IconAdapter extends ListAdapter<Pair<String, String>, IconAdapter.ViewHolder> {
     private static final DiffUtil.ItemCallback<Pair<String, String>> DIFF_CALLBACK = new DiffUtil.ItemCallback<>() {
@@ -56,7 +60,6 @@ public class IconAdapter extends ListAdapter<Pair<String, String>, IconAdapter.V
         this.selected_color = selected_color;
     }
 
-    // 🔥 Multiple Selection Methods
     public boolean isSelectionMode() {
         return isSelectionMode;
     }
@@ -103,12 +106,19 @@ public class IconAdapter extends ListAdapter<Pair<String, String>, IconAdapter.V
         holder.itemBinding.img.setColorFilter(selected_color, PorterDuff.Mode.SRC_IN);
         holder.itemBinding.title.setText(getItem(position).first);
 
+        com.google.android.material.card.MaterialCardView card = (com.google.android.material.card.MaterialCardView) holder.itemBinding.getRoot();
+        Context ctx = card.getContext();
+
         if (selectedItems.contains(position)) {
-            holder.itemBinding.getRoot().setBackgroundColor(0x33000000); // Dark transparent highlight
-            holder.itemBinding.img.setAlpha(0.6f);
+            card.setCardBackgroundColor(ThemeUtils.getColor(ctx, R.attr.colorSecondaryContainer));
+            card.setStrokeColor(ThemeUtils.getColor(ctx, R.attr.colorPrimary));
+            card.setStrokeWidth(SketchwareUtil.dpToPx(2));
+            holder.itemBinding.imgSelected.setVisibility(View.VISIBLE);
         } else {
-            holder.itemBinding.getRoot().setBackgroundColor(Color.TRANSPARENT);
-            holder.itemBinding.img.setAlpha(1.0f);
+            card.setCardBackgroundColor(ThemeUtils.getColor(ctx, R.attr.colorSurface));
+            card.setStrokeColor(ThemeUtils.getColor(ctx, R.attr.colorOutlineVariant));
+            card.setStrokeWidth(SketchwareUtil.dpToPx(1));
+            holder.itemBinding.imgSelected.setVisibility(View.GONE);
         }
     }
 
@@ -132,7 +142,6 @@ public class IconAdapter extends ListAdapter<Pair<String, String>, IconAdapter.V
             super(binding.getRoot());
             itemBinding = binding;
             
-            // Single Click
             binding.getRoot().setOnClickListener(v -> {
                 int position = getLayoutPosition();
                 if (position == RecyclerView.NO_POSITION) return;
