@@ -52,8 +52,12 @@ public class GeminiProvider implements AiProvider {
                 JSONArray contents = new JSONArray();
                 contents.put(content);
 
+                JSONObject generationConfig = new JSONObject();
+                generationConfig.put("temperature", config.temperature);
+
                 JSONObject body = new JSONObject();
                 body.put("contents", contents);
+                body.put("generationConfig", generationConfig);
 
                 String url = "https://generativelanguage.googleapis.com/v1beta/models/"
                         + config.modelName + ":generateContent?key=" + config.apiKey;

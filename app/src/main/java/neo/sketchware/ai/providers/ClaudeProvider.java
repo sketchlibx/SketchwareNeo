@@ -52,6 +52,9 @@ public class ClaudeProvider implements AiProvider {
                 body.put("max_tokens", 4096);
                 body.put("system", systemPrompt);
                 body.put("messages", messages);
+                // Anthropic's Messages API only accepts temperature in [0.0, 1.0], unlike our
+                // Settings UI's 0.0-2.0 range - clamp so a value above 1.0 doesn't fail the request.
+                body.put("temperature", Math.min(config.temperature, 1.0));
 
                 Map<String, String> headers = new HashMap<>();
                 headers.put("x-api-key", config.apiKey);

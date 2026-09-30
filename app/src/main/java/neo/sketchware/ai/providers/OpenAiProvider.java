@@ -55,6 +55,7 @@ public class OpenAiProvider implements AiProvider {
                 JSONObject body = new JSONObject();
                 body.put("model", config.modelName);
                 body.put("messages", messages);
+                body.put("temperature", config.temperature);
 
                 Map<String, String> headers = new HashMap<>();
                 headers.put("Authorization", "Bearer " + config.apiKey);

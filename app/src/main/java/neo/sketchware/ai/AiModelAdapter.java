@@ -20,6 +20,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
     public interface Listener {
         void onEditClicked(AiModelConfig config);
         void onDeleteClicked(AiModelConfig config);
+        void onDuplicateClicked(AiModelConfig config);
         void onItemClicked(AiModelConfig config);
     }
 
@@ -59,6 +60,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
 
         holder.buttonEditModel.setOnClickListener(v -> listener.onEditClicked(config));
         holder.buttonDeleteModel.setOnClickListener(v -> listener.onDeleteClicked(config));
+        holder.buttonDuplicateModel.setOnClickListener(v -> listener.onDuplicateClicked(config));
         holder.itemView.setOnClickListener(v -> listener.onItemClicked(config));
     }
 
@@ -94,6 +96,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         ImageView imageProviderIcon;
         ImageButton buttonEditModel;
         ImageButton buttonDeleteModel;
+        ImageButton buttonDuplicateModel;
 
         ViewHolder(View itemView) {
             super(itemView);
@@ -103,6 +106,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
             imageProviderIcon = itemView.findViewById(R.id.imageProviderIcon);
             buttonEditModel = itemView.findViewById(R.id.buttonEditModel);
             buttonDeleteModel = itemView.findViewById(R.id.buttonDeleteModel);
+            buttonDuplicateModel = itemView.findViewById(R.id.buttonDuplicateModel);
         }
     }
 }
