@@ -88,7 +88,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="Duplicate"
             android:padding="8dp"
-            android:src="@drawable/ic_mtrl_content_copy"
+            android:src="@drawable/ic_mtrl_copy"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <ImageButton

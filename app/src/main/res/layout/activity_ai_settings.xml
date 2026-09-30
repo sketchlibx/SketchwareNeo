@@ -15,7 +15,7 @@
             android:id="@+id/topAppBar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@drawable/ic_mtrl_back_arrow"
+            app:navigationIcon="?attr/homeAsUpIndicator"
             app:title="AI Settings" />
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -87,8 +87,7 @@
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:alpha="0.6"
-            android:src="@drawable/ic_mtrl_error"
-            app:tint="?attr/colorError" />
+            android:src="@drawable/ic_failed"/>
 
         <TextView
             android:id="@+id/textErrorMessage"
