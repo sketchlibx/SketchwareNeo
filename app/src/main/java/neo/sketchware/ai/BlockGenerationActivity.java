@@ -130,7 +130,7 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
                     plan = BlockPlanEntry.parse(responseText);
                     lastPlanJson = responseText;
                     if (plan.entries.isEmpty()) {
-                        showError("AI didn't plan any blocks. Try describing the request differently.", this::retryPlanning);
+                        showError("AI didn't plan any blocks. Try describing the request differently.", BlockGenerationActivity.this::retryPlanning);
                         return;
                     }
                     chunks = buildChunks(plan.entries);
@@ -153,8 +153,6 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
         startPipeline();
     }
 
-    /** Groups plan entries by category (keeping a listener_wrapper with its callbacks together
-     *  where possible) into chunks no larger than CHUNK_SIZE. */
     private List<List<BlockPlanEntry>> buildChunks(List<BlockPlanEntry> entries) {
         Map<String, List<BlockPlanEntry>> byCategory = new java.util.LinkedHashMap<>();
         for (BlockPlanEntry e : entries) {
@@ -291,7 +289,7 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
 
         int issues = invalidReports.size();
         textPreviewSummary.setText(validBlocks.size() + " block(s) ready" + (issues > 0 ? ", " + issues + " skipped (see below)" : ""));
-        previewAdapter.notifyDataSetChanged();
+        previewAdapter.updateData();
         buttonImport.setText("Import " + checkedNames.size() + " block(s)");
         buttonImport.setEnabled(!validBlocks.isEmpty());
     }
@@ -348,8 +346,6 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
         finish();
     }
 
-    // --- Preview list: grouped by category, each row a checkbox + name + purpose, plus a
-    // trailing "Issues" section listing anything that was skipped. ---
 
     private static final int VIEW_HEADER = 0;
     private static final int VIEW_BLOCK = 1;
@@ -358,9 +354,9 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
 
     private class PreviewAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-        private final List<Object> rows = new ArrayList<>(); // String (header) | JSONObject (block) | "ISSUES" marker | String (issue text)
+        private final List<Object> rows = new ArrayList<>();
 
-        void rebuild() {
+        void updateData() {
             rows.clear();
             Map<String, List<JSONObject>> byCategory = new java.util.LinkedHashMap<>();
             for (JSONObject b : validBlocks) {
@@ -376,18 +372,13 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
                 rows.add("ISSUES_HEADER");
                 rows.addAll(invalidReports);
             }
+            notifyDataSetChanged();
         }
 
         private BlockPlanEntry findPlanEntry(String name) {
             if (plan == null) return null;
             for (BlockPlanEntry e : plan.entries) if (e.name.equals(name)) return e;
             return null;
-        }
-
-        @Override
-        public void notifyDataSetChanged() {
-            rebuild();
-            super.notifyDataSetChanged();
         }
 
         @Override
@@ -407,17 +398,17 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
                 return new BlockRowHolder(inflater.inflate(R.layout.item_generated_block, parent, false));
             } else if (viewType == VIEW_ISSUE) {
                 TextView tv = new TextView(parent.getContext());
-                int pad = (int) (16 * getResources().getDisplayMetrics().density);
+                int pad = (int) (16 * parent.getContext().getResources().getDisplayMetrics().density);
                 tv.setPadding(pad, pad / 2, pad, pad / 2);
-                tv.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(parent.getContext(), com.google.android.material.R.attr.colorError));
+                tv.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(parent.getContext(), R.attr.colorError));
                 return new SimpleTextHolder(tv);
             } else {
                 TextView tv = new TextView(parent.getContext());
-                int padH = (int) (16 * getResources().getDisplayMetrics().density);
-                int padV = (int) (12 * getResources().getDisplayMetrics().density);
+                int padH = (int) (16 * parent.getContext().getResources().getDisplayMetrics().density);
+                int padV = (int) (12 * parent.getContext().getResources().getDisplayMetrics().density);
                 tv.setPadding(padH, padV, padH, padV / 2);
                 tv.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall);
-                tv.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(parent.getContext(), com.google.android.material.R.attr.colorPrimary));
+                tv.setTextColor(pro.sketchware.utility.ThemeUtils.getColor(parent.getContext(), R.attr.colorPrimary));
                 return new SimpleTextHolder(tv);
             }
         }
