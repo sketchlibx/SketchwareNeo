@@ -1,20 +1,20 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/gradle.properties",
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/.github/workflows/notify_telegram.py",
       "selection": {
         "end": {
-          "column": 0,
-          "index": 291,
-          "line": 9
+          "column": 68,
+          "index": 1093,
+          "line": 27
         },
         "start": {
-          "column": 0,
-          "index": 291,
-          "line": 9
+          "column": 68,
+          "index": 1093,
+          "line": 27
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/gradle.properties"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/.github/workflows/notify_telegram.py"
 }

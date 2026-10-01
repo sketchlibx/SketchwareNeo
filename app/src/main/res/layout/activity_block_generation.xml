@@ -90,7 +90,7 @@
                 android:layout_width="56dp"
                 android:layout_height="56dp"
                 android:alpha="0.6"
-                android:src="@drawable/ic_mtrl_error"
+                android:src="@drawable/ic_failed"
                 app:tint="?attr/colorError" />
 
             <TextView

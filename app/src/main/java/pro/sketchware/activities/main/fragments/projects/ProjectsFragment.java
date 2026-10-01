@@ -146,7 +146,6 @@ public class ProjectsFragment extends DA {
         View fabGroup = requireActivity().findViewById(R.id.fab_group);
         composeViewFab = requireActivity().findViewById(R.id.compose_view_fab);
 
-        // Safely map Java Actions to Compose
         if (composeViewFab != null) {
             fabMenuController = FloatingActionButtonMenuHost.setupFabMenu(
                     composeViewFab,
@@ -160,13 +159,7 @@ public class ProjectsFragment extends DA {
             Insetter.builder().margin(WindowInsetsCompat.Type.navigationBars()).applyToView(fabGroup);
         }
 
-        binding.swipeRefresh.setProgressViewOffset(false, -200, -200);
-        binding.swipeRefresh.setOnRefreshListener(() -> {
-            if (binding != null && binding.customRefreshIndicator != null) {
-                binding.customRefreshIndicator.setVisibility(View.VISIBLE);
-            }
-            refreshProjectsList();
-        });
+        binding.swipeRefresh.setOnRefreshListener(() -> refreshProjectsList());
 
         projectsAdapter = new ProjectsAdapter(this, projectsList);
         binding.myprojects.setAdapter(projectsAdapter);
@@ -186,7 +179,7 @@ public class ProjectsFragment extends DA {
         binding.nestedScroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
             int dy = scrollY - oldScrollY;
             if (fabGroup != null) {
-                if (dy > 8) { // Scrolling down
+                if (dy > 8) { 
                     if (fabMenuController != null && fabMenuController.isExpanded()) {
                         fabMenuController.collapse();
                     }
@@ -194,7 +187,7 @@ public class ProjectsFragment extends DA {
                         fabGroup.animate().translationY(250f).alpha(0f).setDuration(200)
                             .withEndAction(() -> fabGroup.setVisibility(View.GONE)).start();
                     }
-                } else if (dy < -8) { // Scrolling up
+                } else if (dy < -8) {
                     if (fabGroup.getVisibility() == View.GONE) {
                         fabGroup.setVisibility(View.VISIBLE);
                         fabGroup.animate().translationY(0f).alpha(1f).setDuration(200).start();
@@ -258,7 +251,6 @@ public class ProjectsFragment extends DA {
 
         if (!c()) {
             if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
-            if (binding.customRefreshIndicator != null) binding.customRefreshIndicator.setVisibility(View.GONE);
             ((MainActivity) requireActivity()).s(); 
             return;
         }
@@ -271,7 +263,6 @@ public class ProjectsFragment extends DA {
                 if (binding == null) return;
                 
                 if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
-                if (binding.customRefreshIndicator != null) binding.customRefreshIndicator.setVisibility(View.GONE);
                 
                 boolean isEmpty = loadedProjects.isEmpty();
                 
