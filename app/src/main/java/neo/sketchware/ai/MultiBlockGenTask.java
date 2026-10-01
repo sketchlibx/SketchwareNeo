@@ -3,78 +3,74 @@ package neo.sketchware.ai;
 import android.content.Context;
 
 /**
- * Generates MULTIPLE related custom palette blocks in one AI request (e.g. all the blocks
- * needed to wrap a JSON parser, or a whole ad-SDK's init/load/show/callbacks).
+ * Stage 2 of block generation. Generates full block JSON for ONE CHUNK of an already-produced
+ * BlockPlanTask plan - never the whole SDK in one call - so large requests stay within provider
+ * token limits. The chunk's plan entries are included so names/roles/relationships are already
+ * decided; this stage only has to fill in spec/code/type/color/imports for them.
  *
- * Deliberately mirrors {@link CustomBlockGenTask}'s exact prompt conventions (plain %s/%b/%d
- * placeholders, same "type" vocabulary, same AiManager/AiProviderRegistry call) so the two
- * generators produce blocks that follow one consistent style - this is not a parallel AI
- * system, just a batch-shaped sibling of the existing single-block task.
+ * The system prompt teaches the real Sketchware event/callback pattern via one actual verified
+ * example pulled from this app's own block.json (the Facebook Ads interstitial listener), not
+ * just a description - this is the fix for Phase B's wrong "'h' type for events" guess.
  */
 public final class MultiBlockGenTask {
 
+    private static final String REAL_EXAMPLE =
+            "Real verified example from this app's own block library (Facebook Ads interstitial), " +
+            "showing exactly how a listener_wrapper + its callbacks + a value-exposing callback work:\n" +
+            "{\"name\":\"InterstitialAdsListener\",\"type\":\"c\",\"typeName\":\"\",\"spec\":\"%m.FBAdsInterstitial setListener\",\"code\":\"%1$s.setAdListener(new InterstitialAdListener() {\\n%2$s\\n});\"}\n" +
+            "{\"name\":\"IntersOnAdsLoaded\",\"type\":\"c\",\"typeName\":\"\",\"spec\":\"IntersOnAdsLoaded\",\"code\":\"@Override\\npublic void onAdLoaded(Ad ad) {\\n%1$s\\n}\"}\n" +
+            "{\"name\":\"IntersOnAdsError\",\"type\":\"c\",\"typeName\":\"\",\"spec\":\"IntersOnAdsError\",\"code\":\"@Override\\npublic void onError(Ad ad, AdError adError) {\\nfinal String StringErrorLoadFBAd = adError.getErrorMessage();\\n%1$s\\n}\"}\n" +
+            "{\"name\":\"StringErrorLoadFBAd\",\"type\":\"v\",\"typeName\":\"String\",\"spec\":\"StringErrorLoadFBAd\",\"code\":\"StringErrorLoadFBAd\"}\n" +
+            "Notice: the listener_wrapper's code ends with its OWN spec-param substitutions (here just " +
+            "%1$s for the object) followed by ONE MORE placeholder (%2$s) with nothing after it in spec - " +
+            "that extra trailing placeholder is where callback blocks nest, and it is NOT written in " +
+            "\"spec\" at all, only in \"code\". Each callback's spec is JUST its own bare name (no %% " +
+            "placeholders), because it has no visible parameters - its \"code\" is a Java @Override method " +
+            "with exactly one placeholder (%1$s) for its own nested substack. A callback that exposes a " +
+            "result value declares a real Java local variable in its code using the EXACT SAME name as a " +
+            "companion \"v\"-type block, whose own code is just that same name as a bare expression - that " +
+            "v-type block is how the user reads the value elsewhere in that callback's substack.";
+
     private static final String SYSTEM_PROMPT =
-            "You are generating MULTIPLE related CUSTOM PALETTE BLOCK definitions for Sketchware Neo, a " +
-            "visual Android app builder. These are NOT a project's event logic - they are new block TYPES " +
-            "added to the block palette that users can drag in and use like built-in blocks. " +
-            "The user will describe a library/SDK/API or a group of related operations (e.g. \"JSON Parser\" " +
-            "or \"Unity Ads\"). Generate ALL the blocks logically required to use it from a Sketchware Neo " +
-            "project: for an SDK, that normally means an init/setup block, action blocks (load/show/get/...), " +
-            "and event/callback blocks for its important callbacks (success, failure, loaded, closed, etc.) - " +
-            "use your judgement for what's actually needed, do not pad with unnecessary blocks and do not " +
-            "generate just one block if the request clearly implies several. " +
-            "Reply with ONLY a single JSON object, no markdown fences, no extra text, in exactly this shape: " +
-            "{\"blocks\":[{\"name\":\"...\",\"type\":\"...\",\"typeName\":\"...\",\"spec\":\"...\"," +
-            "\"spec2\":\"...\",\"color\":\"...\",\"imports\":\"...\",\"code\":\"...\"}, ...]} " +
-            "with one object per block, using the exact same per-block field meanings as a single-block " +
-            "generator would: " +
-            "\"name\" = internal unique block name, short, no spaces, e.g. jsonGetElement. " +
-            "\"type\" = one of: regular, c, e, s, b, d, v, a, f, l, p, h. " +
-            "\"typeName\" = return type label shown on the block if it returns a value, empty string if none. " +
-            "\"spec\" = the block's visible label with inline parameter placeholders. " +
-            "\"spec2\" = only used when type is 'e' (if-else) - the second branch's spec, empty string otherwise. " +
-            "\"color\" = a hex color like #4A90D9 - reuse the SAME color across all blocks in this batch unless " +
-            "there's a good reason to distinguish a sub-group (e.g. event blocks a shade different), since they " +
-            "belong to the same palette. " +
-            "\"imports\" = newline-separated fully qualified Java imports this block's code needs, empty string " +
-            "if none. " +
-            "\"code\" = the Java code template for this block. " +
-            "Block type meanings: 'regular' = plain statement/action block. 'c' = if-style control block (has " +
-            "an inner stack). 'e' = if-else style (has two inner stacks, needs spec2). 's' = returns a String " +
-            "value. 'b' = returns a Boolean value. 'd' = returns a Number value. 'v' = variable-style block. " +
-            "'a' = returns a Map. 'f' = a stop/terminator block (like break/return, no inner stack " +
-            "continuation). 'l' = returns a List. 'p' = component-style block. 'h' = header/label block. An " +
-            "event/callback block (e.g. \"Ad Loaded\") is normally type 'h' paired with a matching listener " +
-            "registered in the init/load block's code - prefer this pattern for callbacks over inventing a new " +
-            "shape. Prefer 'regular', 's', 'b', or 'd' for non-event blocks unless control flow is clearly " +
-            "needed - those are safer and more predictable. " +
-            "Spec syntax for parameters (place inline in the spec text where that parameter's input socket " +
-            "should appear): %s = string input socket, %b = boolean input socket, %d = number input socket, " +
-            "%s.inputOnly = plain inline text field with no plug. For a special typed socket use %m.<kind> " +
-            "where <kind> is one of: varMap, view, textview, edittext, imageview, listview, list, listMap, " +
-            "listStr, listInt, intent, color, activity, resource, customViews, layout, anim, drawable, " +
-            "ResString. Every %m must be immediately followed by a dot and one of those exact kinds - never a " +
-            "bare %m. " +
-            "The code field is a Java code template using the SAME placeholder tokens (%s, %b, %d) in the same " +
-            "left-to-right order as they appear in spec - each will be substituted with the actual " +
-            "value/expression plugged into that socket when the project builds. Keep code minimal, correct " +
-            "Java, and make sure the number and order of %s/%b/%d in code matches spec exactly. " +
-            "Every \"name\" across ALL blocks in this response, and against the existing names listed below, " +
-            "must be unique - never repeat a name within your own response.";
+            "You are generating the full block definitions for ONE GROUP of an already-planned set of " +
+            "Sketchware Neo custom palette blocks. You will be given: the overall plan (for context/" +
+            "consistency only) and the specific blocks to fully generate right now. Only output the " +
+            "requested blocks, not the whole plan.\n\n" + REAL_EXAMPLE + "\n\n" +
+            "General rules for every block you generate: " +
+            "\"type\" must match the planned \"role\" exactly: init/action/other -> usually \"regular\" " +
+            "(or \"s\"/\"b\"/\"d\"/\"l\"/\"a\" if it returns a value) - never \"c\"/\"e\" unless it truly has " +
+            "an inner stack; listener_wrapper -> \"c\"; callback -> \"c\". " +
+            "If a callback's plan entry has \"exposesValue\" set, its \"code\" MUST declare a real Java " +
+            "local variable using EXACTLY that exposesValue name (e.g. \"final String <name> = ...;\") " +
+            "before its substack placeholder - do NOT generate a separate block for that value yourself, " +
+            "the app builds its getter block automatically from your variable declaration. " +
+            "\"spec\" placeholder syntax: %s/%b/%d for string/boolean/number input sockets, %s.inputOnly " +
+            "for a plain text field, %m.<kind> for a typed object socket (reuse the SAME <kind> string " +
+            "everywhere this SDK's object handle is referenced, matching the plan's objectKind if one was " +
+            "given - never invent a different kind name for the same handle). A listener_wrapper's spec has " +
+            "ONLY its own real parameters (typically just \"%m.<kind> setListener\"-style) - the substack " +
+            "placeholder is implicit and must NOT appear in spec. A callback's spec is its bare name only. " +
+            "\"code\" placeholders are %s/%b/%d in the SAME left-to-right order as they appear in spec " +
+            "(use %1$s, %2$s, ... numbered form), PLUS exactly one extra trailing numbered placeholder for " +
+            "a listener_wrapper's or callback's own substack (the next number after its real params). " +
+            "\"color\": reuse one consistent hex color across this whole SDK's blocks unless there's a " +
+            "good reason to vary it slightly for a sub-group. " +
+            "\"imports\": newline-separated fully-qualified Java imports this block's code needs, empty " +
+            "string if none. " +
+            "Every block name must be unique, including against the \"existingNames\" list you're given - " +
+            "never reuse one. " +
+            "Reply with ONLY {\"blocks\":[{...}, ...]} - no markdown fences, no commentary, one object per " +
+            "requested block, nothing else.";
 
     private MultiBlockGenTask() {}
 
-    public static void generate(Context context, String existingBlockNames, String libraryOrTopic, String userPrompt, AiResponseCallback callback) {
-        StringBuilder fullPrompt = new StringBuilder();
-        if (libraryOrTopic != null && !libraryOrTopic.trim().isEmpty()) {
-            fullPrompt.append("Library/SDK/API or topic: ").append(libraryOrTopic.trim()).append("\n\n");
-        }
-        fullPrompt.append(userPrompt);
-        if (existingBlockNames != null && !existingBlockNames.isEmpty()) {
-            fullPrompt.append("\n\nThese block names already exist, so no \"name\" in your response may match any of them:\n")
-                    .append(existingBlockNames);
-        }
-
-        AiManager.sendPrompt(context, SYSTEM_PROMPT, fullPrompt.toString(), callback);
+    public static void generateChunk(Context context, String planJson, String chunkBlocksJson, String existingNames, AiResponseCallback callback) {
+        String prompt = "Overall plan (context only, do not re-generate blocks from this list unless they also " +
+                "appear below):\n" + planJson +
+                "\n\nGenerate the FULL block JSON now for exactly these planned blocks:\n" + chunkBlocksJson +
+                (existingNames != null && !existingNames.isEmpty()
+                        ? "\n\nThese names already exist elsewhere and must not be reused: " + existingNames
+                        : "");
+        AiManager.sendPrompt(context, SYSTEM_PROMPT, prompt, callback);
     }
 }

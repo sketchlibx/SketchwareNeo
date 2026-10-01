@@ -48,26 +48,20 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 import dev.pranav.filepicker.FilePickerCallback;
 import dev.pranav.filepicker.FilePickerDialogFragment;
 import dev.pranav.filepicker.FilePickerOptions;
 import mod.hey.studios.util.Helper;
-import neo.sketchware.ai.AiResponseCallback;
-import neo.sketchware.ai.MultiBlockGenTask;
 import pro.sketchware.R;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.PropertiesUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
-import a.a.a.kq;
 
 public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
 
@@ -92,6 +86,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
     private TextView emptySearchState;
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private androidx.activity.result.ActivityResultLauncher<Intent> generationLauncher;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -103,6 +98,14 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         fab_button = findViewById(R.id.fab_button);
         loadingIndicator = findViewById(R.id.loadingIndicator);
         emptySearchState = findViewById(R.id.emptySearchState);
+
+        generationLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        handleGenerationResult(result.getData());
+                    }
+                });
 
         initialize();
         _receive_intents();
@@ -160,15 +163,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         dialog.show(getSupportFragmentManager(), "filePickerDialog");
     }
 
-    private static final Set<String> VALID_BLOCK_TYPES = new HashSet<>(java.util.Arrays.asList(
-            "regular", "c", "e", "s", "b", "d", "v", "a", "f", "l", "p", "h"));
-    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
-    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
-    private static final Pattern BARE_PERCENT_M = Pattern.compile("%m(?!\\.[A-Za-z]+)");
-
-    private static final int KQ_UNRECOGNIZED_COLOR = 0xff8a55d7;
-
-    private void showAiMultiBlockPromptDialog() {
+    private void showAiGenerationPromptDialog() {
         int dp24 = (int) (24 * getResources().getDisplayMetrics().density);
         int dp16 = (int) (16 * getResources().getDisplayMetrics().density);
         int dp8 = (int) (8 * getResources().getDisplayMetrics().density);
@@ -185,7 +180,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Describe an SDK/API/library or a group of related operations. AI can generate several related blocks at once (e.g. init/load/show + callbacks) - you'll review and pick which ones to import next.");
+        subtitle.setText("Describe an SDK/API/library or a group of related operations. AI will plan, then generate and validate the blocks on the next screen before you import anything.");
         subtitle.setTextSize(14);
         subtitle.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
         LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
@@ -209,7 +204,7 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
 
         EditText promptInput = new EditText(this);
-        promptInput.setHint("e.g. blocks to initialize, load, and show a Unity interstitial ad, with load/show callbacks");
+        promptInput.setHint("e.g. initialize, load, and show a Unity interstitial ad, with load/show callbacks");
         promptInput.setBackground(null);
         promptInput.setPadding(dp16, dp16, dp16, dp16);
         promptInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -224,25 +219,19 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
         new MaterialAlertDialogBuilder(this)
                 .setView(root)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Generate", (dialog, which) -> {
+                .setPositiveButton("Next", (dialog, which) -> {
                     String prompt = promptInput.getText() == null ? "" : promptInput.getText().toString().trim();
                     if (prompt.isEmpty()) {
                         SketchwareUtil.toastError("Describe what you need first.");
                         return;
                     }
                     String topic = topicInput.getText() == null ? "" : topicInput.getText().toString().trim();
-                    runMultiBlockGeneration(topic, prompt);
+                    launchGenerationScreen(topic, prompt);
                 })
                 .show();
     }
 
-    private void runMultiBlockGeneration(String topic, String prompt) {
-        androidx.appcompat.app.AlertDialog loadingDialog = new MaterialAlertDialogBuilder(this)
-                .setTitle("Generating blocks")
-                .setMessage("Asking AI to design the blocks...")
-                .setCancelable(false)
-                .show();
-
+    private void launchGenerationScreen(String topic, String prompt) {
         StringBuilder existingNames = new StringBuilder();
         if (all_blocks_list != null) {
             for (HashMap<String, Object> block : all_blocks_list) {
@@ -254,89 +243,41 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
             }
         }
 
-        MultiBlockGenTask.generate(this, existingNames.toString(), topic, prompt, new AiResponseCallback() {
-            @Override
-            public void onSuccess(String responseText) {
-                loadingDialog.dismiss();
-                try {
-                    handleAiMultiBlockResponse(responseText);
-                } catch (Exception e) {
-                    SketchwareUtil.toastError("Couldn't process the AI response: " + e.getMessage());
-                }
-            }
-
-            @Override
-            public void onFailure(String errorMessage) {
-                loadingDialog.dismiss();
-                SketchwareUtil.toastError("AI generation failed: " + errorMessage);
-            }
-        });
+        Intent intent = new Intent(this, neo.sketchware.ai.BlockGenerationActivity.class);
+        intent.putExtra(neo.sketchware.ai.BlockGenerationActivity.EXTRA_TOPIC, topic);
+        intent.putExtra(neo.sketchware.ai.BlockGenerationActivity.EXTRA_PROMPT, prompt);
+        intent.putExtra(neo.sketchware.ai.BlockGenerationActivity.EXTRA_EXISTING_NAMES, existingNames.toString());
+        generationLauncher.launch(intent);
     }
 
     /**
-     * Parses {"blocks":[...]}, validates every entry against the real block.json schema,
-     * drops (and reports) invalid/duplicate ones without touching existing data, converts
-     * fields to the exact on-disk shape addBlock()/insertBlockAt() already use, then hands
-     * the surviving valid blocks to the EXISTING _importBlocks() accept/reject checklist -
-     * that dialog IS the preview/accept-reject step, reused rather than rebuilt.
+     * Converts the approved blocks returned by BlockGenerationActivity into the exact on-disk
+     * shape addBlock()/the file-import path already use (same "regular"->" " conversion, same
+     * spec2-only-for-"e", same imports-only-if-non-empty), then hands them to the EXISTING
+     * _importBlocks() accept/reject checklist - reused rather than rebuilt, same as before.
      */
-    private void handleAiMultiBlockResponse(String responseText) {
-        String jsonText = responseText.trim();
-        int start = jsonText.indexOf('{');
-        int end = jsonText.lastIndexOf('}');
-        if (start == -1 || end == -1 || end < start) {
-            SketchwareUtil.toastError("AI response wasn't valid JSON.");
-            return;
-        }
-        jsonText = jsonText.substring(start, end + 1);
+    private void handleGenerationResult(Intent data) {
+        String json = data.getStringExtra(neo.sketchware.ai.BlockGenerationActivity.EXTRA_RESULT_BLOCKS_JSON);
+        if (json == null) return;
 
-        JSONObject root;
         JSONArray blocksArray;
         try {
-            root = new JSONObject(jsonText);
-            blocksArray = root.getJSONArray("blocks");
+            blocksArray = new JSONObject(json).getJSONArray("blocks");
         } catch (JSONException e) {
-            SketchwareUtil.toastError("AI response didn't match the expected {\"blocks\":[...]} shape.");
+            SketchwareUtil.toastError("Couldn't read the generated blocks.");
             return;
         }
 
-        if (blocksArray.length() == 0) {
-            SketchwareUtil.toastError("AI didn't generate any blocks.");
-            return;
-        }
-
-        Set<String> existingNames = new HashSet<>();
-        if (all_blocks_list != null) {
-            for (HashMap<String, Object> block : all_blocks_list) {
-                Object name = block.get("name");
-                if (name instanceof String) existingNames.add((String) name);
-            }
-        }
-
-        ArrayList<HashMap<String, Object>> validBlocks = new ArrayList<>();
-        ArrayList<String> errors = new ArrayList<>();
-        Set<String> namesInThisBatch = new HashSet<>();
-
+        ArrayList<HashMap<String, Object>> converted = new ArrayList<>();
         for (int i = 0; i < blocksArray.length(); i++) {
             JSONObject b;
             try {
                 b = blocksArray.getJSONObject(i);
             } catch (JSONException e) {
-                errors.add("Block #" + (i + 1) + ": not a JSON object");
                 continue;
             }
-            String label = "Block #" + (i + 1) + " (" + b.optString("name", "unnamed") + ")";
-            String error = validateGeneratedBlock(b, existingNames, namesInThisBatch);
-            if (error != null) {
-                errors.add(label + ": " + error);
-                continue;
-            }
-
-            String name = b.optString("name", "");
-            namesInThisBatch.add(name);
-
             HashMap<String, Object> map = new HashMap<>();
-            map.put("name", name);
+            map.put("name", b.optString("name", ""));
             String type = b.optString("type", "regular");
             map.put("type", type.isEmpty() || type.equals("regular") ? " " : type);
             map.put("typeName", b.optString("typeName", ""));
@@ -345,73 +286,22 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 map.put("spec2", b.optString("spec2", ""));
             }
             String color = b.optString("color", "");
-            map.put("color", HEX_COLOR_PATTERN.matcher(color).matches() ? color : "#F0F0F0");
+            map.put("color", !color.isEmpty() ? color : "#F0F0F0");
             String imports = b.optString("imports", "");
             if (!TextUtils.isEmpty(imports)) {
                 map.put("imports", imports);
             }
             map.put("code", b.optString("code", ""));
-
-            validBlocks.add(map);
+            // palette intentionally not set - _importBlocks() always assigns the currently
+            // open palette, matching "inherit the currently selected palette".
+            converted.add(map);
         }
 
-        if (!errors.isEmpty()) {
-            String message = (validBlocks.isEmpty()
-                    ? "No blocks could be imported:\n\n"
-                    : validBlocks.size() + " of " + blocksArray.length() + " blocks are valid. Skipped:\n\n")
-                    + TextUtils.join("\n", errors);
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle("Validation results")
-                    .setMessage(message)
-                    .setPositiveButton(validBlocks.isEmpty() ? "OK" : "Review valid blocks", (d, w) -> {
-                        if (!validBlocks.isEmpty()) _importBlocks(validBlocks);
-                    })
-                    .setNegativeButton(validBlocks.isEmpty() ? null : "Cancel", null)
-                    .show();
-        } else {
-            _importBlocks(validBlocks);
+        if (converted.isEmpty()) {
+            SketchwareUtil.toastError("No blocks to import.");
+            return;
         }
-    }
-
-    /** Returns null if valid, otherwise a short human-readable reason. */
-    private String validateGeneratedBlock(JSONObject b, Set<String> existingNames, Set<String> namesInThisBatch) {
-        String name = b.optString("name", "");
-        if (name.isEmpty()) return "missing \"name\"";
-        if (!IDENTIFIER_PATTERN.matcher(name).matches()) return "\"name\" must be a plain identifier (letters/digits/underscore, not starting with a digit)";
-        if (namesInThisBatch.contains(name)) return "duplicate \"name\" within this AI response";
-        if (existingNames.contains(name)) return "a block named \"" + name + "\" already exists";
-        try {
-            if (kq.a(name, " ") != KQ_UNRECOGNIZED_COLOR) {
-                return "\"" + name + "\" collides with a reserved built-in block name";
-            }
-        } catch (Exception ignored) {
-            // If the reserved-name check itself fails for some reason, don't block import over it.
-        }
-
-        String type = b.optString("type", "regular");
-        if (!VALID_BLOCK_TYPES.contains(type)) {
-            return "invalid \"type\": \"" + type + "\"";
-        }
-
-        String spec = b.optString("spec", "");
-        if (spec.isEmpty()) return "missing \"spec\"";
-        if (BARE_PERCENT_M.matcher(spec).find()) return "\"spec\" has a bare %m not followed by .kind";
-
-        if ("e".equals(type)) {
-            String spec2 = b.optString("spec2", "");
-            if (spec2.isEmpty()) return "type is 'e' (if-else) but \"spec2\" is missing";
-            if (BARE_PERCENT_M.matcher(spec2).find()) return "\"spec2\" has a bare %m not followed by .kind";
-        }
-
-        String color = b.optString("color", "");
-        if (!color.isEmpty() && !HEX_COLOR_PATTERN.matcher(color).matches()) {
-            return "\"color\" isn't a valid hex color (e.g. #4A90D9)";
-        }
-
-        String code = b.optString("code", "");
-        if (code.trim().isEmpty()) return "missing \"code\"";
-
-        return null;
+        _importBlocks(converted);
     }
 
     @Override
@@ -524,13 +414,14 @@ public class BlocksManagerDetailsActivity extends BaseAppCompatActivity {
                 break;
 
             case "Generate Blocks with AI":
-                showAiMultiBlockPromptDialog();
+                showAiGenerationPromptDialog();
                 break;
 
             case "Export":
                 Object paletteName = pallet_list.get(palette - 9).get("name");
                 if (paletteName instanceof String) {
-
+                    // Export always covers the whole palette, regardless of an active
+                    // search filter — search is a display-only concern.
                     ArrayList<HashMap<String, Object>> exportList = new ArrayList<>();
                     for (HashMap<String, Object> block : all_blocks_list) {
                         Object blockPalette = block.get("palette");
