@@ -7,17 +7,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
-import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.speech.RecognizerIntent;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -31,25 +31,30 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
-import com.google.android.material.card.MaterialCardView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import io.noties.markwon.Markwon;
-import neo.sketchware.ai.local.LocalModel;
 import neo.sketchware.ai.local.LocalModelManager;
 import pro.sketchware.R;
 import pro.sketchware.databinding.ActivityAiChatBinding;
 import pro.sketchware.databinding.ActivityAiSettingsBinding;
 import pro.sketchware.databinding.ActivityLocalModelsBinding;
-import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.ThemeUtils;
 
 public class AiSettingsActivity extends BaseAppCompatActivity {
 
@@ -65,21 +70,24 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
     private ActivityResultLauncher<Intent> editorLauncher;
     private ActivityResultLauncher<Intent> speechLauncher;
     private ActivityResultLauncher<Intent> filePickerLauncher;
-    
+
     private int screen = 0;
     private String chatConfigId = null;
-    private List<ChatMessage> currentChatMessages = new ArrayList<>();
+    
+    private final List<ChatMessage> currentChatMessages = new ArrayList<>();
+    private final Set<String> cancelledRequests = new HashSet<>();
+    private String activeRequestId = null;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Map<String, Runnable> pendingUiUpdates = new HashMap<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         editorLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
-                    if (result.getResultCode() == RESULT_OK && screen == 0) {
-                        refreshAgents();
-                    }
+                    if (result.getResultCode() == RESULT_OK && screen == 0) refreshAgents();
                 }
         );
 
@@ -125,7 +133,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         screen = 0;
         settingsBinding = ActivityAiSettingsBinding.inflate(getLayoutInflater());
         setContentView(settingsBinding.getRoot());
-        
+
         settingsBinding.topAppBar.setNavigationOnClickListener(v -> finish());
         settingsBinding.buttonSettings.setOnClickListener(v -> showAiPreferences());
 
@@ -137,7 +145,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         settingsBinding.buttonChat.setOnClickListener(v -> showChat(null));
         settingsBinding.buttonLocalModels.setOnClickListener(v -> showLocalModels());
         settingsBinding.buttonTestActive.setOnClickListener(v -> testActive());
-        
+
         settingsBinding.tabAll.setOnClickListener(v -> { filter = 0; refreshAgents(); });
         settingsBinding.tabLocal.setOnClickListener(v -> { filter = 1; refreshAgents(); });
         settingsBinding.tabCloud.setOnClickListener(v -> { filter = 2; refreshAgents(); });
@@ -150,9 +158,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
 
         List<AiModelConfig> all = AiManager.getConfigs(this);
         List<AiModelConfig> shown = new ArrayList<>();
-        
-        int localCount = 0;
-        int cloudCount = 0;
+        int localCount = 0, cloudCount = 0;
 
         for (AiModelConfig c : all) {
             AiProvider p = AiProviderRegistry.get(c.providerId);
@@ -163,22 +169,19 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
 
         adapter.setConfigs(shown);
         settingsBinding.emptyStateLayout.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
-        
         settingsBinding.tabAll.setChecked(filter == 0);
         settingsBinding.tabLocal.setChecked(filter == 1);
         settingsBinding.tabCloud.setChecked(filter == 2);
-        
+
         AiModelConfig active = AiManager.getActiveConfig(this);
         String activeLabel = active == null ? "No active agent" : (active.displayName + " · " + active.modelName);
         settingsBinding.textAgentSummary.setText(activeLabel + "\n" + localCount + " local • " + cloudCount + " cloud agents");
-        
         settingsBinding.buttonTestActive.setEnabled(active != null);
     }
 
     private void testActive() {
         AiModelConfig active = AiManager.getActiveConfig(this);
-        if (active == null) return;
-        testAgent(active);
+        if (active != null) testAgent(active);
     }
 
     private void testAgent(AiModelConfig config) {
@@ -187,28 +190,24 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 .setMessage("Connecting to " + config.displayName + "...")
                 .setCancelable(false)
                 .show();
-        
+
         AiManager.testConfig(this, config, new AiResponseCallback() {
             @Override
             public void onSuccess(String s) {
-                runOnUiThread(() -> {
-                    new MaterialAlertDialogBuilder(AiSettingsActivity.this)
-                            .setTitle("Connection Successful")
-                            .setMessage(s)
-                            .setPositiveButton("OK", null)
-                            .show();
-                });
+                runOnUiThread(() -> new MaterialAlertDialogBuilder(AiSettingsActivity.this)
+                        .setTitle("Connection Successful")
+                        .setMessage(s)
+                        .setPositiveButton("OK", null)
+                        .show());
             }
 
             @Override
             public void onFailure(String e) {
-                runOnUiThread(() -> {
-                    new MaterialAlertDialogBuilder(AiSettingsActivity.this)
-                            .setTitle("Connection Failed")
-                            .setMessage(e)
-                            .setPositiveButton("OK", null)
-                            .show();
-                });
+                runOnUiThread(() -> new MaterialAlertDialogBuilder(AiSettingsActivity.this)
+                        .setTitle("Connection Failed")
+                        .setMessage(e)
+                        .setPositiveButton("OK", null)
+                        .show());
             }
         });
     }
@@ -253,26 +252,26 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         screen = 1;
         localModelsBinding = ActivityLocalModelsBinding.inflate(getLayoutInflater());
         setContentView(localModelsBinding.getRoot());
-        
+
         if (localModelsBinding.topAppBar != null) {
             localModelsBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
         }
-        
+
         localModelsBinding.buttonImportGguf.setOnClickListener(v -> pickGguf());
         localModelsBinding.buttonConnectServer.setOnClickListener(v -> editorLauncher.launch(new Intent(this, AiModelEditActivity.class)));
-        
+
         renderLocalList();
     }
 
     private void renderLocalList() {
         if (localModelsBinding == null) return;
-        
+
         LinearLayout list = localModelsBinding.localModelList;
         list.removeAllViews();
-        
+
         List<File> files = LocalModelManager.installed(this);
         localModelsBinding.textInstalled.setText(files.isEmpty() ? "Installed models · none" : "Installed models · " + files.size());
-        
+
         for (File f : files) {
             View card = getLayoutInflater().inflate(R.layout.item_ai_model, list, false);
             TextView name = card.findViewById(R.id.textModelName);
@@ -280,20 +279,20 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             TextView status = card.findViewById(R.id.textStatus);
             card.findViewById(R.id.textActiveBadge).setVisibility(View.GONE);
             card.findViewById(R.id.iconStatus).setVisibility(View.GONE);
-            
+
             name.setText(f.getName());
             desc.setText("Local GGUF File");
             status.setText((f.length() / 1024 / 1024) + " MB");
-            
+
             card.findViewById(R.id.buttonMore).setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(this, v);
                 popup.getMenu().add("Delete").setOnMenuItemClickListener(item -> {
                     new MaterialAlertDialogBuilder(this)
-                        .setTitle("Delete model?")
-                        .setMessage(f.getName())
-                        .setPositiveButton("Delete", (d, w) -> { f.delete(); renderLocalList(); })
-                        .setNegativeButton("Cancel", null)
-                        .show();
+                            .setTitle("Delete model?")
+                            .setMessage(f.getName())
+                            .setPositiveButton("Delete", (d, w) -> { f.delete(); renderLocalList(); })
+                            .setNegativeButton("Cancel", null)
+                            .show();
                     return true;
                 });
                 popup.show();
@@ -309,35 +308,23 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         startActivityForResult(i, PICK_GGUF);
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == PICK_GGUF && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
-            try {
-                LocalModelManager.importModel(this, data.getData(), "imported-" + System.currentTimeMillis() + ".gguf");
-                Toast.makeText(this, "GGUF imported", Toast.LENGTH_SHORT).show();
-                if (screen == 1) renderLocalList();
-            } catch (Exception e) {
-                Toast.makeText(this, "Import failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
     private void showChat(String explicitConfigId) {
         screen = 2;
         chatBinding = ActivityAiChatBinding.inflate(getLayoutInflater());
         setContentView(chatBinding.getRoot());
-        
+
         if (chatBinding.topAppBar != null) {
             chatBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
         }
-        
+
         chatBinding.buttonClear.setOnClickListener(v -> {
             currentChatMessages.clear();
             saveChatHistory();
             chatAdapter.notifyDataSetChanged();
+            activeRequestId = null;
+            updateInputState();
         });
-        
+
         if (explicitConfigId != null) {
             chatConfigId = explicitConfigId;
         } else if (chatConfigId == null) {
@@ -362,19 +349,15 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         chatBinding.recyclerChat.setLayoutManager(new LinearLayoutManager(this));
         chatAdapter = new ChatAdapter();
         chatBinding.recyclerChat.setAdapter(chatAdapter);
-        
+
         loadChatHistory();
-        
-        chatBinding.buttonSend.setOnClickListener(v -> sendChat());
+
+        chatBinding.buttonSend.setOnClickListener(v -> handleSendOrStop());
         chatBinding.buttonSend.setVisibility(View.GONE);
-        
+
         chatBinding.editMessage.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                boolean hasText = s.toString().trim().length() > 0;
-                chatBinding.buttonSend.setVisibility(hasText ? View.VISIBLE : View.GONE);
-                chatBinding.buttonMic.setVisibility(hasText ? View.GONE : View.VISIBLE);
-            }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateInputState(); }
             @Override public void afterTextChanged(Editable s) {}
         });
 
@@ -391,57 +374,151 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             filePickerLauncher.launch(intent);
         });
 
-        // Shortcuts
         chatBinding.chipGenBlocks.setOnClickListener(v -> startActivity(new Intent(this, BlockGenerationActivity.class)));
         chatBinding.chipFixErrors.setOnClickListener(v -> chatBinding.editMessage.setText("I am facing a build error in Sketchware Neo. Here is the log: \n"));
         chatBinding.chipExplain.setOnClickListener(v -> chatBinding.editMessage.setText("Explain this code:\n"));
     }
 
-    private void sendChat() {
+    private void updateInputState() {
+        if (chatBinding == null) return;
+        boolean hasText = chatBinding.editMessage.getText().toString().trim().length() > 0;
+        boolean isGenerating = activeRequestId != null;
+
+        if (isGenerating) {
+            chatBinding.buttonSend.setImageResource(R.drawable.ic_mtrl_close); // Act as Stop
+            chatBinding.buttonSend.setVisibility(View.VISIBLE);
+            chatBinding.buttonMic.setVisibility(View.GONE);
+        } else {
+            chatBinding.buttonSend.setImageResource(R.drawable.ic_mtrl_arrow_up);
+            chatBinding.buttonSend.setVisibility(hasText ? View.VISIBLE : View.GONE);
+            chatBinding.buttonMic.setVisibility(hasText ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void handleSendOrStop() {
+        if (activeRequestId != null) {
+            cancelledRequests.add(activeRequestId);
+            updateAiMessage(activeRequestId, "\n\n*[Generation Stopped]*", false, true);
+            activeRequestId = null;
+            updateInputState();
+            return;
+        }
+
         if (chatBinding == null || chatConfigId == null) {
             Toast.makeText(this, "Select an AI Agent first", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         String q = chatBinding.editMessage.getText().toString().trim();
         if (q.isEmpty()) return;
-        
-        addMessageToChat("You", q);
-        chatBinding.editMessage.setText("");
-        
-        currentChatMessages.add(new ChatMessage("AI", "Thinking…", true));
-        chatAdapter.notifyItemInserted(currentChatMessages.size() - 1);
-        scrollToBottom();
 
-        AiManager.sendPrompt(this, "You are the Sketchware Neo AI assistant. Answer using Markdown formatting where appropriate.", q, new AiResponseCallback() {
+        chatBinding.editMessage.setText("");
+        invokeAi(q);
+    }
+
+    private void invokeAi(String userPrompt) {
+        String reqId = UUID.randomUUID().toString();
+        activeRequestId = reqId;
+        updateInputState();
+
+        currentChatMessages.add(new ChatMessage(UUID.randomUUID().toString(), "You", userPrompt, false, false));
+        chatAdapter.notifyItemInserted(currentChatMessages.size() - 1);
+
+        currentChatMessages.add(new ChatMessage(reqId, "AI", "Thinking…", true, false));
+        chatAdapter.notifyItemInserted(currentChatMessages.size() - 1);
+        scrollToBottom(true);
+
+        AiManager.sendPrompt(this, "You are the Sketchware Neo AI assistant. Answer using Markdown formatting.", userPrompt, new AiResponseCallback() {
+            @Override
+            public void onStart(String id) {
+                // Future stream support starts here
+            }
+
+            @Override
+            public void onChunk(String id, String chunk) {
+                if (cancelledRequests.contains(reqId)) return;
+                updateAiMessage(reqId, chunk, true, false);
+            }
+
+            @Override
+            public void onComplete(String id, String fullText) {
+                if (cancelledRequests.contains(reqId)) return;
+                updateAiMessage(reqId, fullText, false, false);
+                finalizeRequest(reqId);
+            }
+
+            @Override
+            public void onError(String id, String err) {
+                if (cancelledRequests.contains(reqId)) return;
+                updateAiMessage(reqId, "Error: " + err, false, true);
+                finalizeRequest(reqId);
+            }
+
             @Override
             public void onSuccess(String s) {
-                runOnUiThread(() -> {
-                    currentChatMessages.remove(currentChatMessages.size() - 1); // remove thinking
-                    addMessageToChat("AI", s);
-                });
+                onComplete(reqId, s);
             }
 
             @Override
             public void onFailure(String e) {
-                runOnUiThread(() -> {
-                    currentChatMessages.remove(currentChatMessages.size() - 1);
-                    addMessageToChat("AI", "Error: " + e);
-                });
+                onError(reqId, e);
             }
         });
     }
 
-    private void addMessageToChat(String role, String content) {
-        currentChatMessages.add(new ChatMessage(role, content, false));
-        chatAdapter.notifyItemInserted(currentChatMessages.size() - 1);
-        saveChatHistory();
-        scrollToBottom();
+    private void updateAiMessage(String messageId, String newContent, boolean isStreaming, boolean isError) {
+        int idx = -1;
+        for (int i = currentChatMessages.size() - 1; i >= 0; i--) {
+            if (currentChatMessages.get(i).id.equals(messageId)) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx == -1) return;
+
+        ChatMessage msg = currentChatMessages.get(idx);
+        msg.content = newContent;
+        msg.isStreaming = isStreaming;
+        msg.isError = isError;
+
+        final int finalIdx = idx;
+        
+        Runnable updateTask = () -> {
+            chatAdapter.notifyItemChanged(finalIdx);
+            scrollToBottom(false);
+            if (!isStreaming) saveChatHistory();
+        };
+
+        if (!isStreaming) {
+            mainHandler.removeCallbacksAndMessages(messageId);
+            runOnUiThread(updateTask);
+        } else {
+            Runnable existing = pendingUiUpdates.get(messageId);
+            if (existing == null) {
+                pendingUiUpdates.put(messageId, updateTask);
+                mainHandler.postDelayed(() -> {
+                    pendingUiUpdates.remove(messageId);
+                    if (!isDestroyed()) runOnUiThread(updateTask);
+                }, 100);
+            }
+        }
     }
 
-    private void scrollToBottom() {
-        if (chatBinding != null && chatAdapter.getItemCount() > 0) {
-            chatBinding.recyclerChat.smoothScrollToPosition(chatAdapter.getItemCount() - 1);
+    private void finalizeRequest(String reqId) {
+        if (activeRequestId != null && activeRequestId.equals(reqId)) {
+            activeRequestId = null;
+            runOnUiThread(this::updateInputState);
+        }
+    }
+
+    private void scrollToBottom(boolean force) {
+        if (chatBinding == null || chatAdapter.getItemCount() == 0) return;
+        LinearLayoutManager lm = (LinearLayoutManager) chatBinding.recyclerChat.getLayoutManager();
+        if (lm != null) {
+            int lastVisible = lm.findLastVisibleItemPosition();
+            if (force || lastVisible >= chatAdapter.getItemCount() - 3) {
+                chatBinding.recyclerChat.smoothScrollToPosition(chatAdapter.getItemCount() - 1);
+            }
         }
     }
 
@@ -464,17 +541,26 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         if (currentChatMessages.isEmpty()) {
             AiModelConfig config = null;
             for (AiModelConfig c : AiManager.getConfigs(this)) if (c.id.equals(chatConfigId)) config = c;
-            currentChatMessages.add(new ChatMessage("AI", config == null ? "Please add an AI Agent." : "Hello! I am " + config.displayName + ".\nAsk me about your project.", false));
+            currentChatMessages.add(new ChatMessage(UUID.randomUUID().toString(), "AI", config == null ? "Please add an AI Agent." : "Hello! I am " + config.displayName + ".\nAsk me about your project.", false, false));
         }
         chatAdapter.notifyDataSetChanged();
-        scrollToBottom();
+        scrollToBottom(true);
     }
 
     private static class ChatMessage {
+        String id;
         String role;
         String content;
-        boolean isTemp;
-        ChatMessage(String role, String content, boolean isTemp) { this.role = role; this.content = content; this.isTemp = isTemp; }
+        boolean isStreaming;
+        boolean isError;
+
+        ChatMessage(String id, String role, String content, boolean isStreaming, boolean isError) {
+            this.id = id;
+            this.role = role;
+            this.content = content;
+            this.isStreaming = isStreaming;
+            this.isError = isError;
+        }
     }
 
     private class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ChatVH> {
@@ -490,14 +576,14 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         public void onBindViewHolder(@NonNull ChatVH holder, int position) {
             ChatMessage msg = currentChatMessages.get(position);
             holder.textSender.setText(msg.role);
-            
+
             boolean isUser = msg.role.equals("You");
             holder.cardBubble.setCardBackgroundColor(ThemeUtils.getColor(AiSettingsActivity.this, isUser ? R.attr.colorSurfaceContainerHigh : R.attr.colorSurfaceContainerLow));
             holder.textSender.setTextColor(ThemeUtils.getColor(AiSettingsActivity.this, isUser ? R.attr.colorPrimary : R.attr.colorOnSurfaceVariant));
-            
+
             holder.layoutContent.removeAllViews();
-            
-            if (msg.isTemp) {
+
+            if (msg.isStreaming && msg.content.equals("Thinking…")) {
                 TextView tv = new TextView(AiSettingsActivity.this);
                 tv.setText(msg.content);
                 tv.setTextColor(ThemeUtils.getColor(AiSettingsActivity.this, R.attr.colorOnSurfaceVariant));
@@ -505,14 +591,14 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 return;
             }
 
-            // Custom Markdown Splitter for Code Blocks
-            String[] parts = msg.content.split("```");
+            // Safe Markdown Code Splitter for Fenced Blocks
+            String[] parts = msg.content.split("```", -1);
             for (int i = 0; i < parts.length; i++) {
                 if (i % 2 == 0) {
                     if (!parts[i].trim().isEmpty()) {
                         TextView tv = new TextView(AiSettingsActivity.this);
                         tv.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
-                        tv.setTextColor(ThemeUtils.getColor(AiSettingsActivity.this, R.attr.colorOnSurface));
+                        tv.setTextColor(ThemeUtils.getColor(AiSettingsActivity.this, msg.isError ? R.attr.colorError : R.attr.colorOnSurface));
                         markwon.setMarkdown(tv, parts[i].trim());
                         holder.layoutContent.addView(tv);
                     }
@@ -549,15 +635,12 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                     Toast.makeText(AiSettingsActivity.this, "Copied", Toast.LENGTH_SHORT).show();
                     return true;
                 });
-                if (!isUser) {
+                if (!isUser && !msg.isStreaming) {
                     popup.getMenu().add("Regenerate").setOnMenuItemClickListener(item -> {
-                        currentChatMessages.remove(position);
-                        notifyItemRemoved(position);
-                        // find last user message
-                        for(int i = currentChatMessages.size()-1; i>=0; i--) {
+                        for (int i = position - 1; i >= 0; i--) {
                             if (currentChatMessages.get(i).role.equals("You")) {
-                                chatBinding.editMessage.setText(currentChatMessages.get(i).content);
-                                sendChat();
+                                String userText = currentChatMessages.get(i).content;
+                                invokeAi(userText);
                                 break;
                             }
                         }
@@ -570,7 +653,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         }
 
         @Override public int getItemCount() { return currentChatMessages.size(); }
-        
+
         class ChatVH extends RecyclerView.ViewHolder {
             TextView textSender;
             MaterialCardView cardBubble;
@@ -610,44 +693,44 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         public void onBindViewHolder(@NonNull AgentVH holder, int position) {
             AiModelConfig c = configs.get(position);
             AiProvider p = AiProviderRegistry.get(c.providerId);
-            
+
             holder.textName.setText(c.displayName);
             holder.textProvider.setText((p != null ? p.getProviderName() : "Unknown") + " • " + c.modelName);
-            
+
             boolean isActive = c.id.equals(activeId);
             holder.textBadge.setVisibility(isActive ? View.VISIBLE : View.GONE);
             holder.cardRoot.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(AiSettingsActivity.this, isActive ? R.attr.colorPrimary : R.attr.colorOutlineVariant)));
             holder.cardRoot.setStrokeWidth(isActive ? SketchwareUtil.dpToPx(2) : SketchwareUtil.dpToPx(1));
 
             holder.textStatus.setText("Ready • " + (p != null && p.isLocal() ? "LOCAL" : "CLOUD"));
-            
+
             holder.buttonMore.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(AiSettingsActivity.this, v);
                 popup.getMenu().add("Chat").setOnMenuItemClickListener(item -> { activity.showChat(c.id); return true; });
                 if (!isActive) popup.getMenu().add("Set Active").setOnMenuItemClickListener(item -> { AiManager.setActiveConfigId(AiSettingsActivity.this, c.id); refreshAgents(); return true; });
                 popup.getMenu().add("Test").setOnMenuItemClickListener(item -> { testAgent(c); return true; });
-                popup.getMenu().add("Edit").setOnMenuItemClickListener(item -> { 
+                popup.getMenu().add("Edit").setOnMenuItemClickListener(item -> {
                     Intent i = new Intent(activity, AiModelEditActivity.class);
                     i.putExtra(AiModelEditActivity.EXTRA_CONFIG, c);
                     activity.editorLauncher.launch(i);
-                    return true; 
+                    return true;
                 });
-                popup.getMenu().add("Duplicate").setOnMenuItemClickListener(item -> { 
+                popup.getMenu().add("Duplicate").setOnMenuItemClickListener(item -> {
                     AiModelConfig x = new AiModelConfig(c.providerId, c.displayName + " (copy)", c.apiKey, c.modelName, c.customEndpoint);
                     x.temperature = c.temperature; x.threads = c.threads; x.maxTokens = c.maxTokens; x.topP = c.topP;
                     x.systemPrompt = c.systemPrompt; x.enableChat = c.enableChat; x.enableBlocks = c.enableBlocks; x.enableLogic = c.enableLogic;
                     x.enableLayouts = c.enableLayouts; x.enableCustomBlocks = c.enableCustomBlocks; x.enableErrorFix = c.enableErrorFix;
                     AiManager.addConfig(activity, x);
                     refreshAgents();
-                    return true; 
+                    return true;
                 });
-                popup.getMenu().add("Delete").setOnMenuItemClickListener(item -> { 
+                popup.getMenu().add("Delete").setOnMenuItemClickListener(item -> {
                     new MaterialAlertDialogBuilder(activity)
-                        .setTitle("Delete AI agent")
-                        .setMessage("Remove \"" + c.displayName + "\"?")
-                        .setPositiveButton("Delete", (d, w) -> { AiManager.removeConfig(activity, c.id); refreshAgents(); })
-                        .setNegativeButton("Cancel", null).show();
-                    return true; 
+                            .setTitle("Delete AI agent")
+                            .setMessage("Remove \"" + c.displayName + "\"?")
+                            .setPositiveButton("Delete", (d, w) -> { AiManager.removeConfig(activity, c.id); refreshAgents(); })
+                            .setNegativeButton("Cancel", null).show();
+                    return true;
                 });
                 popup.show();
             });

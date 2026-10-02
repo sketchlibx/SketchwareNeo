@@ -27,7 +27,7 @@
             android:background="@drawable/bg_circle_surface_variant"
             android:padding="12dp"
             app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Material3.Corner.Full"
-            app:tint="?attr/colorOnSurfaceVariant"
+            app:tint="?attr/colorPrimary"
             tools:src="@drawable/ic_mtrl_cloud" />
 
         <LinearLayout
