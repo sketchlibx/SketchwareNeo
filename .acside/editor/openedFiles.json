@@ -1,20 +1,20 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/.github/workflows/notify_telegram.py",
+      "file": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/README.md",
       "selection": {
         "end": {
-          "column": 68,
-          "index": 1093,
-          "line": 27
+          "column": 0,
+          "index": 4480,
+          "line": 88
         },
         "start": {
-          "column": 68,
-          "index": 1093,
-          "line": 27
+          "column": 0,
+          "index": 4480,
+          "line": 88
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/.github/workflows/notify_telegram.py"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/SketchwareNeo/README.md"
 }

@@ -207,14 +207,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             public void onDrawerStateChanged(int newState) {}
         });
 
-        ImageButton btnSearch = findViewById(R.id.btn_toolbar_search);
-        if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> {
-                if (activeFragment instanceof ProjectsFragment) {
-                    ((ProjectsFragment) activeFragment).openSearch();
-                }
-            });
-        }
         ImageButton btnSettings = findViewById(R.id.btn_toolbar_settings);
         if (btnSettings != null) {
             btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, pro.sketchware.activities.settings.SettingsActivity.class)));

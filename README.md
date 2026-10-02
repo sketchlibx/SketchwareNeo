@@ -11,94 +11,53 @@
 [![Repository Size](https://img.shields.io/github/repo-size/sketchlibx/SketchwareNeo)](https://github.com/sketchlibx/SketchwareNeo)
 [![Telegram](https://img.shields.io/badge/Telegram-sketchwareneo-26A5E4?logo=telegram)](https://t.me/sketchwareneo)
 
-**Sketchware Neo** is a community-maintained Android IDE that lets you build real Android apps — entirely from your Android device. No desktop required.
+<p align="center">
+  <b>A modified version of Sketchware Pro for Android</b>
+</p>
 
-It began as a continuation of Sketchware Pro (itself a fork of the original Sketchware), and has since grown into something significantly more powerful. With the original Sketchware ecosystem largely inactive, Sketchware Neo is where active development is happening: modern features, proper tooling, and long-term support.
+<p align="center">
+<a href="https://github.com/fora2323/Sketchware-DayGreen/blob/main/LICENSE">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-007ec6" alt="License">
+</a>
+  </a>
+  <img src="https://img.shields.io/badge/platform-Android-4c1" alt="Platform">
+  <a href="https://github.com/fora2323/Sketchware-DayGreen/releases">
+    <img src="https://img.shields.io/github/downloads/fora2323/Sketchware-DayGreen/total?color=dfb317" alt="Downloads">
+  </a>
+</p>
 
----
+<p align="center">
+  <a href="https://t.me/sketchware_daygreen">
+    <img src="https://img.shields.io/badge/Telegram-26A5E4?logo=telegram&logoColor=white" alt="Telegram">
+  </a>
+  <a href="https://discord.gg/V4ePcgaCq">
+    <img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord">
+  </a>
+</p>
 
-## What's New in Sketchware Neo
+# Important!
+Based on and always including updates from [Sketchware Pro](https://github.com/Sketchware-Pro/Sketchware-Pro). Please backup all your projects if using this version. We will not be responsible if any unexpected problems occur.
 
-Beyond what Sketchware Pro offered, Sketchware Neo adds:
+# Sketchware Pro
 
-**Editor & Code**
-- Improved multi-language source code editor (C, C++, Kotlin, Groovy, CMake, Markdown, JSON…)
-- C/C++ (JNI) Manager with full CMake integration
-- Custom Java Manager
-- Java ↔ Blocks synchronization *(ongoing)*
-
-**Build System**
-- Custom Gradle support
-- Local Library Manager with AAR/JAR support
-- Code Shrinking (R8 / ProGuard) with template keep-rules
-- Android Studio Project Importer *(ongoing)*
-
-**Project Management**
-- AndroidManifest Editor
-- Resource Usage Tracker
-- Cloud Backup system
-- Layout Preview
-- Global Search
-
-**Tooling & Workflow**
-- Git client integration
-- Performance improvements throughout
-- Many bug fixes from the upstream forks
-
-**Extensibility**
-- Plugin system — drop in an external `.jar`/`.apk` and it loads at runtime, no rebuild needed. Plugins can add entries to the Managers drawer and hook into build success/failure. Still early: a plugin can't bring its own full-screen UI yet, and code-block injection works structurally but hasn't been proven against a real block spec.
-
-> This list isn't exhaustive. Most active development happens in the `mod` package. Check recent commits for the latest.
-
----
-
-## Roadmap
-
-The following areas are actively being worked on or planned:
-
-| Status | Feature |
-|--------|---------|
-| 🔄 In Progress | Java ↔ Blocks bidirectional conversion |
-| 🔄 In Progress | Android Studio Project Importer |
-| 🔄 In Progress | Git client improvements |
-| 📋 Planned | On-device native (NDK) compilation via Termux |
-| 📋 Planned | Full Kotlin project support |
-| 📋 Planned | Compose UI preview |
-| 📋 Planned | Better error reporting across the build pipeline |
-
-If you want to work on something not listed here, open a Discussion first so we can coordinate.
-
----
+Welcome to Sketchware Pro! Here you'll find the source code of many classes in Sketchware Pro and, most importantly, the place to contribute to Sketchware Pro.
 
 ## Building the App
-
-To build the app, you need Gradle. Android Studio is strongly recommended.
-
-```bash
-git clone https://github.com/sketchlibx/SketchwareNeo.git
-cd SketchwareNeo
-./gradlew assembleDebug
-```
+To build the app, you must use Gradle. It's highly recommended to use Android Studio for the best experience.
 
 ### Source Code Map
 
-| Class | Role |
-|-------|------|
-| `a.a.a.ProjectBuilder` | Compiles an entire Sketchware project into an APK |
-| `a.a.a.Ix` | Generates `AndroidManifest.xml` |
-| `a.a.a.Jx` | Generates activity source code |
-| `a.a.a.Lx` | Generates component code (listeners, etc.) |
-| `a.a.a.Ox` | Generates XML layout files |
-| `a.a.a.qq` | Registry of built-in library dependencies |
-| `a.a.a.tq` | Compiling dialog quiz strings |
-| `a.a.a.yq` | Manages Sketchware project file paths |
-| `neo.sketchware.plugin.PluginManager` | Loads and manages external plugins via `DexClassLoader` |
-| `neo.sketchware.plugin.NeoPluginInterface` | The contract a plugin implements to hook into the IDE |
+| Class           | Role                                        |
+| --------------- | ------------------------------------------- |
+| `a.a.a.ProjectBuilder`      | Helper for compiling an entire project       |
+| `a.a.a.Ix`      | Responsible for generating AndroidManifest.xml |
+| `a.a.a.Jx`      | Generates source code of activities          |
+| `a.a.a.Lx`      | Generates source code of components, such as listeners, etc. |
+| `a.a.a.Ox`      | Responsible for generating XML files of layouts |
+| `a.a.a.qq`      | Registry of built-in libraries' dependencies |
+| `a.a.a.tq`      | Responsible for the compiling dialog's quizzes |
+| `a.a.a.yq`      | Organizes Sketchware projects' file paths    |
 
-> [!TIP]
-> The `mod` package contains the majority of contributor changes. If you're looking for a specific feature, it's likely there.
-
----
 
 ## Writing Plugins
 
@@ -128,74 +87,39 @@ Two things aren't there yet: a plugin can't bring its own full-screen Activity (
 
 ---
 
+
+> [!TIP]
+> You can also check the `mod` package, which contains the majority of contributors' changes.
+
 ## Contributing
 
-Contributions are welcome and appreciated. Whether it's a bug fix, a new feature, or a documentation improvement — every bit helps.
-
-### Steps
+If you'd like to contribute to Sketchware Pro, follow these steps:
 
 1. Fork this repository.
-2. Create a feature branch: `git checkout -b feat/your-feature-name`
-3. Make your changes and test them on a real device or emulator.
-4. Commit using the convention below.
-5. Open a Pull Request — describe what you changed and why.
+2. Make changes in your forked repository.
+3. Test out those changes.
+4. Create a pull request in this repository.
+5. Your pull request will be reviewed by the repository members and merged if accepted.
 
-Pull requests are reviewed by maintainers. Please be patient; we aim to review promptly.
+We welcome contributions of any size, whether they are major features or bug fixes, but please note that all contributions will be thoroughly reviewed.
 
-### What We're Looking For
+### Commit Message
 
-- Bug fixes and stability improvements
-- Performance improvements
-- UI/UX improvements
-- New editor or compiler features
-- Gradle / build system improvements
-- Documentation and code comments
-- Testing and regression coverage
+When you make changes to one or more files, you need to commit those changes with a commit message. Here are some guidelines:
 
-No contribution is too small. If you're unsure whether something is worth submitting, open an Issue or Discussion first.
-
-### Commit Message Convention
-
-Use one of these prefixes:
-
-| Prefix | Use for |
-|--------|---------|
-| `feat:` | A new feature or enhancement |
-| `fix:` | A bug fix |
-| `style:` | Styling or formatting changes |
-| `refactor:` | Code restructuring without behaviour change |
-| `perf:` | Performance improvements |
-| `test:` | Test-related changes |
-| `docs:` | Documentation only |
-| `chore:` | Maintenance, dependency updates |
-
-Examples:
-- `feat: Add keep-rule template picker to ProGuard manager`
-- `fix: Fix crash on launch when no projects exist`
-- `refactor: Simplify block ID mapping in LogicEditorActivity`
+- Keep the commit message short and detailed.
 
 > [!IMPORTANT]
-> New features that don't need to touch existing packages should go into `pro.sketchware`, respecting the existing directory and file naming conventions. Prefer Java over Kotlin unless Kotlin is clearly the better fit for the task. The one exception is bigger, self-contained subsystems (like the plugin system, under `neo.sketchware.plugin`) — those get their own `neo.sketchware.*` package so they stay easy to find and don't get tangled up with everything else.
+> If you want to add new features that don't require editing other packages other than `pro.sketchware`, make your changes in `pro.sketchware` package, and respect the directories and files structure and names. Also, even though the project compiles just fine with Kotlin classes that you might add, try to make your changes or additions in Java, not Kotlin unless it is more than necessary.
 
----
+## Thanks for Contributing
 
-## Community & Support
-
-For discussions, help, feature suggestions, and community updates, visit:
-
-**[sketchlib.in](https://sketchlib.in)**
-
-For development-related communication, prefer:
-- **GitHub Issues** — bug reports, feature requests
-- **GitHub Discussions** — ideas, questions, general dev talk
-- **Pull Requests** — code contributions
-
----
+Thank you for contributing to Sketchware Pro! Your contributions help keep Sketchware Pro alive. Each accepted contribution will be noted down in the "About Team" activity. We'll use your GitHub name and profile picture initially, but they can be changed, of course.
 
 ## Disclaimer
 
-Sketchware Neo is a community continuation of Sketchware, built to keep the project alive and moving forward. It is **not affiliated with or endorsed by the original Sketchware developers**.
+This mod was not created for any harmful purposes, such as harming Sketchware; quite the opposite, actually. It was made to keep Sketchware alive by the community for the community. Please use it at your own discretion.
 
-This project is **source-available**, not fully open source. You may view, fork, and contribute to the code, but you may not redistribute Sketchware Neo — modified or unmodified — on the Play Store or any other app marketplace. See [LICENSE.md](LICENSE.md) for details.
+We do NOT permit publishing Sketchware Pro as it is, or with modifications, on Play Store or on any other app store. Keep in mind that this project is still a mod. Unauthorized modding of apps is considered illegal and we discourage such behavior.
 
-We have a lot of respect for the original Sketchware team and what they built. This project exists because Sketchware hasn't received updates in a long time, and the community wanted to keep it going.
+We love Sketchware very much and are grateful to Sketchware's developers for creating such an amazing app. However, we haven't received updates for a long time. That's why we decided to keep Sketchware alive by creating this mod, and it's completely free. We don't demand any money :)

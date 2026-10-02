@@ -16,6 +16,8 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -47,6 +49,7 @@ import pro.sketchware.databinding.ActivityAiChatBinding;
 import pro.sketchware.databinding.ActivityAiSettingsBinding;
 import pro.sketchware.databinding.ActivityLocalModelsBinding;
 import pro.sketchware.utility.ThemeUtils;
+import pro.sketchware.utility.SketchwareUtil;
 
 public class AiSettingsActivity extends BaseAppCompatActivity {
 
@@ -127,7 +130,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         settingsBinding.buttonSettings.setOnClickListener(v -> showAiPreferences());
 
         settingsBinding.recyclerViewAiModels.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new AgentAdapter();
+        adapter = new AgentAdapter(this);
         settingsBinding.recyclerViewAiModels.setAdapter(adapter);
 
         settingsBinding.buttonAddAgent.setOnClickListener(v -> editorLauncher.launch(new Intent(this, AiModelEditActivity.class)));
@@ -251,7 +254,10 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         localModelsBinding = ActivityLocalModelsBinding.inflate(getLayoutInflater());
         setContentView(localModelsBinding.getRoot());
         
-        localModelsBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
+        if (localModelsBinding.topAppBar != null) {
+            localModelsBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
+        }
+        
         localModelsBinding.buttonImportGguf.setOnClickListener(v -> pickGguf());
         localModelsBinding.buttonConnectServer.setOnClickListener(v -> editorLauncher.launch(new Intent(this, AiModelEditActivity.class)));
         
@@ -322,7 +328,10 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         chatBinding = ActivityAiChatBinding.inflate(getLayoutInflater());
         setContentView(chatBinding.getRoot());
         
-        chatBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
+        if (chatBinding.topAppBar != null) {
+            chatBinding.topAppBar.setNavigationOnClickListener(v -> showAgents());
+        }
+        
         chatBinding.buttonClear.setOnClickListener(v -> {
             currentChatMessages.clear();
             saveChatHistory();
@@ -382,6 +391,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             filePickerLauncher.launch(intent);
         });
 
+        // Shortcuts
         chatBinding.chipGenBlocks.setOnClickListener(v -> startActivity(new Intent(this, BlockGenerationActivity.class)));
         chatBinding.chipFixErrors.setOnClickListener(v -> chatBinding.editMessage.setText("I am facing a build error in Sketchware Neo. Here is the log: \n"));
         chatBinding.chipExplain.setOnClickListener(v -> chatBinding.editMessage.setText("Explain this code:\n"));
@@ -460,7 +470,6 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         scrollToBottom();
     }
 
-
     private static class ChatMessage {
         String role;
         String content;
@@ -496,6 +505,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 return;
             }
 
+            // Custom Markdown Splitter for Code Blocks
             String[] parts = msg.content.split("```");
             for (int i = 0; i < parts.length; i++) {
                 if (i % 2 == 0) {
@@ -543,6 +553,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                     popup.getMenu().add("Regenerate").setOnMenuItemClickListener(item -> {
                         currentChatMessages.remove(position);
                         notifyItemRemoved(position);
+                        // find last user message
                         for(int i = currentChatMessages.size()-1; i>=0; i--) {
                             if (currentChatMessages.get(i).role.equals("You")) {
                                 chatBinding.editMessage.setText(currentChatMessages.get(i).content);
@@ -576,6 +587,11 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
     private class AgentAdapter extends RecyclerView.Adapter<AgentAdapter.AgentVH> {
         private final List<AiModelConfig> configs = new ArrayList<>();
         private String activeId;
+        private final AiSettingsActivity activity;
+
+        public AgentAdapter(AiSettingsActivity activity) {
+            this.activity = activity;
+        }
 
         public void setConfigs(List<AiModelConfig> newConfigs) {
             this.configs.clear();
@@ -607,12 +623,32 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             
             holder.buttonMore.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(AiSettingsActivity.this, v);
-                popup.getMenu().add("Chat").setOnMenuItemClickListener(item -> { showChat(c.id); return true; });
+                popup.getMenu().add("Chat").setOnMenuItemClickListener(item -> { activity.showChat(c.id); return true; });
                 if (!isActive) popup.getMenu().add("Set Active").setOnMenuItemClickListener(item -> { AiManager.setActiveConfigId(AiSettingsActivity.this, c.id); refreshAgents(); return true; });
                 popup.getMenu().add("Test").setOnMenuItemClickListener(item -> { testAgent(c); return true; });
-                popup.getMenu().add("Edit").setOnMenuItemClickListener(item -> { onEditClicked(c); return true; });
-                popup.getMenu().add("Duplicate").setOnMenuItemClickListener(item -> { onDuplicateClicked(c); return true; });
-                popup.getMenu().add("Delete").setOnMenuItemClickListener(item -> { onDeleteClicked(c); return true; });
+                popup.getMenu().add("Edit").setOnMenuItemClickListener(item -> { 
+                    Intent i = new Intent(activity, AiModelEditActivity.class);
+                    i.putExtra(AiModelEditActivity.EXTRA_CONFIG, c);
+                    activity.editorLauncher.launch(i);
+                    return true; 
+                });
+                popup.getMenu().add("Duplicate").setOnMenuItemClickListener(item -> { 
+                    AiModelConfig x = new AiModelConfig(c.providerId, c.displayName + " (copy)", c.apiKey, c.modelName, c.customEndpoint);
+                    x.temperature = c.temperature; x.threads = c.threads; x.maxTokens = c.maxTokens; x.topP = c.topP;
+                    x.systemPrompt = c.systemPrompt; x.enableChat = c.enableChat; x.enableBlocks = c.enableBlocks; x.enableLogic = c.enableLogic;
+                    x.enableLayouts = c.enableLayouts; x.enableCustomBlocks = c.enableCustomBlocks; x.enableErrorFix = c.enableErrorFix;
+                    AiManager.addConfig(activity, x);
+                    refreshAgents();
+                    return true; 
+                });
+                popup.getMenu().add("Delete").setOnMenuItemClickListener(item -> { 
+                    new MaterialAlertDialogBuilder(activity)
+                        .setTitle("Delete AI agent")
+                        .setMessage("Remove \"" + c.displayName + "\"?")
+                        .setPositiveButton("Delete", (d, w) -> { AiManager.removeConfig(activity, c.id); refreshAgents(); })
+                        .setNegativeButton("Cancel", null).show();
+                    return true; 
+                });
                 popup.show();
             });
         }
@@ -634,27 +670,4 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             }
         }
     }
-
-    @Override public void onEditClicked(AiModelConfig c) {
-        Intent i = new Intent(this, AiModelEditActivity.class);
-        i.putExtra(AiModelEditActivity.EXTRA_CONFIG, c);
-        editorLauncher.launch(i);
-    }
-    @Override public void onDuplicateClicked(AiModelConfig c) {
-        AiModelConfig x = new AiModelConfig(c.providerId, c.displayName + " (copy)", c.apiKey, c.modelName, c.customEndpoint);
-        x.temperature = c.temperature; x.threads = c.threads; x.maxTokens = c.maxTokens; x.topP = c.topP;
-        x.systemPrompt = c.systemPrompt; x.enableChat = c.enableChat; x.enableBlocks = c.enableBlocks; x.enableLogic = c.enableLogic;
-        x.enableLayouts = c.enableLayouts; x.enableCustomBlocks = c.enableCustomBlocks; x.enableErrorFix = c.enableErrorFix;
-        AiManager.addConfig(this, x);
-        refreshAgents();
-    }
-    @Override public void onDeleteClicked(AiModelConfig c) {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Delete AI agent")
-                .setMessage("Remove \"" + c.displayName + "\"?")
-                .setPositiveButton("Delete", (d, w) -> { AiManager.removeConfig(this, c.id); refreshAgents(); })
-                .setNegativeButton("Cancel", null).show();
-    }
-    @Override public void onItemClicked(AiModelConfig c) {}
-    @Override public void onChatClicked(AiModelConfig c) { showChat(c.id); }
 }

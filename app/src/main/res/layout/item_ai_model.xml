@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)"
+    xmlns:app="[http://schemas.android.com/apk/res-auto](http://schemas.android.com/apk/res-auto)"
+    xmlns:tools="[http://schemas.android.com/tools](http://schemas.android.com/tools)"
     android:id="@+id/cardModel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -13,9 +14,9 @@
     app:strokeWidth="1dp">
 
     <LinearLayout
+        android:gravity="center_vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="16dp">
 
@@ -110,5 +111,7 @@
             android:contentDescription="Options"
             android:src="@drawable/ic_more_vert_white_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
+
     </LinearLayout>
+
 </com.google.android.material.card.MaterialCardView>
