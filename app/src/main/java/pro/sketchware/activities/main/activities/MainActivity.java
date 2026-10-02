@@ -41,6 +41,7 @@ import java.io.IOException;
 
 import a.a.a.DB;
 import a.a.a.GB;
+import mod.hilal.saif.activities.tools.AppSettings;
 import mod.hey.studios.project.backup.BackupFactory;
 import mod.hey.studios.project.backup.BackupRestoreManager;
 import mod.hey.studios.util.Helper;
@@ -209,7 +210,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
 
         ImageButton btnSettings = findViewById(R.id.btn_toolbar_settings);
         if (btnSettings != null) {
-            btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, pro.sketchware.activities.settings.SettingsActivity.class)));
+            btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, AppSettings.class)));
         }
 
         boolean hasStorageAccess = isStoragePermissionGranted();

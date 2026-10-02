@@ -23,7 +23,6 @@ import androidx.annotation.StringRes;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
-import com.besome.sketch.editor.manage.ManageCollectionActivity;
 import com.besome.sketch.tools.NewKeyStoreActivity;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -41,6 +40,7 @@ import mod.hilal.saif.activities.tools.AppSettings;
 import mod.hilal.saif.activities.tools.BlocksManager;
 import mod.sketchlibx.project.backup.CloudBackupManagerActivity;
 import neo.sketchware.ai.AiSettingsActivity;
+import pro.sketchware.activities.editor.component.ManageCustomComponentActivity;
 import pro.sketchware.R;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
@@ -181,7 +181,7 @@ public class MainDrawer extends NavigationView {
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
         } else if (id == R.id.component_manager) {
-            Intent intent = new Intent(activity, ManageCollectionActivity.class);
+            Intent intent = new Intent(activity, ManageCustomComponentActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
         } else if (id == R.id.block_manager) {

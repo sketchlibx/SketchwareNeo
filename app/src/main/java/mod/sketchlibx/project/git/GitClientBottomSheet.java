@@ -16,11 +16,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -35,9 +37,11 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import com.google.android.material.badge.BadgeDrawable;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand;
@@ -75,11 +79,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -109,6 +113,9 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private String sc_id;
     private ViewPager viewPager;
     private TabLayout tabLayout;
+    
+    // Tab configuration
+    private final int[] tabIcons = { R.drawable.ic_mtrl_article, R.drawable.ic_mtrl_history, R.drawable.ic_mtrl_branches, R.drawable.ic_mtrl_cloud, R.drawable.ic_mtrl_settings };
     private final String[] tabTitles = {"Changes", "History", "Branches", "Remotes", "Settings"};
 
     private Git git;
@@ -178,8 +185,8 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
         rootView = view;
 
-        TextView tvRepoName = view.findViewById(R.id.tv_repo_name);
-        tvRepoName.setText("Project: " + sc_id);
+        TextView tvRepoName = view.findViewById(R.id.tv_hero_title);
+        if (tvRepoName != null) tvRepoName.setText("Project: " + sc_id);
 
         viewPager = view.findViewById(R.id.view_pager);
         tabLayout = view.findViewById(R.id.tab_layout);
@@ -187,13 +194,63 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         viewPager.setOffscreenPageLimit(Math.max(1, tabTitles.length - 1));
         tabLayout.setupWithViewPager(viewPager);
 
+        // Setup Custom Tab Icons & Titles
+        for (int i = 0; i < tabLayout.getTabCount(); i++) {
+            TabLayout.Tab tab = tabLayout.getTabAt(i);
+            if (tab != null) {
+                tab.setIcon(tabIcons[i]);
+                tab.setText(tabTitles[i]);
+            }
+        }
+
         view.findViewById(R.id.btn_action_refresh).setOnClickListener(v -> refreshSourceThenAll());
+        view.findViewById(R.id.btn_action_info).setOnClickListener(v -> showProjectInfoDialog());
+
+        View btnClose = view.findViewById(R.id.topAppBar);
+        if (btnClose != null) {
+            ((androidx.appcompat.widget.Toolbar) btnClose).setNavigationOnClickListener(v -> dismiss());
+        }
 
         if (git == null) {
             SketchwareUtil.toastError("Git repository not found for this project.");
         } else {
             refreshAll();
+            checkAutoFetch();
         }
+    }
+
+    private void checkAutoFetch() {
+        SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
+        if (prefs.getBoolean("auto_fetch", false)) {
+            doFetch(false); // silent fetch
+        }
+    }
+
+    private void showProjectInfoDialog() {
+        runGitTask("Calculating...", true, () -> {
+            long size = FileUtil.getFileSizeBytes(repoDir);
+            int commits = 0;
+            try {
+                if (git.getRepository().resolve(Constants.HEAD) != null) {
+                    for (RevCommit ignored : git.log().call()) commits++;
+                }
+            } catch(Exception ignored){}
+            int branches = git.branchList().setListMode(ListBranchCommand.ListMode.ALL).call().size();
+            return new long[]{size, commits, branches};
+        }, new GitTaskCallback<long[]>() {
+            @Override public void onSuccess(long[] data) {
+                String sizeStr = new DecimalFormat("#,##0.#").format(data[0] / 1024.0 / 1024.0) + " MB";
+                String msg = "Repository Size: " + sizeStr + "\n" +
+                             "Total Commits: " + data[1] + "\n" +
+                             "Total Branches: " + data[2];
+                new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Project Info")
+                    .setMessage(msg)
+                    .setPositiveButton("Close", null)
+                    .show();
+            }
+            @Override public void onError(String message) { SketchwareUtil.toastError(message); }
+        });
     }
 
     private CredentialsProvider getCredentials() {
@@ -249,7 +306,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private <T> void runGitTask(@Nullable String progressMessage, boolean showProgress, GitTask<T> task, GitTaskCallback<T> callback) {
         if (git == null) {
-            SketchwareUtil.toastError("Git repository not initialized for this project.");
+            SketchwareUtil.toastError("Git repository not initialized.");
             return;
         }
         if (showProgress && progressMessage != null) showProgressDialog(progressMessage);
@@ -284,8 +341,8 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         final Set<String> missing = new HashSet<>();
         final Set<String> untracked = new HashSet<>();
         final Set<String> conflicting = new HashSet<>();
-        final Map<String, String> stagedRenames = new LinkedHashMap<>();   // newPath -> oldPath
-        final Map<String, String> unstagedRenames = new LinkedHashMap<>(); // newPath -> oldPath
+        final Map<String, String> stagedRenames = new LinkedHashMap<>();
+        final Map<String, String> unstagedRenames = new LinkedHashMap<>();
         String currentBranch = "";
         int ahead, behind;
     }
@@ -296,7 +353,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             AbstractTreeIterator newIter;
             if (staged) {
                 ObjectId headTree = repo.resolve("HEAD^{tree}");
-                if (headTree == null) return; // no commits yet, nothing to diff against
+                if (headTree == null) return; 
                 CanonicalTreeParser headIter = new CanonicalTreeParser();
                 headIter.reset(reader, headTree);
                 oldIter = headIter;
@@ -316,8 +373,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                     }
                 }
             }
-        } catch (IOException ignored) {
-        }
+        } catch (IOException ignored) {}
     }
 
     private RawStatusData computeRawStatus() throws Exception {
@@ -359,29 +415,23 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private void applyStatus(RawStatusData data) {
         if (!isAdded()) return;
-        Context ctx = requireContext();
-        int colorModified = ThemeUtils.getColor(ctx, R.attr.colorAccent);
-        int colorAdded = ThemeUtils.getColor(ctx, R.attr.colorPrimary);
-        int colorDeleted = ThemeUtils.getColor(ctx, R.attr.colorError);
-        int colorUntracked = ThemeUtils.getColor(ctx, R.attr.colorOnSurfaceVariant);
-        int colorConflict = ThemeUtils.getColor(ctx, R.attr.colorError);
-        int colorRenamed = ThemeUtils.getColor(ctx, R.attr.colorPrimary);
 
         List<ChangesAdapter.GitFile> files = new ArrayList<>();
-        for (String p : data.conflicting) files.add(new ChangesAdapter.GitFile(p, "Conflict", true, colorConflict));
+        for (String p : data.conflicting) files.add(new ChangesAdapter.GitFile(p, "Conflict", true));
         for (Map.Entry<String, String> e : data.stagedRenames.entrySet())
-            files.add(ChangesAdapter.GitFile.renamed(e.getValue(), e.getKey(), true, colorRenamed));
+            files.add(ChangesAdapter.GitFile.renamed(e.getValue(), e.getKey(), true));
         for (Map.Entry<String, String> e : data.unstagedRenames.entrySet())
-            files.add(ChangesAdapter.GitFile.renamed(e.getValue(), e.getKey(), false, colorRenamed));
-        for (String p : data.modified) files.add(new ChangesAdapter.GitFile(p, "Modified", false, colorModified));
-        for (String p : data.changed) files.add(new ChangesAdapter.GitFile(p, "Modified", true, colorModified));
-        for (String p : data.added) files.add(new ChangesAdapter.GitFile(p, "Added", true, colorAdded));
-        for (String p : data.untracked) files.add(new ChangesAdapter.GitFile(p, "Untracked", false, colorUntracked));
-        for (String p : data.removed) files.add(new ChangesAdapter.GitFile(p, "Deleted", true, colorDeleted));
-        for (String p : data.missing) files.add(new ChangesAdapter.GitFile(p, "Deleted", false, colorDeleted));
+            files.add(ChangesAdapter.GitFile.renamed(e.getValue(), e.getKey(), false));
+        for (String p : data.modified) files.add(new ChangesAdapter.GitFile(p, "Modified", false));
+        for (String p : data.changed) files.add(new ChangesAdapter.GitFile(p, "Modified", true));
+        for (String p : data.added) files.add(new ChangesAdapter.GitFile(p, "Added", true));
+        for (String p : data.untracked) files.add(new ChangesAdapter.GitFile(p, "Untracked", false));
+        for (String p : data.removed) files.add(new ChangesAdapter.GitFile(p, "Deleted", true));
+        for (String p : data.missing) files.add(new ChangesAdapter.GitFile(p, "Deleted", false));
 
         lastChangeList = files;
         if (changesAdapter != null) changesAdapter.updateData(files);
+        
         if (changesTabView != null) {
             boolean empty = files.isEmpty();
             View rv = changesTabView.findViewById(R.id.rv_changes);
@@ -400,11 +450,21 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         summary.currentBranch = data.currentBranch;
         lastStatusSummary = summary;
 
+        int totalChanges = summary.stagedCount + summary.unstagedCount + summary.untrackedCount + summary.conflictCount;
+        TabLayout.Tab tab = tabLayout.getTabAt(0);
+        if (tab != null) {
+            BadgeDrawable badge = tab.getOrCreateBadge();
+            if (totalChanges > 0) { badge.setVisible(true); badge.setNumber(totalChanges); }
+            else { badge.setVisible(false); }
+        }
+
         if (rootView != null) {
             TextView tvStatus = rootView.findViewById(R.id.tv_repo_status);
             if (tvStatus != null) tvStatus.setText(buildStatusText(summary));
-            Chip chipBranch = rootView.findViewById(R.id.chip_current_branch);
-            if (chipBranch != null && data.currentBranch != null) chipBranch.setText(data.currentBranch);
+            TextView tvBranch = rootView.findViewById(R.id.tv_hero_branch);
+            if (tvBranch != null && data.currentBranch != null) tvBranch.setText(data.currentBranch);
+            TextView tvCommitBranch = rootView.findViewById(R.id.tv_commit_branch);
+            if (tvCommitBranch != null && data.currentBranch != null) tvCommitBranch.setText(data.currentBranch);
         }
     }
 
@@ -416,10 +476,10 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             return sb.toString();
         }
         List<String> parts = new ArrayList<>();
-        if (s.unstagedCount > 0) parts.add(s.unstagedCount + " Modified");
         if (s.stagedCount > 0) parts.add(s.stagedCount + " Staged");
         if (s.untrackedCount > 0) parts.add(s.untrackedCount + " Untracked");
-        sb.append(parts.isEmpty() ? "Working tree clean" : String.join(" \u2022 ", parts));
+        if (s.unstagedCount > 0) parts.add(s.unstagedCount + " Modified");
+        sb.append(parts.isEmpty() ? "Clean" : String.join(" • ", parts));
         appendAheadBehind(sb, s);
         return sb.toString();
     }
@@ -477,10 +537,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         String current = lastStatusSummary.currentBranch;
         try { current = git.getRepository().getBranch(); } catch (Exception ignored) {}
         if (branchAdapter != null) branchAdapter.updateData(refs, current);
-        if (rootView != null) {
-            Chip chipBranch = rootView.findViewById(R.id.chip_current_branch);
-            if (chipBranch != null && current != null) chipBranch.setText(current);
-        }
     }
 
     private void refreshBranches() {
@@ -588,9 +644,24 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         if (appGradleSrc.exists()) FileUtil.copyFile(appGradleSrc.getAbsolutePath(), new File(repoDir, "app" + File.separator + "build.gradle").getAbsolutePath());
     }
 
-    private void commitAndPush(String rawMessage) {
+    private void commitAndPush(String rawMessage, boolean push) {
         String message = rawMessage == null ? "" : rawMessage.trim();
         if (git == null) return;
+        
+        SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
+        if (push && prefs.getBoolean("confirm_push", true)) {
+            new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Confirm Push")
+                .setMessage("Are you sure you want to commit and push to origin?")
+                .setPositiveButton("Push", (d, w) -> executeCommit(message, true))
+                .setNegativeButton("Cancel", null)
+                .show();
+        } else {
+            executeCommit(message, push);
+        }
+    }
+    
+    private void executeCommit(String message, boolean push) {
         showProgressDialog("Checking working tree...");
         gitExecutor.execute(() -> {
             try {
@@ -601,9 +672,20 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 }
 
                 if (willCommit) {
-                    showProgressDialog("Staging all changes...");
-                    git.add().addFilepattern(".").call();
-                    git.add().setUpdate(true).addFilepattern(".").call();
+                    showProgressDialog("Staging changes...");
+                    List<ChangesAdapter.GitFile> selected = changesAdapter.getSelectedFiles();
+                    if (!selected.isEmpty()) {
+                        for (ChangesAdapter.GitFile f : selected) {
+                            if ("Deleted".equals(f.statusLabel)) {
+                                git.rm().addFilepattern(f.path).call();
+                            } else {
+                                git.add().addFilepattern(f.path).call();
+                            }
+                        }
+                    } else {
+                        git.add().addFilepattern(".").call();
+                        git.add().setUpdate(true).addFilepattern(".").call();
+                    }
 
                     showProgressDialog("Committing...");
                     SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
@@ -612,29 +694,34 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                     git.commit().setAuthor(name, email).setCommitter(name, email).setMessage(message).call();
                 }
 
-                ObjectId localHead = git.getRepository().resolve(Constants.HEAD);
-                if (localHead == null) {
-                    throw new IllegalStateException("Nothing to commit. Working tree is clean.");
+                if (push) {
+                    ObjectId localHead = git.getRepository().resolve(Constants.HEAD);
+                    if (localHead == null) {
+                        throw new IllegalStateException("Nothing to push.");
+                    }
+
+                    String remoteName = "origin";
+                    List<RemoteConfig> remotes = RemoteConfig.getAllRemoteConfigs(git.getRepository().getConfig());
+                    boolean hasRemote = false;
+                    for (RemoteConfig rc : remotes) if (rc.getName().equals(remoteName)) { hasRemote = true; break; }
+                    if (!hasRemote) throw new IllegalStateException("No remote repository configured.");
+
+                    showProgressDialog("Fetching from remote...");
+                    git.fetch().setRemote(remoteName).setCredentialsProvider(getCredentials()).call();
+
+                    showProgressDialog("Pushing...");
+                    String branch = git.getRepository().getBranch();
+                    verifyAndPush(remoteName, branch, localHead);
                 }
-
-                String remoteName = "origin";
-                List<RemoteConfig> remotes = RemoteConfig.getAllRemoteConfigs(git.getRepository().getConfig());
-                boolean hasRemote = false;
-                for (RemoteConfig rc : remotes) if (rc.getName().equals(remoteName)) { hasRemote = true; break; }
-                if (!hasRemote) {
-                    throw new IllegalStateException("No remote repository configured. Add a remote in the Remotes tab.");
-                }
-
-                showProgressDialog("Fetching from remote...");
-                git.fetch().setRemote(remoteName).setCredentialsProvider(getCredentials()).call();
-
-                showProgressDialog("Pushing...");
-                String branch = git.getRepository().getBranch();
-                verifyAndPush(remoteName, branch, localHead);
 
                 mainHandler.post(() -> {
                     hideProgressDialog();
-                    SketchwareUtil.toast("Commit & Push successful");
+                    SketchwareUtil.toast(push ? "Commit & Push successful" : "Commit successful");
+                    if (changesTabView != null) {
+                        EditText et = changesTabView.findViewById(R.id.et_commit_message);
+                        if (et != null) et.setText("");
+                        changesAdapter.selectAll(false);
+                    }
                     refreshAll();
                 });
             } catch (Exception e) {
@@ -650,9 +737,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void verifyAndPush(String remoteName, String branch, ObjectId localHead) throws Exception {
-        if (localHead == null) {
-            throw new IllegalStateException("Nothing to commit. Working tree is clean.");
-        }
+        if (localHead == null) throw new IllegalStateException("Nothing to commit. Working tree is clean.");
         Iterable<PushResult> results = git.push()
                 .setRemote(remoteName)
                 .setCredentialsProvider(getCredentials())
@@ -670,26 +755,16 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 }
             }
         }
-        if (!anySuccess) {
-            throw new IllegalStateException(failures.length() > 0 ? failures.toString().trim() : "Push rejected by remote.");
-        }
+        if (!anySuccess) throw new IllegalStateException(failures.length() > 0 ? failures.toString().trim() : "Push rejected by remote.");
 
-        Collection<Ref> remoteRefs = git.lsRemote()
-                .setRemote(remoteName)
-                .setCredentialsProvider(getCredentials())
-                .call();
+        Collection<Ref> remoteRefs = git.lsRemote().setRemote(remoteName).setCredentialsProvider(getCredentials()).call();
         String fullRef = "refs/heads/" + branch;
         boolean verified = false;
         for (Ref r : remoteRefs) {
             ObjectId remoteId = r.getObjectId();
-            if (remoteId != null && fullRef.equals(r.getName()) && remoteId.equals(localHead)) {
-                verified = true;
-                break;
-            }
+            if (remoteId != null && fullRef.equals(r.getName()) && remoteId.equals(localHead)) { verified = true; break; }
         }
-        if (!verified) {
-            throw new IllegalStateException("Push reported success but the remote branch does not match local HEAD yet. Please verify manually.");
-        }
+        if (!verified) throw new IllegalStateException("Push reported success but the remote branch does not match local HEAD yet. Please verify manually.");
     }
 
     private String describePushFailure(RemoteRefUpdate.Status status, RemoteRefUpdate rru) {
@@ -705,17 +780,16 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
-    // Bug #7: fetch/pull/push always show the exact outcome.
-    private void doFetch() {
-        runGitTask("Fetching...", true,
+    private void doFetch(boolean showToast) {
+        runGitTask(showToast ? "Fetching..." : null, showToast,
                 () -> git.fetch().setRemote("origin").setTagOpt(TagOpt.FETCH_TAGS).setCredentialsProvider(getCredentials()).call(),
                 new GitTaskCallback<FetchResult>() {
                     @Override public void onSuccess(FetchResult result) {
                         int n = result.getTrackingRefUpdates().size();
-                        SketchwareUtil.toast(n == 0 ? "Already up to date." : "Fetched \u2014 " + n + " ref(s) updated.");
+                        if (showToast) SketchwareUtil.toast(n == 0 ? "Already up to date." : "Fetched \u2014 " + n + " ref(s) updated.");
                         refreshBranches(); refreshRemotes(); refreshGitStatus();
                     }
-                    @Override public void onError(String message) { SketchwareUtil.toastError(message); }
+                    @Override public void onError(String message) { if (showToast) SketchwareUtil.toastError(message); }
                 });
     }
 
@@ -760,9 +834,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     // ---------------------------------------------------------------------
-    // Changes tab (feature request #12: Stage All / Unstage All / Discard /
-    // View Diff). Every action below routes through runGitTask -> the single
-    // gitExecutor, never a per-row Thread.
+    // Changes tab
     // ---------------------------------------------------------------------
     private void setupChangesTab(View view) {
         changesTabView = view;
@@ -773,59 +845,47 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             @Override public void onStageToggle(ChangesAdapter.GitFile file) { toggleStage(file); }
             @Override public void onDiscard(ChangesAdapter.GitFile file) { discardFile(file); }
             @Override public void onViewDiff(ChangesAdapter.GitFile file) { showDiffDialog(file); }
+            @Override public void onSelectionChanged(Set<String> selectedPaths) { }
         });
         rvChanges.setAdapter(changesAdapter);
         if (!lastChangeList.isEmpty()) changesAdapter.updateData(lastChangeList);
 
         TextInputEditText etCommit = view.findViewById(R.id.et_commit_message);
 
-        view.findViewById(R.id.btn_commit).setOnClickListener(v -> {
-            String msg = etCommit.getText() != null ? etCommit.getText().toString().trim() : "";
-            if (msg.isEmpty()) { SketchwareUtil.toast("Enter a commit message"); return; }
-            runGitTask("Committing...", true, () -> {
-                Status before = git.status().call();
-                boolean hasStaged = !before.getAdded().isEmpty() || !before.getChanged().isEmpty() || !before.getRemoved().isEmpty();
-                if (!hasStaged) throw new IllegalStateException("Nothing to commit. Stage some changes first.");
-                SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
-                String name = prefs.getString("name", "Sketchware User");
-                String email = prefs.getString("email", "user@sketchware.neo");
-                git.commit().setAuthor(name, email).setCommitter(name, email).setMessage(msg).call();
-                return null;
-            }, new GitTaskCallback<Void>() {
-                @Override public void onSuccess(Void r) {
-                    etCommit.setText("");
-                    SketchwareUtil.toast("Commit successful");
-                    refreshGitStatus(); refreshHistory();
+        view.findViewById(R.id.btn_commit).setOnClickListener(v -> commitAndPush(etCommit.getText() != null ? etCommit.getText().toString() : "", false));
+        view.findViewById(R.id.btn_commit_push).setOnClickListener(v -> commitAndPush(etCommit.getText() != null ? etCommit.getText().toString() : "", true));
+
+        view.findViewById(R.id.btn_stage_all).setOnClickListener(v -> runGitTask("Staging changes...", true, () -> {
+            List<ChangesAdapter.GitFile> selected = changesAdapter.getSelectedFiles();
+            if (!selected.isEmpty()) {
+                for (ChangesAdapter.GitFile f : selected) {
+                    if ("Deleted".equals(f.statusLabel)) git.rm().addFilepattern(f.path).call();
+                    else git.add().addFilepattern(f.path).call();
                 }
-                @Override public void onError(String message) { SketchwareUtil.toastError(message); }
-            });
-        });
-
-        // Bug #1: this button previously had NO click listener at all.
-        view.findViewById(R.id.btn_commit_push).setOnClickListener(v -> {
-            String msg = etCommit.getText() != null ? etCommit.getText().toString() : "";
-            commitAndPush(msg);
-            etCommit.setText("");
-        });
-
-        View stageAll = view.findViewById(R.id.btn_stage_all);
-        if (stageAll != null) stageAll.setOnClickListener(v -> runGitTask("Staging all changes...", true, () -> {
-            git.add().addFilepattern(".").call();
-            git.add().setUpdate(true).addFilepattern(".").call();
+            } else {
+                git.add().addFilepattern(".").call();
+                git.add().setUpdate(true).addFilepattern(".").call();
+            }
             return null;
         }, new GitTaskCallback<Void>() {
             @Override public void onSuccess(Void r) { refreshGitStatus(); }
             @Override public void onError(String message) { SketchwareUtil.toastError(message); }
         }));
 
-        View unstageAll = view.findViewById(R.id.btn_unstage_all);
-        if (unstageAll != null) unstageAll.setOnClickListener(v -> runGitTask("Unstaging all changes...", true, () -> {
+        view.findViewById(R.id.btn_unstage_all).setOnClickListener(v -> runGitTask("Unstaging changes...", true, () -> {
             git.reset().call();
             return null;
         }, new GitTaskCallback<Void>() {
-            @Override public void onSuccess(Void r) { refreshGitStatus(); }
+            @Override public void onSuccess(Void r) { refreshGitStatus(); changesAdapter.selectAll(false); }
             @Override public void onError(String message) { SketchwareUtil.toastError(message); }
         }));
+        
+        TextInputEditText searchChanges = view.findViewById(R.id.et_search_changes);
+        searchChanges.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) { } 
+        });
     }
 
     private void toggleStage(ChangesAdapter.GitFile file) {
@@ -843,7 +903,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             } else if ("Deleted".equals(file.statusLabel)) {
                 git.rm().addFilepattern(file.path).call();
             } else {
-                git.add().addFilepattern(file.path).call(); // also marks a Conflict entry resolved
+                git.add().addFilepattern(file.path).call();
             }
             return null;
         }, new GitTaskCallback<Void>() {
@@ -938,7 +998,12 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         String shortHash = hash.substring(0, 7);
         String author = commit.getAuthorIdent().getName() + " <" + commit.getAuthorIdent().getEmailAddress() + ">";
         String date = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(new Date(commit.getCommitTime() * 1000L));
+        
+        SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
+        boolean showStats = prefs.getBoolean("show_diff", false);
+        
         String details = "Hash: " + shortHash + "\nAuthor: " + author + "\nDate: " + date + "\n\n" + commit.getFullMessage();
+        if (showStats) details += "\n\n[Diff stats enabled but rendering pending]";
 
         TextView tv = new TextView(requireContext());
         tv.setText(details);
@@ -1098,7 +1163,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         rvRemotes.setAdapter(remoteAdapter);
         if (!lastRemoteList.isEmpty()) remoteAdapter.updateData(lastRemoteList);
 
-        view.findViewById(R.id.btn_git_fetch).setOnClickListener(v -> doFetch());
+        view.findViewById(R.id.btn_git_fetch).setOnClickListener(v -> doFetch(true));
         view.findViewById(R.id.btn_git_pull).setOnClickListener(v -> doPull());
         view.findViewById(R.id.btn_git_push).setOnClickListener(v -> doPush());
 
@@ -1248,10 +1313,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         dialog.show();
     }
 
-    // ---------------------------------------------------------------------
-    // Settings tab — unchanged in behaviour, but the config write now also
-    // goes through gitExecutor instead of the UI thread.
-    // ---------------------------------------------------------------------
     private void setupSettingsTab(View view) {
         SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
 
@@ -1259,16 +1320,31 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         TextInputEditText etEmail = view.findViewById(R.id.et_git_email);
         TextInputEditText etToken = view.findViewById(R.id.et_git_token);
 
+        MaterialSwitch autoFetch = view.findViewById(R.id.switch_auto_fetch);
+        MaterialSwitch confirmPush = view.findViewById(R.id.switch_confirm_push);
+        MaterialSwitch showDiff = view.findViewById(R.id.switch_show_diff);
+
         etName.setText(prefs.getString("name", ""));
         etEmail.setText(prefs.getString("email", ""));
         etToken.setText(prefs.getString("token", ""));
+
+        autoFetch.setChecked(prefs.getBoolean("auto_fetch", false));
+        confirmPush.setChecked(prefs.getBoolean("confirm_push", true));
+        showDiff.setChecked(prefs.getBoolean("show_diff", false));
 
         view.findViewById(R.id.btn_save_settings).setOnClickListener(v -> {
             String name = etName.getText().toString().trim();
             String email = etEmail.getText().toString().trim();
             String token = etToken.getText().toString().trim();
 
-            prefs.edit().putString("name", name).putString("email", email).putString("token", token).apply();
+            prefs.edit()
+                 .putString("name", name)
+                 .putString("email", email)
+                 .putString("token", token)
+                 .putBoolean("auto_fetch", autoFetch.isChecked())
+                 .putBoolean("confirm_push", confirmPush.isChecked())
+                 .putBoolean("show_diff", showDiff.isChecked())
+                 .apply();
 
             if (git != null) {
                 runGitTask(null, false, () -> {
@@ -1285,9 +1361,22 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 SketchwareUtil.toast("Settings Saved");
             }
         });
+
+        view.findViewById(R.id.btn_remove_repo).setOnClickListener(v -> {
+            new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Danger Zone")
+                .setMessage("Are you sure you want to permanently delete the Git repository from this project? This cannot be undone.")
+                .setPositiveButton("Remove Repository", (d, w) -> {
+                    FileUtil.deleteFile(repoDir.getAbsolutePath());
+                    SketchwareUtil.toast("Repository removed");
+                    dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
     }
 
-    private interface NameValidator { String validate(String text); } // null == valid
+    private interface NameValidator { String validate(String text); } 
     private interface OnValidatedSave { void onSave(String text); }
 
     private void showValidatedInputDialog(String title, String hint, String defaultText, NameValidator validator, OnValidatedSave listener) {

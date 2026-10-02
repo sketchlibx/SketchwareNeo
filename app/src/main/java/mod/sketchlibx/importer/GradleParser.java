@@ -9,8 +9,12 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.io.FileInputStream;
+import java.util.Properties;
+
 import mod.hey.studios.build.BuildSettings;
 import mod.hey.studios.project.ProjectSettings;
+import mod.hey.studios.project.proguard.ProguardHandler;
 
 /**
  * Parses build.gradle (Groovy DSL) and build.gradle.kts (Kotlin DSL).
@@ -69,18 +73,6 @@ public class GradleParser {
         return parseFile(target, appModuleDir);
     }
 
-    /**
-     * Parses a specific Gradle build file directly, instead of resolving it
-     * from a conventional module folder. Used for standalone files that don't
-     * follow the build.gradle / build.gradle.kts module-folder convention
-     * (e.g. Sketchware Neo's per-project custom Gradle scripts).
-     *
-     * @param buildGradleFile  The Gradle file to parse. May not exist.
-     * @param appModuleDir     The real app module folder, used to resolve
-     *                         proguard/native/local-library paths relative to
-     *                         it. Pass null when there is no such folder
-     *                         (those fields are simply left at their defaults).
-     */
     public ParsedGradle parseFile(File buildGradleFile, File appModuleDir) {
         ParsedGradle result = new ParsedGradle();
 
@@ -135,6 +127,9 @@ public class GradleParser {
         result.minifyEnabledInRelease = releaseBlock != null
                 && (releaseBlock.contains("minifyEnabled true") || releaseBlock.contains("minifyEnabled = true")
                     || releaseBlock.contains("isMinifyEnabled = true"));
+        if (releaseBlock != null && (releaseBlock.contains("minifyEnabled") || releaseBlock.contains("isMinifyEnabled"))) {
+            result.explicitFields.add(ParsedGradle.FIELD_MINIFY_ENABLED);
+        }
 
         // ── Flavors / build types (names only, best effort) ────────────────────
         String flavorsBlock = extractNamedBlock(content, "productFlavors");
@@ -209,19 +204,6 @@ public class GradleParser {
         return p.matcher(content).find();
     }
 
-    /**
-     * Applies the fields that were actually found in a parsed custom Gradle
-     * script onto this project's existing settings — the same
-     * {@link ProjectSettings}/{@link BuildSettings} keys that
-     * {@link a.a.a.ProjectBuilder} already reads for every build. Fields not
-     * present in {@link ParsedGradle#explicitFields} are left untouched, so a
-     * script that only overrides one value never resets the rest back to
-     * struct defaults.
-     *
-     * Dependency management (built-in libraries, local .aar/.jar, Firebase/
-     * AdMob/Maps toggles) is intentionally never touched here — that remains
-     * entirely owned by {@code ManageLocalLibrary} / {@code BuiltInLibraryManager}.
-     */
     public void applyToProjectBuildSettings(ParsedGradle parsed, String sc_id) {
         ProjectSettings projectSettings = new ProjectSettings(sc_id);
 
@@ -246,6 +228,35 @@ public class GradleParser {
         if (parsed.explicitFields.contains(ParsedGradle.FIELD_JAVA_VERSION)) {
             BuildSettings buildSettings = new BuildSettings(sc_id);
             buildSettings.setValue(BuildSettings.SETTING_JAVA_VERSION, parsed.javaVersion);
+        }
+
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_MINIFY_ENABLED)) {
+            ProguardHandler proguardHandler = new ProguardHandler(sc_id);
+            proguardHandler.setProguardEnabled(parsed.minifyEnabledInRelease);
+            if (parsed.minifyEnabledInRelease && !parsed.explicitFields.contains(ParsedGradle.FIELD_R8_ENABLED)) {
+                proguardHandler.setR8Enabled(true);
+            }
+        }
+        if (parsed.explicitFields.contains(ParsedGradle.FIELD_R8_ENABLED)) {
+            new ProguardHandler(sc_id).setR8Enabled(parsed.r8Enabled);
+        }
+    }
+
+    public void parsePropertiesInto(File propertiesFile, ParsedGradle result) {
+        if (propertiesFile == null || !propertiesFile.exists()) return;
+
+        Properties props = new Properties();
+        try (FileInputStream in = new FileInputStream(propertiesFile)) {
+            props.load(in);
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to read " + propertiesFile.getName(), e);
+            return;
+        }
+
+        String enableR8 = props.getProperty("android.enableR8");
+        if (enableR8 != null) {
+            result.r8Enabled = Boolean.parseBoolean(enableR8.trim());
+            result.explicitFields.add(ParsedGradle.FIELD_R8_ENABLED);
         }
     }
 

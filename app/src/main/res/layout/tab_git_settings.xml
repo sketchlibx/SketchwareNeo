@@ -75,6 +75,37 @@
                 android:inputType="textPassword" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="16dp"
+            android:text="Repository Settings"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_auto_fetch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="Auto Fetch on Open" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_confirm_push"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="Confirm Before Push" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_show_diff"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="Show Diff Stats" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_save_settings"
             style="@style/Widget.Material3.Button"
@@ -83,5 +114,27 @@
             android:layout_marginTop="24dp"
             android:text="Save Settings"
             app:icon="@drawable/ic_mtrl_save" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="48dp"
+            android:layout_marginBottom="16dp"
+            android:text="Danger Zone"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorError"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_remove_repo"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="24dp"
+            android:text="Remove Git Repository"
+            android:textColor="?attr/colorError"
+            app:icon="@drawable/ic_mtrl_delete"
+            app:iconTint="?attr/colorError"
+            app:strokeColor="?attr/colorError" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

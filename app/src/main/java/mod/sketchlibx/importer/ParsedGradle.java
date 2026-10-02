@@ -17,15 +17,13 @@ public class ParsedGradle {
     public static final String FIELD_VIEW_BINDING = "viewBinding";
     public static final String FIELD_JAVA_VERSION = "javaVersion";
     public static final String FIELD_MULTIDEX = "multiDex";
+    public static final String FIELD_MINIFY_ENABLED = "minifyEnabled";
+    public static final String FIELD_R8_ENABLED = "r8Enabled";
 
-    /**
-     * Which fields were actually found written in the parsed file, as opposed
-     * to falling back to this class's struct defaults. Only fields present in
-     * this set are safe to apply on top of existing project settings.
-     */
+    public boolean r8Enabled = true;
+
     public final Set<String> explicitFields = new HashSet<>();
 
-    // ── App identity ──────────────────────────────────────────────────────────
 
     public String applicationId = "com.imported.project";
     public String namespace     = null;   // null → falls back to applicationId
@@ -35,10 +33,8 @@ public class ParsedGradle {
     public int    targetSdk     = 34;
     public int    compileSdk    = 34;
 
-    /** e.g. "1.8", "11", "17" — from compileOptions sourceCompatibility. */
     public String javaVersion = "1.8";
 
-    // ── Built-in Sketchware library flags ────────────────────────────────────
     // These map directly to ProjectLibraryBean libType 0-3.
 
     public boolean hasFirebase   = false;   // libType 0

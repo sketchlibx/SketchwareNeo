@@ -1473,9 +1473,12 @@ if (canceled) return;
             if (!customGradleEnabled) return;
 
             try {
-                File appBuildGradle = new File(new FilePathUtil().getPathCustomGradle(sc_id), "app_build.gradle");
+                String customGradleDir = new FilePathUtil().getPathCustomGradle(sc_id);
+                File appBuildGradle = new File(customGradleDir, "app_build.gradle");
+                File gradleProperties = new File(customGradleDir, "gradle.properties");
                 GradleParser parser = new GradleParser();
                 ParsedGradle parsed = parser.parseFile(appBuildGradle, null);
+                parser.parsePropertiesInto(gradleProperties, parsed);
                 parser.applyToProjectBuildSettings(parsed, sc_id);
             } catch (Exception e) {
                 LogUtil.e("DesignActivity$BuildTask", "Failed to apply custom Gradle configuration; build will use the project's existing settings", e);
