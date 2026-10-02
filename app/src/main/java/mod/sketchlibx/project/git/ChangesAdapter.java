@@ -1,6 +1,7 @@
 package mod.sketchlibx.project.git;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -130,7 +131,6 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         displayItems.clear();
         displayItems.addAll(newItems);
         
-        // Remove selection for files that no longer exist
         selectedPaths.removeIf(path -> newFiles.stream().noneMatch(f -> f.path.equals(path)));
         callback.onSelectionChanged(selectedPaths);
         
@@ -210,13 +210,13 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         
         if (isConflict) {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorError));
-            vh.btnStatus.setStrokeColorResource(R.color.color_error);
+            vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorError)));
         } else if (file.isStaged) {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorPrimary));
-            vh.btnStatus.setStrokeColorResource(R.color.color_primary);
+            vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorPrimary)));
         } else {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorError));
-            vh.btnStatus.setStrokeColorResource(R.color.color_error);
+            vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorError)));
         }
 
         vh.btnStatus.setOnClickListener(v -> callback.onStageToggle(file));

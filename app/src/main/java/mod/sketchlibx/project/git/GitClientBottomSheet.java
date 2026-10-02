@@ -84,6 +84,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -226,9 +227,19 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         }
     }
 
+    private long getFileSizeBytes(File file) {
+        if (file == null || !file.exists()) return 0L;
+        if (file.isFile()) return file.length();
+        File[] children = file.listFiles();
+        if (children == null) return 0L;
+        long size = 0L;
+        for (File child : children) size += getFileSizeBytes(child);
+        return size;
+    }
+
     private void showProjectInfoDialog() {
         runGitTask("Calculating...", true, () -> {
-            long size = FileUtil.getFileSizeBytes(repoDir);
+            long size = getFileSizeBytes(repoDir);
             int commits = 0;
             try {
                 if (git.getRepository().resolve(Constants.HEAD) != null) {
