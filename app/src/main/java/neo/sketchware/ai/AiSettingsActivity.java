@@ -29,6 +29,10 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
     private TextView errorMessageText;
     private CircularProgressIndicator loadingIndicator;
     private AiModelAdapter adapter;
+
+    private TextView activeModelName;
+    private TextView activeModelRuntime;
+    private MaterialButton testActiveButton;
     private ActivityResultLauncher<Intent> editModelLauncher;
 
     @Override
@@ -44,30 +48,34 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
         errorState = findViewById(R.id.errorStateLayout);
         errorMessageText = findViewById(R.id.textErrorMessage);
         loadingIndicator = findViewById(R.id.loadingIndicator);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        activeModelName = findViewById(R.id.textActiveModelName);
+        activeModelRuntime = findViewById(R.id.textActiveModelRuntime);
+        testActiveButton = findViewById(R.id.buttonTestActive);
 
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new AiModelAdapter(this);
         recyclerView.setAdapter(adapter);
 
-        editModelLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-            if (result.getResultCode() == RESULT_OK) refreshList();
-        });
+        editModelLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK) refreshList();
+                }
+        );
 
         MaterialButton retryButton = findViewById(R.id.buttonRetry);
         retryButton.setOnClickListener(v -> refreshList());
 
         FloatingActionButton fab = findViewById(R.id.fabAddAiModel);
-        fab.setOnClickListener(v -> editModelLauncher.launch(new Intent(this, AiModelEditActivity.class)));
+        fab.setOnClickListener(v ->
+                editModelLauncher.launch(new Intent(this, AiModelEditActivity.class))
+        );
+
+        testActiveButton.setOnClickListener(v -> testActiveModel());
 
         refreshList();
     }
 
-    /**
-     * Config reads are just an encrypted local SharedPreferences lookup (see AiManager) - not
-     * slow enough to need a background thread - but the loading/empty/error states are wired
-     * properly here in case that storage ever becomes async or starts failing (e.g. Keystore
-     * key access problems, which AiManager.decrypt() otherwise swallows into an empty list).
-     */
     private void refreshList() {
         loadingIndicator.setVisibility(View.VISIBLE);
         recyclerView.setVisibility(View.GONE);
@@ -78,6 +86,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
             List<AiModelConfig> configs = AiManager.getConfigs(this);
             String activeId = AiManager.getActiveConfigId(this);
             adapter.submitList(configs, activeId);
+            updateActiveSummary(configs, activeId);
 
             loadingIndicator.setVisibility(View.GONE);
             boolean empty = configs.isEmpty();
@@ -86,9 +95,71 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
         } catch (Exception e) {
             loadingIndicator.setVisibility(View.GONE);
             errorState.setVisibility(View.VISIBLE);
-            errorMessageText.setText("Couldn't load your AI models: " +
-                    (e.getMessage() != null ? e.getMessage() : "unknown error"));
+            errorMessageText.setText(
+                    "Couldn't load your AI models: " +
+                            (e.getMessage() != null ? e.getMessage() : "unknown error")
+            );
+            activeModelName.setText("AI is not configured");
+            activeModelRuntime.setText("Add a cloud or local/self-hosted model");
+            testActiveButton.setEnabled(false);
         }
+    }
+
+    private void updateActiveSummary(List<AiModelConfig> configs, String activeId) {
+        AiModelConfig active = null;
+        if (activeId != null) {
+            for (AiModelConfig config : configs) {
+                if (activeId.equals(config.id)) {
+                    active = config;
+                    break;
+                }
+            }
+        }
+
+        if (active == null) {
+            activeModelName.setText("No active AI model");
+            activeModelRuntime.setText("Choose a model below to use AI generation");
+            testActiveButton.setEnabled(false);
+            return;
+        }
+
+        AiProvider provider = AiProviderRegistry.get(active.providerId);
+        activeModelName.setText(active.displayName + " · " + active.modelName);
+        activeModelRuntime.setText(
+                provider != null && provider.isLocal()
+                        ? "Local / self-hosted AI"
+                        : provider != null ? provider.getProviderName() : "AI provider"
+        );
+        testActiveButton.setEnabled(provider != null);
+    }
+
+    private void testActiveModel() {
+        testActiveButton.setEnabled(false);
+        testActiveButton.setText("Testing…");
+
+        AiManager.testActive(this, new AiResponseCallback() {
+            @Override
+            public void onSuccess(String response) {
+                testActiveButton.setEnabled(true);
+                testActiveButton.setText("Test connection");
+                new MaterialAlertDialogBuilder(AiSettingsActivity.this)
+                        .setTitle("Connection successful")
+                        .setMessage(response)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                testActiveButton.setEnabled(true);
+                testActiveButton.setText("Test connection");
+                new MaterialAlertDialogBuilder(AiSettingsActivity.this)
+                        .setTitle("Connection failed")
+                        .setMessage(errorMessage)
+                        .setPositiveButton("OK", null)
+                        .show();
+            }
+        });
     }
 
     @Override
@@ -100,9 +171,17 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
 
     @Override
     public void onDuplicateClicked(AiModelConfig config) {
-        AiModelConfig copy = new AiModelConfig(config.providerId, config.displayName + " (copy)", config.apiKey, config.modelName, config.customEndpoint);
+        AiModelConfig copy = new AiModelConfig(
+                config.providerId,
+                config.displayName + " (copy)",
+                config.apiKey,
+                config.modelName,
+                config.customEndpoint
+        );
         copy.temperature = config.temperature;
         copy.threads = config.threads;
+        copy.maxTokens = config.maxTokens;
+        copy.topP = config.topP;
         AiManager.addConfig(this, copy);
         refreshList();
     }
@@ -124,7 +203,10 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
     public void onItemClicked(AiModelConfig config) {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Set as active model?")
-                .setMessage(config.displayName + " will be used for all AI features (layout, logic, error fix, block generation).")
+                .setMessage(
+                        config.displayName +
+                                " will be used for AI features such as block, logic, layout and error generation."
+                )
                 .setPositiveButton("Set active", (dialog, which) -> {
                     AiManager.setActiveConfigId(this, config.id);
                     refreshList();
@@ -132,5 +214,4 @@ public class AiSettingsActivity extends BaseAppCompatActivity implements AiModel
                 .setNegativeButton("Cancel", null)
                 .show();
     }
-
 }

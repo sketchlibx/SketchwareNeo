@@ -7,6 +7,7 @@ import neo.sketchware.ai.providers.ClaudeProvider;
 import neo.sketchware.ai.providers.CustomEndpointProvider;
 import neo.sketchware.ai.providers.DeepSeekProvider;
 import neo.sketchware.ai.providers.GeminiProvider;
+import neo.sketchware.ai.providers.LocalProvider;
 import neo.sketchware.ai.providers.NvidiaProvider;
 import neo.sketchware.ai.providers.OpenAiProvider;
 
@@ -21,6 +22,7 @@ public final class AiProviderRegistry {
         register(new NvidiaProvider());
         register(new DeepSeekProvider());
         register(new CustomEndpointProvider());
+        register(new LocalProvider());
     }
 
     private AiProviderRegistry() {}

@@ -11,11 +11,18 @@ public class AiModelConfig implements Serializable {
     public String modelName;
     public String customEndpoint;
     public boolean isActive;
-    /** Sampling temperature, 0.0-2.0. Sent for every current provider (all support it). */
+
+    /** Sampling temperature, 0.0-2.0 where supported by the provider. */
     public double temperature = 0.7;
-    /** CPU thread count for local inference. 0 = unset. Only ever read/sent when the
-     *  active provider's supportsThreads() is true - no current provider qualifies. */
+
+    /** CPU thread count for native/local runtimes. 0 = provider default. */
     public int threads = 0;
+
+    /** Preferred maximum generated tokens. Existing providers may ignore this safely. */
+    public int maxTokens = 4096;
+
+    /** Nucleus sampling value for providers that support it. */
+    public double topP = 1.0;
 
     public AiModelConfig() {
         this.id = UUID.randomUUID().toString();

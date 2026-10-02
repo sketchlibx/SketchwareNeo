@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="16dp"
     android:layout_marginVertical="6dp"
     android:clickable="true"
     android:focusable="true"
-    app:cardElevation="0dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="?attr/colorOutlineVariant"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="16dp"
-    app:rippleColor="?attr/colorControlHighlight">
+    app:cardElevation="0dp"
+    app:rippleColor="?attr/colorControlHighlight"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -25,12 +26,11 @@
             android:id="@+id/imageProviderIcon"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:padding="8dp"
             android:background="@drawable/bg_circle_surface_variant"
+            android:padding="8dp"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
             app:tint="?attr/colorOnSurfaceVariant"
-            tools:src="@drawable/ic_mtrl_ai"
-            xmlns:tools="http://schemas.android.com/tools" />
+            tools:src="@drawable/ic_mtrl_ai" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -51,8 +51,7 @@
                     android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textColor="?attr/colorOnSurface"
-                    tools:text="My GPT-4o"
-                    xmlns:tools="http://schemas.android.com/tools" />
+                    tools:text="My GPT-4o" />
 
                 <TextView
                     android:id="@+id/textActiveBadge"
@@ -66,8 +65,7 @@
                     android:textAppearance="?attr/textAppearanceLabelSmall"
                     android:textColor="?attr/colorOnPrimary"
                     android:visibility="gone"
-                    tools:visibility="visible"
-                    xmlns:tools="http://schemas.android.com/tools" />
+                    tools:visibility="visible" />
             </LinearLayout>
 
             <TextView
@@ -77,8 +75,17 @@
                 android:layout_marginTop="2dp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                tools:text="OpenAI · gpt-4o"
-                xmlns:tools="http://schemas.android.com/tools" />
+                tools:text="OpenAI · gpt-4o" />
+
+            <TextView
+                android:id="@+id/textRuntimeBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:text="CLOUD"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorPrimary"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton

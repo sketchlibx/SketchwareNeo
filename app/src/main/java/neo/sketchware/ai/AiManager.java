@@ -43,7 +43,10 @@ public final class AiManager {
             keyStore.load(null);
 
             if (!keyStore.containsAlias(KEY_ALIAS)) {
-                KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER);
+                KeyGenerator keyGenerator = KeyGenerator.getInstance(
+                        KeyProperties.KEY_ALGORITHM_AES,
+                        KEYSTORE_PROVIDER
+                );
                 KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(
                         KEY_ALIAS,
                         KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT
@@ -86,13 +89,19 @@ public final class AiManager {
             byte[] combined = Base64.decode(storedValue, Base64.NO_WRAP);
 
             int ivLength = 12;
+            if (combined.length <= ivLength) return null;
+
             byte[] iv = new byte[ivLength];
             byte[] cipherBytes = new byte[combined.length - ivLength];
             System.arraycopy(combined, 0, iv, 0, ivLength);
             System.arraycopy(combined, ivLength, cipherBytes, 0, cipherBytes.length);
 
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
+            cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    getOrCreateKey(),
+                    new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            );
             byte[] plainBytes = cipher.doFinal(cipherBytes);
 
             return new String(plainBytes, "UTF-8");
@@ -105,6 +114,7 @@ public final class AiManager {
         String encrypted = getPrefs(context).getString(KEY_CONFIGS, null);
         String json = decrypt(encrypted);
         if (json == null) return new ArrayList<>();
+
         Type listType = new TypeToken<ArrayList<AiModelConfig>>() {}.getType();
         List<AiModelConfig> configs = getGson().fromJson(json, listType);
         return configs != null ? configs : new ArrayList<>();
@@ -119,6 +129,7 @@ public final class AiManager {
         List<AiModelConfig> configs = getConfigs(context);
         configs.add(config);
         saveConfigs(context, configs);
+
         if (configs.size() == 1) {
             setActiveConfigId(context, config.id);
         }
@@ -153,19 +164,53 @@ public final class AiManager {
     }
 
     public static void setActiveConfigId(Context context, String id) {
+        if (id == null) {
+            getPrefs(context).edit().remove(KEY_ACTIVE_ID).apply();
+            return;
+        }
         getPrefs(context).edit().putString(KEY_ACTIVE_ID, encrypt(id)).apply();
     }
 
     public static AiModelConfig getActiveConfig(Context context) {
         String activeId = getActiveConfigId(context);
         if (activeId == null) return null;
+
         for (AiModelConfig config : getConfigs(context)) {
             if (config.id.equals(activeId)) return config;
         }
         return null;
     }
 
-    public static void sendPrompt(Context context, String systemPrompt, String userPrompt, AiResponseCallback callback) {
+    public static AiProvider getActiveProvider(Context context) {
+        AiModelConfig config = getActiveConfig(context);
+        return config == null ? null : AiProviderRegistry.get(config.providerId);
+    }
+
+    public static void testConfig(Context context, AiModelConfig config, AiResponseCallback callback) {
+        if (config == null) {
+            callback.onFailure("No AI model is configured.");
+            return;
+        }
+
+        AiProvider provider = AiProviderRegistry.get(config.providerId);
+        if (provider == null) {
+            callback.onFailure("Unknown AI provider: " + config.providerId);
+            return;
+        }
+
+        provider.testConnection(config, callback);
+    }
+
+    public static void testActive(Context context, AiResponseCallback callback) {
+        testConfig(context, getActiveConfig(context), callback);
+    }
+
+    public static void sendPrompt(
+            Context context,
+            String systemPrompt,
+            String userPrompt,
+            AiResponseCallback callback
+    ) {
         AiModelConfig activeConfig = getActiveConfig(context);
         if (activeConfig == null) {
             callback.onFailure("No active AI model configured. Add one from AI Settings.");

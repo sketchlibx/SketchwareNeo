@@ -55,9 +55,19 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         holder.textModelProvider.setText(
                 (provider != null ? provider.getProviderName() : config.providerId) + " · " + config.modelName
         );
-        holder.textActiveBadge.setVisibility(config.id.equals(activeId) ? View.VISIBLE : View.GONE);
-        holder.imageProviderIcon.setImageResource(getProviderIcon(config.providerId));
 
+        boolean active = config.id.equals(activeId);
+        holder.textActiveBadge.setVisibility(active ? View.VISIBLE : View.GONE);
+
+        if (provider != null && provider.isLocal()) {
+            holder.textRuntimeBadge.setText("LOCAL");
+            holder.textRuntimeBadge.setVisibility(View.VISIBLE);
+        } else {
+            holder.textRuntimeBadge.setText("CLOUD");
+            holder.textRuntimeBadge.setVisibility(View.VISIBLE);
+        }
+
+        holder.imageProviderIcon.setImageResource(getProviderIcon(config.providerId));
         holder.buttonEditModel.setOnClickListener(v -> listener.onEditClicked(config));
         holder.buttonDeleteModel.setOnClickListener(v -> listener.onDeleteClicked(config));
         holder.buttonDuplicateModel.setOnClickListener(v -> listener.onDuplicateClicked(config));
@@ -71,6 +81,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
 
     private int getProviderIcon(String providerId) {
         if (providerId == null) return R.drawable.ic_mtrl_ai;
+
         switch (providerId) {
             case "openai":
                 return R.drawable.ic_mtrl_openai;
@@ -83,6 +94,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
             case "deepseek":
                 return R.drawable.ic_mtrl_deepseek;
             case "custom":
+            case "local":
                 return R.drawable.ic_mtrl_customai;
             default:
                 return R.drawable.ic_mtrl_ai;
@@ -93,6 +105,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         TextView textModelName;
         TextView textModelProvider;
         TextView textActiveBadge;
+        TextView textRuntimeBadge;
         ImageView imageProviderIcon;
         ImageButton buttonEditModel;
         ImageButton buttonDeleteModel;
@@ -103,6 +116,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
             textModelName = itemView.findViewById(R.id.textModelName);
             textModelProvider = itemView.findViewById(R.id.textModelProvider);
             textActiveBadge = itemView.findViewById(R.id.textActiveBadge);
+            textRuntimeBadge = itemView.findViewById(R.id.textRuntimeBadge);
             imageProviderIcon = itemView.findViewById(R.id.imageProviderIcon);
             buttonEditModel = itemView.findViewById(R.id.buttonEditModel);
             buttonDeleteModel = itemView.findViewById(R.id.buttonDeleteModel);

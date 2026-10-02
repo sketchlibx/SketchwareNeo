@@ -29,6 +29,7 @@ import dev.chrisbanes.insetter.Insetter;
 import dev.chrisbanes.insetter.Side;
 import mod.hey.studios.activity.managers.cpp.NativeToolsActivity;
 import mod.hilal.saif.activities.tools.AppSettings;
+import neo.sketchware.ai.AiSettingsActivity;
 import pro.sketchware.R;
 import pro.sketchware.activities.about.AboutActivity;
 import pro.sketchware.utility.SketchwareUtil;
@@ -52,9 +53,16 @@ public class MainDrawer extends NavigationView {
 
         var layoutDirection = context.getResources().getConfiguration().getLayoutDirection();
         Insetter.builder()
-                .margin(WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.navigationBars(),
-                        Side.create(layoutDirection == LAYOUT_DIRECTION_LTR,
-                                false, layoutDirection == LAYOUT_DIRECTION_RTL, false))
+                .margin(
+                        WindowInsetsCompat.Type.displayCutout()
+                                | WindowInsetsCompat.Type.navigationBars(),
+                        Side.create(
+                                layoutDirection == LAYOUT_DIRECTION_LTR,
+                                false,
+                                layoutDirection == LAYOUT_DIRECTION_RTL,
+                                false
+                        )
+                )
                 .applyToView(this);
 
         ShapeAppearanceModel shapeModel = ShapeAppearanceModel.builder()
@@ -63,11 +71,17 @@ public class MainDrawer extends NavigationView {
                 .build();
 
         MaterialShapeDrawable background = new MaterialShapeDrawable(shapeModel);
-        background.setFillColor(ColorStateList.valueOf(ThemeUtils.getColor(context, R.attr.colorSurfaceContainerLow)));
+        background.setFillColor(
+                ColorStateList.valueOf(
+                        ThemeUtils.getColor(context, R.attr.colorSurfaceContainerLow)
+                )
+        );
         setBackground(background);
 
-        ViewGroup headerView = (ViewGroup) LayoutInflater.from(context).inflate(R.layout.main_drawer_header, null);
-        headerView.findViewById(R.id.status_bar_overlapper).setMinimumHeight(UI.getStatusBarHeight(context));
+        ViewGroup headerView = (ViewGroup) LayoutInflater.from(context)
+                .inflate(R.layout.main_drawer_header, null);
+        headerView.findViewById(R.id.status_bar_overlapper)
+                .setMinimumHeight(UI.getStatusBarHeight(context));
 
         addHeaderView(headerView);
         inflateMenu(R.menu.main_drawer_menu);
@@ -95,21 +109,18 @@ public class MainDrawer extends NavigationView {
 
     private void initializeDrawerItems(@IdRes int id) {
         Activity activity = unwrap(getContext());
-        if (id == R.id.about_team) {
-            Intent intent = new Intent(activity, AboutActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            activity.startActivity(intent);
-        } else if (id == R.id.changelog) {
-            Intent intent = new Intent(activity, AboutActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra("select", "changelog");
-            activity.startActivity(intent);
-        } else if (id == R.id.program_info) {
+        
+        
+        if (id == R.id.program_info) {
             Intent intent = new Intent(activity, ProgramInfoActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivityForResult(intent, 105);
         } else if (id == R.id.app_settings) {
             Intent intent = new Intent(activity, AppSettings.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(intent);
+        } else if (id == R.id.ai_settings) {
+            Intent intent = new Intent(activity, AiSettingsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
         } else if (id == R.id.create_release_keystore) {
