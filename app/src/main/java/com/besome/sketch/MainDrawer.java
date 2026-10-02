@@ -10,15 +10,18 @@ import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 
-import com.besome.sketch.help.ProgramInfoActivity;
+import com.besome.sketch.editor.manage.ManageCollectionActivity;
 import com.besome.sketch.tools.NewKeyStoreActivity;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.shape.MaterialShapeDrawable;
@@ -29,9 +32,10 @@ import dev.chrisbanes.insetter.Insetter;
 import dev.chrisbanes.insetter.Side;
 import mod.hey.studios.activity.managers.cpp.NativeToolsActivity;
 import mod.hilal.saif.activities.tools.AppSettings;
+import mod.hilal.saif.activities.tools.BlocksManager;
+import mod.sketchlibx.project.backup.CloudBackupManagerActivity;
 import neo.sketchware.ai.AiSettingsActivity;
 import pro.sketchware.R;
-import pro.sketchware.activities.about.AboutActivity;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.UI;
@@ -83,6 +87,17 @@ public class MainDrawer extends NavigationView {
         headerView.findViewById(R.id.status_bar_overlapper)
                 .setMinimumHeight(UI.getStatusBarHeight(context));
 
+        View btnClose = headerView.findViewById(R.id.btn_close_drawer);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> {
+                Activity activity = unwrap(getContext());
+                if (activity instanceof pro.sketchware.activities.main.activities.MainActivity) {
+                    DrawerLayout dl = activity.findViewById(R.id.drawer_layout);
+                    if (dl != null) dl.closeDrawers();
+                }
+            });
+        }
+
         addHeaderView(headerView);
         inflateMenu(R.menu.main_drawer_menu);
         setNavigationItemSelectedListener(item -> {
@@ -109,21 +124,8 @@ public class MainDrawer extends NavigationView {
 
     private void initializeDrawerItems(@IdRes int id) {
         Activity activity = unwrap(getContext());
-
-        if (id == R.id.about_team) {
-            Intent intent = new Intent(activity, AboutActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            activity.startActivity(intent);
-        } else if (id == R.id.changelog) {
-            Intent intent = new Intent(activity, AboutActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra("select", "changelog");
-            activity.startActivity(intent);
-        } else if (id == R.id.program_info) {
-            Intent intent = new Intent(activity, ProgramInfoActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            activity.startActivityForResult(intent, 105);
-        } else if (id == R.id.app_settings) {
+        
+        if (id == R.id.app_settings) {
             Intent intent = new Intent(activity, AppSettings.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
@@ -131,7 +133,7 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, AiSettingsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
-        } else if (id == R.id.create_release_keystore) {
+        } else if (id == R.id.create_release_keystore || id == R.id.keystore_manager) {
             Intent intent = new Intent(activity, NewKeyStoreActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
@@ -139,6 +141,25 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, NativeToolsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
+        } else if (id == R.id.component_manager) {
+            Intent intent = new Intent(activity, ManageCollectionActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(intent);
+        } else if (id == R.id.block_manager) {
+            Intent intent = new Intent(activity, BlocksManager.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(intent);
+        } else if (id == R.id.cloud_backup) {
+            Intent intent = new Intent(activity, CloudBackupManagerActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(intent);
+        } else if (id == R.id.app_signing) {
+            SketchwareUtil.toast("App Signing: Coming soon", Toast.LENGTH_SHORT);
+        } else if (id == R.id.nav_home) {
+            if (activity instanceof pro.sketchware.activities.main.activities.MainActivity) {
+                DrawerLayout dl = activity.findViewById(R.id.drawer_layout);
+                if (dl != null) dl.closeDrawers();
+            }
         }
     }
 

@@ -11,7 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
-        app:elevation="0dp">
+        app:elevation="0dp"
+        app:liftOnScroll="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
@@ -33,6 +34,7 @@
             android:id="@+id/content_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:animateLayoutChanges="true"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
             android:paddingTop="8dp"
@@ -45,9 +47,7 @@
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:cardElevation="0dp">
 
                 <LinearLayout
                     android:id="@+id/layout_switch"
@@ -116,9 +116,7 @@
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:cardElevation="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -170,11 +168,9 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
                         app:cardCornerRadius="10dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
+                        app:cardElevation="0dp">
 
                         <TextView
                             android:id="@+id/tv_source_path"
@@ -184,7 +180,7 @@
                             android:padding="12dp"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorPrimary"
-                            tools:text="/storage/emulated/0/.sketchware/data/733/files/native" />
+                            tools:text="Calculating path..." />
                     </com.google.android.material.card.MaterialCardView>
 
                     <TextView
@@ -194,7 +190,7 @@
                         android:layout_marginTop="10dp"
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        tools:text="Directory ready • 0 files present in native folder" />
+                        tools:text="Calculating files..." />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -215,9 +211,7 @@
                 android:layout_marginBottom="20dp"
                 app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:cardElevation="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -251,7 +245,7 @@
                                 android:layout_marginTop="2dp"
                                 android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                tools:text="Location: files/bin/android-ndk/ (~360 MB)" />
+                                tools:text="Calculating size..." />
                         </LinearLayout>
 
                         <com.google.android.material.chip.Chip
@@ -263,7 +257,7 @@
                             app:chipCornerRadius="8dp"
                             app:chipMinHeight="32dp"
                             app:chipStrokeWidth="0dp"
-                            tools:text="Not Installed" />
+                            tools:text="Checking..." />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -298,7 +292,7 @@
                                 android:layout_marginTop="2dp"
                                 android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                tools:text="Location: files/bin/cmake/ (~48 MB)" />
+                                tools:text="Calculating size..." />
                         </LinearLayout>
 
                         <com.google.android.material.chip.Chip
@@ -310,7 +304,7 @@
                             app:chipCornerRadius="8dp"
                             app:chipMinHeight="32dp"
                             app:chipStrokeWidth="0dp"
-                            tools:text="Not Installed" />
+                            tools:text="Checking..." />
                     </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
@@ -331,9 +325,7 @@
                 android:layout_height="wrap_content"
                 app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
+                app:cardElevation="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"

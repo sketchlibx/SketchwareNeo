@@ -19,6 +19,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.io.File;
+import java.text.DecimalFormat;
 
 import pro.sketchware.R;
 import pro.sketchware.databinding.ManageLibraryNativeToolsBinding;
@@ -68,8 +69,8 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        binding.toolbar.setNavigationOnClickListener(v -> finishWithResult());
         setSupportActionBar(binding.toolbar);
+        binding.toolbar.setNavigationOnClickListener(v -> finishWithResult());
 
         if (isGlobalContext) {
             binding.toolbar.setTitle("Build Tools");
@@ -124,10 +125,15 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
 
         File dir = new File(android.net.Uri.parse(path).getPath() != null
                 ? android.net.Uri.parse(path).getPath() : path);
-        int fileCount = countFilesRecursive(dir);
-        binding.tvSourceStatus.setText(dir.exists()
-                ? "Directory ready • " + fileCount + " file" + (fileCount == 1 ? "" : "s") + " present in native folder"
-                : "Directory will be created when you add your first source file");
+                
+        new Thread(() -> {
+            int fileCount = countFilesRecursive(dir);
+            runOnUiThread(() -> {
+                binding.tvSourceStatus.setText(dir.exists()
+                        ? "Directory ready • " + fileCount + " file" + (fileCount == 1 ? "" : "s") + " present in native folder"
+                        : "Directory will be created when you add your first source file");
+            });
+        }).start();
     }
 
     private int countFilesRecursive(File dir) {
@@ -145,8 +151,47 @@ public class NativeToolsActivity extends BaseAppCompatActivity {
         boolean ndkInstalled = InbuiltNdkManager.isNdkInstalled(this);
         setStatusChip(binding.chipNdkStatus, ndkInstalled);
         setStatusChip(binding.chipCmakeStatus, ndkInstalled);
-        binding.tvNdkLocation.setText("Location: files/bin/android-ndk/ (~360 MB)");
-        binding.tvCmakeLocation.setText("Location: files/bin/cmake/ (~48 MB)");
+
+        File cmakeDir = new File(getFilesDir(), "cmake");
+        File ndkDir = InbuiltNdkManager.getInstalledNdkDir(this);
+        if (ndkDir == null) ndkDir = new File(getFilesDir(), "ndk");
+
+        calculateAndSetSizeAsync(cmakeDir, binding.tvCmakeLocation, "Location: files/cmake/");
+        calculateAndSetSizeAsync(ndkDir, binding.tvNdkLocation, "Location: files/ndk/");
+    }
+
+    private void calculateAndSetSizeAsync(File dir, TextView targetView, String pathPrefix) {
+        if (dir == null || !dir.exists()) {
+            targetView.setText(pathPrefix + " (Not installed)");
+            return;
+        }
+        new Thread(() -> {
+            long sizeBytes = getFolderSize(dir);
+            String sizeLabel = formatSize(sizeBytes);
+            runOnUiThread(() -> targetView.setText(pathPrefix + " (~" + sizeLabel + ")"));
+        }).start();
+    }
+
+    private long getFolderSize(File file) {
+        long size = 0;
+        if (file != null && file.exists()) {
+            if (file.isDirectory()) {
+                File[] children = file.listFiles();
+                if (children != null) {
+                    for (File child : children) size += getFolderSize(child);
+                }
+            } else {
+                size = file.length();
+            }
+        }
+        return size;
+    }
+
+    private String formatSize(long size) {
+        if (size <= 0) return "0 B";
+        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+        return new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
 
     private void setStatusChip(Chip chip, boolean installed) {

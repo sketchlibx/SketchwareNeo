@@ -296,9 +296,9 @@
             android:theme="@style/Theme.SketchwarePro.ProjectPreview" />
             
         <activity
-    android:name="pro.sketchware.activities.main.fragments.projects_store.ImageViewerActivity"
-    android:configChanges="orientation|screenSize"
-    android:theme="@style/Theme.SketchwarePro.ProjectPreview" />
+            android:name="pro.sketchware.activities.main.fragments.projects_store.ImageViewerActivity"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.SketchwarePro.ProjectPreview" />
 
         <activity android:name="pro.sketchware.activities.settings.SettingsActivity" />
 
@@ -346,7 +346,7 @@
             android:windowSoftInputMode="stateAlwaysHidden" />
             
         <activity
-        android:name=".activities.editor.gradle.ManageGradleActivity"
+            android:name=".activities.editor.gradle.ManageGradleActivity"
             android:configChanges="orientation|screenSize"
             android:windowSoftInputMode="stateAlwaysHidden" />
             
@@ -367,18 +367,23 @@
             android:name=".activities.preview.LayoutPreviewActivity"
             android:configChanges="orientation|screenSize" />
             
-         <activity
+        <activity
             android:name="neo.sketchware.plugin.ui.ManagePluginsActivity"
             android:configChanges="orientation|screenSize" />
-         <activity
+        <activity
             android:name="neo.sketchware.ai.AiSettingsActivity"
             android:configChanges="orientation|screenSize" />
-         <activity
+        <activity
             android:name="neo.sketchware.ai.AiModelEditActivity"
             android:configChanges="orientation|screenSize" />
-         <activity
+        <activity
             android:name="neo.sketchware.ai.BlockGenerationActivity"
             android:configChanges="orientation|screenSize" />
+
+        <activity
+            android:name="mod.sketchlibx.project.backup.CloudBackupManagerActivity"
+            android:configChanges="orientation|screenSize"
+            android:windowSoftInputMode="stateHidden" />
 
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"

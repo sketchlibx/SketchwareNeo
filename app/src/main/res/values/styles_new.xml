@@ -24,6 +24,11 @@
         </item>
         <item name="titleCollapseMode">scale</item>
     </style>
+    
+    <style name="ShapeAppearanceOverlay.Material3.Corner.Full" parent="">
+    <item name="cornerFamily">rounded</item>
+    <item name="cornerSize">50%</item>
+</style>
 
     <style name="TextAppearance.SketchwarePro.CollapsingToolbar.Collapsed" parent="TextAppearance.SketchwarePro.TitleLarge" />
     <style name="TextAppearance.SketchwarePro.CollapsingToolbar.Expanded" parent="TextAppearance.SketchwarePro.HeadlineMedium" />

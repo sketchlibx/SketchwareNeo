@@ -15,6 +15,7 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewOutlineProvider;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -155,7 +156,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         binding = MainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         
-        // Search Toolbar acting as the primary Action Bar
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle(null);
@@ -186,8 +186,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         });
         binding.layoutCoordinator.setClipToOutline(true);
 
-        // Bind the ActionBarDrawerToggle to the distinct nav_toolbar container
-        drawerToggle = new ActionBarDrawerToggle(this, binding.drawerLayout, binding.navToolbar, R.string.app_name, R.string.app_name);
+        drawerToggle = new ActionBarDrawerToggle(this, binding.drawerLayout, binding.toolbar, R.string.app_name, R.string.app_name);
         binding.drawerLayout.addDrawerListener(drawerToggle);
         binding.drawerLayout.addDrawerListener(new DrawerLayout.DrawerListener() {
             @Override
@@ -206,6 +205,19 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             @Override
             public void onDrawerStateChanged(int newState) {}
         });
+
+        ImageButton btnSearch = findViewById(R.id.btn_toolbar_search);
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> {
+                if (activeFragment instanceof ProjectsFragment) {
+                    ((ProjectsFragment) activeFragment).openSearch();
+                }
+            });
+        }
+        ImageButton btnSettings = findViewById(R.id.btn_toolbar_settings);
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, pro.sketchware.activities.settings.SettingsActivity.class)));
+        }
 
         boolean hasStorageAccess = isStoragePermissionGranted();
         if (!hasStorageAccess) {
@@ -254,6 +266,9 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             } else if (id == R.id.item_sketchub) {
                 navigateToSketchubFragment();
                 return true;
+            } else if (id == R.id.item_templates) {
+                SketchwareUtil.toast("Templates: Coming soon");
+                return false; 
             }
             return false;
         });

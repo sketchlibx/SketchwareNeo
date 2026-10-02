@@ -1,56 +1,54 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <item
-        android:id="@+id/about_team"
-        android:icon="@drawable/ic_mtrl_team"
-        android:title="About the team" />
-
-    <item
-        android:id="@+id/changelog"
-        android:icon="@drawable/ic_mtrl_update"
-        android:title="Changelog" />
-
-    <item
-        android:id="@+id/program_info"
-        android:icon="@drawable/ic_sketchware_24"
-        android:title="App information" />
-
-    <item
-        android:id="@+id/create_release_keystore"
-        android:icon="@drawable/ic_mtrl_key"
-        android:title="Create keystore" />
-
-    <item
-        android:id="@+id/app_settings"
-        android:icon="@drawable/ic_mtrl_settings"
-        android:title="Settings" />
-
-    <item
-        android:id="@+id/ai_settings"
-        android:icon="@drawable/ic_mtrl_ai"
-        android:title="AI Agents" />
-
-    <item android:title="Tools">
-        <menu>
-            <item
-                android:id="@+id/build_tools"
-                android:icon="@drawable/ic_mtrl_build_tools"
-                android:title="Build Tools" />
-        </menu>
-    </item>
-
-    <item android:title="Related links">
+    <group android:id="@+id/group_main" android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_home"
+            android:icon="@drawable/ic_mtrl_home"
+            android:title="Home" />
+    </group>
+    <group android:id="@+id/group_tools">
+        <item
+            android:id="@+id/ai_agents"
+            android:icon="@drawable/ic_mtrl_ai"
+            android:title="AI Agents" />
+        <item
+            android:id="@+id/cloud_backup"
+            android:icon="@drawable/ic_mtrl_cloud"
+            android:title="Cloud Backup" />
+        <item
+            android:id="@+id/component_manager"
+            android:icon="@drawable/ic_mtrl_components"
+            android:title="Component Manager" />
+        <item
+            android:id="@+id/block_manager"
+            android:icon="@drawable/ic_mtrl_block"
+            android:title="Block Manager" />
+        <item
+            android:id="@+id/build_tools"
+            android:icon="@drawable/ic_mtrl_build_tools"
+            android:title="Build Tools" />
+        <item
+            android:id="@+id/app_signing"
+            android:icon="@drawable/ic_mtrl_key"
+            android:title="App Signing" />
+        <item
+            android:id="@+id/keystore_manager"
+            android:icon="@drawable/ic_mtrl_key"
+            android:title="Keystore Manager" />
+        <item
+            android:id="@+id/app_settings"
+            android:icon="@drawable/ic_mtrl_settings"
+            android:title="Settings" />
+    </group>
+    <item android:title="">
         <menu>
             <item
                 android:id="@+id/social_telegram"
                 android:icon="@drawable/ic_telegram"
                 android:title="Telegram" />
-
             <item
                 android:id="@+id/social_github"
                 android:icon="@drawable/ic_github"
                 android:title="GitHub" />
         </menu>
     </item>
-
 </menu>
