@@ -12,6 +12,8 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.IdRes;
@@ -23,6 +25,10 @@ import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.besome.sketch.editor.manage.ManageCollectionActivity;
 import com.besome.sketch.tools.NewKeyStoreActivity;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.shape.ShapeAppearanceModel;
@@ -42,6 +48,8 @@ import pro.sketchware.utility.UI;
 
 public class MainDrawer extends NavigationView {
     private static final int DEF_STYLE_RES = R.style.Widget_SketchwarePro_NavigationView_Main;
+    private TextView profileName;
+    private TextView profileEmail;
 
     public MainDrawer(@NonNull Context context) {
         this(context, null);
@@ -87,6 +95,18 @@ public class MainDrawer extends NavigationView {
         headerView.findViewById(R.id.status_bar_overlapper)
                 .setMinimumHeight(UI.getStatusBarHeight(context));
 
+        profileName = headerView.findViewById(R.id.profile_name);
+        profileEmail = headerView.findViewById(R.id.profile_email);
+        ImageView profileExpand = headerView.findViewById(R.id.profile_expand);
+        
+        if (profileExpand != null) {
+            profileExpand.setOnClickListener(v -> {
+                Intent intent = new Intent(unwrap(getContext()), CloudBackupManagerActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                unwrap(getContext()).startActivity(intent);
+            });
+        }
+
         View btnClose = headerView.findViewById(R.id.btn_close_drawer);
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> {
@@ -105,6 +125,25 @@ public class MainDrawer extends NavigationView {
             initializeDrawerItems(item.getItemId());
             return false;
         });
+
+        refreshProfile();
+    }
+
+    public void refreshProfile() {
+        if (profileName == null || profileEmail == null) return;
+        try {
+            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(getContext());
+            if (account != null) {
+                profileName.setText(account.getDisplayName() != null ? account.getDisplayName() : "Developer");
+                profileEmail.setText(account.getEmail());
+            } else {
+                profileName.setText("Username");
+                profileEmail.setText("sketchwareneo");
+            }
+        } catch (Exception e) {
+            profileName.setText("Username");
+            profileEmail.setText("sketchwareneo");
+        }
     }
 
     private void initializeSocialLinks(@IdRes int id) {
@@ -133,7 +172,7 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, AiSettingsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
-        } else if (id == R.id.create_release_keystore) {
+        } else if (id == R.id.create_release_keystore || id == R.id.keystore_manager) {
             Intent intent = new Intent(activity, NewKeyStoreActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
@@ -153,8 +192,6 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, CloudBackupManagerActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
-        } else if (id == R.id.keystore_manager) {
-            SketchwareUtil.toast("Keystore Manager: Coming soon", Toast.LENGTH_SHORT);
         } else if (id == R.id.app_signing) {
             SketchwareUtil.toast("App Signing: Coming soon", Toast.LENGTH_SHORT);
         } else if (id == R.id.nav_home) {

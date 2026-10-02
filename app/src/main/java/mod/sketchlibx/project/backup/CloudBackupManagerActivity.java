@@ -45,16 +45,21 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential;
+import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.DriveScopes;
+import com.google.api.services.drive.model.About;
 
 import java.io.File;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -77,6 +82,11 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     private LinearLayout layoutDashboardStats;
     private TextView textCloudCount;
     private TextView textAutoBackupStatus;
+    private MaterialSwitch switchAutoBackup;
+
+    private LinearProgressIndicator progressStorage;
+    private TextView textStorageInfo;
+    private ImageView btnRefreshStorage;
 
     private RecyclerView recyclerBackup;
     private MaterialButton buttonStartBackup;
@@ -135,6 +145,11 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
         layoutDashboardStats = findViewById(R.id.layoutDashboardStats);
         textCloudCount = findViewById(R.id.textCloudCount);
         textAutoBackupStatus = findViewById(R.id.textAutoBackupStatus);
+        switchAutoBackup = findViewById(R.id.switchAutoBackup);
+
+        progressStorage = findViewById(R.id.progressStorage);
+        textStorageInfo = findViewById(R.id.textStorageInfo);
+        btnRefreshStorage = findViewById(R.id.btnRefreshStorage);
 
         recyclerBackup = findViewById(R.id.recyclerViewBackup);
         buttonStartBackup = findViewById(R.id.buttonStartBackup);
@@ -208,13 +223,13 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     private void refreshDashboardData() {
         if (cloudManager == null) return;
+
         textCloudCount.setText("Loading...");
         cloudManager.getCloudBackupCount(new CloudBackupManager.CountCallback() {
             @Override
             public void onResult(int count) {
                 textCloudCount.setText(count + " backup" + (count == 1 ? "" : "s") + " found");
             }
-
             @Override
             public void onError(String error) {
                 textCloudCount.setText("Error loading count");
@@ -225,6 +240,55 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
         int interval = prefs.getInt("auto_backup_interval", 0);
         String txt = interval == 0 ? "Off" : (interval == 1 ? "Daily" : (interval == 2 ? "Weekly" : "Monthly"));
         textAutoBackupStatus.setText(txt);
+        switchAutoBackup.setChecked(interval > 0);
+
+        fetchDriveStorageQuota();
+    }
+
+    private void fetchDriveStorageQuota() {
+        if (currentAccount == null) return;
+        progressStorage.setIndeterminate(true);
+        textStorageInfo.setText("Calculating storage...");
+
+        new Thread(() -> {
+            try {
+                GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(this, Collections.singleton(DriveScopes.DRIVE_APPDATA));
+                credential.setSelectedAccount(currentAccount.getAccount());
+
+                Drive driveService = new Drive.Builder(GoogleNetHttpTransport.newTrustedTransport(), GsonFactory.getDefaultInstance(), credential)
+                        .setApplicationName("Sketchware Neo Backup")
+                        .build();
+
+                About about = driveService.about().get().setFields("storageQuota").execute();
+                About.StorageQuota quota = about.getStorageQuota();
+
+                runOnUiThread(() -> {
+                    if (quota != null) {
+                        long limit = quota.getLimit() != null ? quota.getLimit() : -1;
+                        long usage = quota.getUsage() != null ? quota.getUsage() : 0;
+                        progressStorage.setIndeterminate(false);
+
+                        if (limit > 0) {
+                            int progress = (int) ((usage * 100) / limit);
+                            progressStorage.setProgress(progress);
+                            textStorageInfo.setText(formatSize(usage) + " used of " + formatSize(limit));
+                        } else {
+                            progressStorage.setProgress(0);
+                            textStorageInfo.setText(formatSize(usage) + " used (Unlimited quota)");
+                        }
+                    } else {
+                        progressStorage.setIndeterminate(false);
+                        textStorageInfo.setText("Storage information unavailable");
+                    }
+                });
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progressStorage.setIndeterminate(false);
+                    textStorageInfo.setText("Error fetching storage quota");
+                });
+            }
+        }).start();
     }
 
     private void setupDashboardListeners() {
@@ -234,12 +298,12 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             } else {
                 new MaterialAlertDialogBuilder(this)
                         .setTitle("Disconnect")
-                        .setMessage("Revoke Google Drive access for Cloud Backup?")
+                        .setMessage("Revoke Google Drive access for Cloud Backup? Auto Backups will be disabled.")
                         .setPositiveButton("Disconnect", (d, w) -> {
                             mGoogleSignInClient.revokeAccess().addOnCompleteListener(task -> {
                                 SketchwareUtil.toast("Disconnected");
                                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putInt("auto_backup_interval", 0).apply();
-                                WorkManager.getInstance(this).cancelUniqueWork("CloudAutoBackup_Recurring");
+                                WorkManager.getInstance(this).cancelUniqueWork(CloudBackupScheduler.WORK_NAME);
                                 onAccountUpdated(null);
                             });
                         })
@@ -252,6 +316,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
         findViewById(R.id.buttonRestoreBackup).setOnClickListener(v -> openRestoreBackup());
         findViewById(R.id.buttonAutoBackupSettings).setOnClickListener(v -> configureAutoBackup());
         findViewById(R.id.buttonViewDisclaimer).setOnClickListener(v -> showDisclaimerDialog(null));
+        btnRefreshStorage.setOnClickListener(v -> fetchDriveStorageQuota());
     }
 
     private void setupSearchAndFilterListeners() {
@@ -574,19 +639,11 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     }
 
     private void configureWorkManager(int intervalType, boolean wifiOnly, boolean chargingOnly) {
-        WorkManager workManager = WorkManager.getInstance(this);
         if (intervalType == 0) {
-            workManager.cancelUniqueWork("CloudAutoBackup_Recurring");
+            CloudBackupScheduler.cancel(this);
         } else {
-            long days = intervalType == 1 ? 1 : (intervalType == 2 ? 7 : 30);
-            Constraints.Builder builder = new Constraints.Builder();
-            if (wifiOnly) builder.setRequiredNetworkType(NetworkType.UNMETERED);
-            if (chargingOnly) builder.setRequiresCharging(true);
-            
-            PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(AutoBackupWorker.class, days, TimeUnit.DAYS)
-                .setConstraints(builder.build())
-                .build();
-            workManager.enqueueUniquePeriodicWork("CloudAutoBackup_Recurring", ExistingPeriodicWorkPolicy.UPDATE, request);
+            long hours = intervalType == 1 ? 24 : (intervalType == 2 ? 168 : 720);
+            CloudBackupScheduler.schedule(this, hours);
         }
     }
 

@@ -146,7 +146,7 @@ import pro.sketchware.utility.apk.ApkSignatures;
 public class DesignActivity extends BaseAppCompatActivity implements View.OnClickListener {
     public static String sc_id;
     
-    private String terminalPlacement; // 0=Tab, 1=BottomSheet, 2=Drawer
+    private String terminalPlacement; 
     
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
@@ -172,10 +172,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     private final androidx.activity.result.ActivityResultLauncher<Intent> versionHistoryLauncher =
             registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK) {
-                    // A restore happened - reload the project from scratch rather than
-                    // asking the user to manually restart (this used to just show a
-                    // toast telling them to restart, which didn't actually reflect the
-                    // restored state until they did so themselves).
                     String restoredScId = DesignActivity.sc_id;
                     finish();
                     Intent intent = new Intent(DesignActivity.this, DesignActivity.class);
@@ -265,6 +261,13 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         if (projectMetadata != null) {
             projectMetadata.put("sketchware_ver", GB.d(getApplicationContext()));
             lC.b(sc_id, projectMetadata);
+            
+            // This is the specific fix for "Unknown" timing issue: Touching the project directory file explicitly
+            String projectFilePath = wq.e() + File.separator + sc_id + File.separator + "project";
+            File projectFileActual = new File(projectFilePath);
+            if (projectFileActual.exists()) {
+                projectFileActual.setLastModified(System.currentTimeMillis());
+            }
         }
     }
 
@@ -682,19 +685,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         fProgress = new FloatingProgressWindow();
     }
     
-    /**
-     * Builds the full-screen terminal panel as a sibling of the main content inside
-     * {@code R.id.container} (same RelativeLayout that already hosts {@code view_property} using
-     * this exact translationY-slide idiom — following the established pattern in this file rather
-     * than introducing a new mechanism). Parked off-screen above via a negative translationY
-     * until opened.
-     * <p>
-     * NOTE: this replaces the BottomSheetDialog-based popup from the previous round, which slid
-     * up from the BOTTOM and required a menu tap to appear at all. Root layout (design.xml) is
-     * already a DrawerLayout, but DrawerLayout only supports LEFT/START/RIGHT/END drawers — there
-     * is no TOP/BOTTOM gravity option in the framework — so a real top-edge sliding panel has to
-     * be a plain view + manual drag handling, not DrawerLayout.
-     */
     private void setupTerminalSlidePanel() {
         android.widget.RelativeLayout container = findViewById(R.id.container);
 
@@ -715,7 +705,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         column.addView(terminalSlidePanelView);
 
-        // Grab handle at the BOTTOM of the panel — "hold from below, push up to hide" per spec.
         android.widget.FrameLayout handleRow = new android.widget.FrameLayout(this);
         int handleHeight = (int) (getResources().getDisplayMetrics().density * 28);
         handleRow.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, handleHeight));
@@ -733,16 +722,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         column.addView(handleRow);
 
         terminalSlidePanel.addView(column);
-        terminalSlidePanel.setVisibility(View.INVISIBLE); // see class-level note below
+        terminalSlidePanel.setVisibility(View.INVISIBLE); 
 
-        // Real statusBars + navigationBars handling — not an edge-to-edge-forced assumption. If
-        // the window isn't edge-to-edge, the system already reserves space for these bars and
-        // these insets report 0 here, so this is a harmless no-op in that case. If it is
-        // edge-to-edge (opted-in, or forced on targetSdk 35+), this is what actually stops the
-        // panel's content and drag handle from drawing under the status/navigation bars.
-        // Deliberately NOT handling ime() here — NeoTerminalView's own applyImeAwarePadding()
-        // already owns IME padding internally; adding it here too would double-pad when the
-        // keyboard is open (this padding + NeoTerminalView's own delta padding stacking).
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(terminalSlidePanel, (v, insets) -> {
             int statusTop = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top;
             int navBottom = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom;
@@ -757,12 +738,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         handleRow.setOnTouchListener(new EdgeDragListener(false));
     }
 
-    /**
-     * Shared drag handler for both directions: {@code opensPanel=true} on the toolbar (drag DOWN
-     * opens), {@code opensPanel=false} on the handle (drag UP closes). Only starts actually
-     * intercepting once the drag passes touch-slop in the expected direction, so ordinary taps on
-     * toolbar icons (search / save / overflow) keep working untouched.
-     */
     private class EdgeDragListener implements View.OnTouchListener {
         private final boolean opensPanel;
         private float startY;
@@ -786,7 +761,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (velocityTracker != null) velocityTracker.recycle();
                     velocityTracker = android.view.VelocityTracker.obtain();
                     velocityTracker.addMovement(event);
-                    return false; // don't consume yet — let a plain tap pass through normally
+                    return false; 
 
                 case android.view.MotionEvent.ACTION_MOVE: {
                     if (velocityTracker != null) velocityTracker.addMovement(event);
@@ -795,18 +770,6 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     if (!dragging && correctDirection && Math.abs(dy) > touchSlop) {
                         dragging = true;
                         if (opensPanel && !terminalPanelOpen) {
-                            // BUG FIX (opened full-screen immediately on project load, twice
-                            // over): trying to precisely time when translationY got set to
-                            // "parked off-screen" (first via post{}, then via a persistent
-                            // OnGlobalLayoutListener) kept losing to some layout-timing edge case
-                            // I couldn't fully pin down. Removed that guessing game entirely:
-                            // the panel now defaults to View.INVISIBLE, which — unlike
-                            // translationY — is a hard guarantee that nothing is drawn, no
-                            // matter what timing race might affect the height/position
-                            // computation. We only need translationY to be correct at the exact
-                            // moment we're about to reveal it (right here, at drag-start), and by
-                            // then the Activity has definitely been through real layout passes —
-                            // "is this view visible" no longer depends on layout timing at all.
                             terminalSlidePanel.setTranslationY(-panelHeight);
                             terminalSlidePanel.setVisibility(View.VISIBLE);
                         }
@@ -825,28 +788,17 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 case android.view.MotionEvent.ACTION_CANCEL:
                     if (dragging) {
                         float currentY = terminalSlidePanel.getTranslationY();
-                        // 0 = fully closed (currentY == -panelHeight), 1 = fully open (currentY == 0).
                         float openness = 1f + (currentY / panelHeight);
 
-                        // A quick, deliberate flick should work even over a short drag distance —
-                        // matching how a real notification shade / bottom sheet feels. Without
-                        // this, a fast flick that only covered ~15% of the height (fully valid,
-                        // natural gesture) would snap back the "wrong" way because it didn't clear
-                        // the distance threshold below.
                         float flingVelocity = 0f;
                         if (velocityTracker != null) {
-                            velocityTracker.computeCurrentVelocity(1000); // px/sec
+                            velocityTracker.computeCurrentVelocity(1000); 
                             flingVelocity = velocityTracker.getYVelocity();
                         }
                         boolean fastFlingInExpectedDirection = opensPanel
                                 ? flingVelocity > 800f
                                 : flingVelocity < -800f;
 
-                        // Closing is intentionally more forgiving than opening on plain distance
-                        // (a real drag up from open should close easily) — a single 60%-of-height
-                        // threshold applied to BOTH directions meant closing needed the panel
-                        // dragged up by 60% of the ENTIRE screen height to register at all, which
-                        // is why "hold and push up" used to appear to do nothing.
                         boolean shouldBeOpen = fastFlingInExpectedDirection
                                 ? opensPanel
                                 : (opensPanel ? openness > 0.30f : openness > 0.75f);
@@ -874,7 +826,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         if (terminalSlidePanel == null) return;
         int height = terminalSlidePanel.getHeight();
         if (open) {
-            if (height == 0) return; // not laid out yet at all — nothing sane to animate to
+            if (height == 0) return; 
             if (terminalSlidePanel.getVisibility() != View.VISIBLE) {
                 terminalSlidePanel.setTranslationY(-height);
                 terminalSlidePanel.setVisibility(View.VISIBLE);
@@ -890,10 +842,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 .start();
     }
 
-    /** Manual trigger — the "Open Terminal" menu item still works alongside the swipe gesture. */
     private void showTerminalBottomSheet() {
         if (terminalSlidePanel == null) setupTerminalSlidePanel();
-        terminalSlidePanel.post(() -> setTerminalPanelOpen(true)); // post{}: give a freshly-built panel one layout pass so getHeight() is real
+        terminalSlidePanel.post(() -> setTerminalPanelOpen(true)); 
     }
 
     private void checkAndInitGit() {
@@ -1859,7 +1810,7 @@ if (canceled) return;
         }
         
         if (fileBean != null) {
-            k(); // Loading dialog SHOW
+            k(); 
             
             boolean isDifferentFile = (this.projectFile == null) || 
                 (!this.projectFile.getJavaName().equals(fileBean.getJavaName()));
@@ -1888,7 +1839,7 @@ if (canceled) return;
                         com.besome.sketch.editor.view.ViewProperty viewProperty = findViewById(R.id.view_property);
                         if (viewProperty != null) {
                             viewProperty.setVisibility(View.VISIBLE);
-                            viewProperty.a(result.targetId); // Attach view properties
+                            viewProperty.a(result.targetId); 
                         }
                         
                     } else if (result.category.equals("Logic Block") && result.targetId != null && result.eventName != null) {
@@ -1906,7 +1857,7 @@ if (canceled) return;
                 } catch (Exception e) {
                     Log.e("DeepLink", "Failed to resolve deep link", e);
                 } finally {
-                    h(); // Loading Dialog HIDE
+                    h(); 
                 }
             }, delayTime);
 

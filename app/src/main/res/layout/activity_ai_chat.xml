@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
@@ -18,66 +19,181 @@
             app:navigationIcon="@drawable/ic_mtrl_arrow_back"
             app:title="AI Chat">
 
-            <ImageButton
-                android:id="@+id/buttonClear"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_gravity="end"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Clear chat"
-                android:src="@drawable/ic_mtrl_delete"
-                app:tint="?attr/colorOnSurfaceVariant" />
+                android:gravity="center_vertical">
+
+                <ImageButton
+                    android:id="@+id/buttonHistory"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_mtrl_history"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <ImageButton
+                    android:id="@+id/buttonClear"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_mtrl_delete"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
-    </com.google.android.material.appbar.AppBarLayout>
 
-    <ScrollView
-        android:id="@+id/chatScroll"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:padding="16dp"
-        android:paddingBottom="112dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
+        <!-- Current Selected Agent Indicator -->
         <LinearLayout
-            android:id="@+id/chatMessages"
+            android:id="@+id/layoutCurrentAgent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical" />
-    </ScrollView>
+            android:background="?attr/colorSurfaceContainerLowest"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
 
-    <com.google.android.material.card.MaterialCardView
+            <ImageView
+                android:id="@+id/imgChatAgentIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_mtrl_ai"
+                app:tint="?attr/colorPrimary" />
+
+            <TextView
+                android:id="@+id/textChatAgentName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="?attr/textAppearanceLabelLarge"
+                android:textColor="?attr/colorPrimary"
+                tools:text="Claude 3.5 Sonnet (CLOUD)" />
+        </LinearLayout>
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerChat"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="120dp"
+        android:clipToPadding="false"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_margin="12dp"
-        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="2dp">
+        android:background="?attr/colorSurface"
+        android:orientation="vertical"
+        android:paddingTop="4dp">
 
-        <LinearLayout
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:padding="8dp">
+            android:scrollbars="none"
+            android:paddingHorizontal="12dp">
 
-            <EditText
-                android:id="@+id/editMessage"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:hint="Ask your active AI agent…"
-                android:inputType="textCapSentences|textMultiLine"
-                android:maxLines="5"
-                android:minLines="1"
-                android:paddingStart="8dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonSend"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Send" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+                android:orientation="horizontal"
+                android:paddingBottom="8dp">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipGenBlocks"
+                    style="@style/Widget.Material3.Chip.Suggestion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="Generate Blocks"
+                    app:chipIcon="@drawable/ic_mtrl_blocks" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipFixErrors"
+                    style="@style/Widget.Material3.Chip.Suggestion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="Fix Errors"
+                    app:chipIcon="@drawable/ic_mtrl_bug_report" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipExplain"
+                    style="@style/Widget.Material3.Chip.Suggestion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="Explain Code"
+                    app:chipIcon="@drawable/ic_mtrl_bulb" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="bottom"
+                android:padding="4dp">
+
+                <ImageButton
+                    android:id="@+id/buttonAttach"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_mtrl_add"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <EditText
+                    android:id="@+id/editMessage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:hint="Message AI agent..."
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:maxLines="5"
+                    android:minLines="1"
+                    android:paddingVertical="12dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <ImageButton
+                    android:id="@+id/buttonMic"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_mtrl_speech"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <ImageButton
+                    android:id="@+id/buttonSend"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_circle_surface_variant"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:src="@drawable/ic_mtrl_arrow_up"
+                    android:visibility="gone"
+                    app:tint="?attr/colorOnPrimary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

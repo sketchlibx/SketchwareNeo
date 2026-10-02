@@ -53,7 +53,6 @@ import pro.sketchware.utility.DataResetter;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.UI;
-import com.besome.sketch.MainDrawer;
 
 public class MainActivity extends BasePermissionAppCompatActivity {
     private static final String PROJECTS_FRAGMENT_TAG = "projects_fragment";
@@ -217,7 +216,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         }
         ImageButton btnSettings = findViewById(R.id.btn_toolbar_settings);
         if (btnSettings != null) {
-            btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, pro.sketchware.activities.settings.SettingsActivity.class)));
+            btnSettings.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, mod.hilal.saif.activities.tools.AppSettings.class)));
         }
 
         boolean hasStorageAccess = isStoragePermissionGranted();
@@ -365,11 +364,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        
-        if (binding.leftDrawer != null) {
-            ((MainDrawer) binding.leftDrawer).refreshProfile();
-        }
-        
         long freeMegabytes = GB.c();
         if (freeMegabytes < 100 && freeMegabytes > 0) {
             showNoticeNotEnoughFreeStorageSpace();

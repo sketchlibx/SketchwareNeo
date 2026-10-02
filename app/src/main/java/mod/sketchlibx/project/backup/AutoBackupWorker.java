@@ -36,7 +36,6 @@ public class AutoBackupWorker extends Worker {
     private static final String TAG = "AutoBackupWorker";
     private static final String CHANNEL_ID = "cloud_backup_channel";
     private static final int NOTIFICATION_ID = 9988;
-    /** Hard cap per upload — 2 minutes, same as before but now enforced by latch. */
     private static final long UPLOAD_TIMEOUT_MS = 120_000L;
 
     private NotificationManager notificationManager;
@@ -53,9 +52,6 @@ public class AutoBackupWorker extends Worker {
         Log.i(TAG, "========== AutoBackupWorker started ==========");
         Context context = getApplicationContext();
 
-        // ── Step 1: Set foreground IMMEDIATELY ──────────────────────────────────────────
-        // Must happen before any long-running work; otherwise Android 8+ can kill the
-        // worker silently while it waits for network or Drive responses.
         if (CloudBackupScheduler.hasNotificationPermission(context)) {
             try {
                 setForegroundAsync(buildForegroundInfo("Preparing cloud backup…", 0, 1))
@@ -68,13 +64,11 @@ public class AutoBackupWorker extends Worker {
             Log.w(TAG, "POST_NOTIFICATIONS not granted — running without foreground notification (Android 13+).");
         }
 
-        // ── Step 2: Network check (NetworkCapabilities, Android Q+) ──────────────────
         if (!isNetworkAvailable(context)) {
             Log.e(TAG, "No validated internet connection — scheduling retry.");
             return Result.retry();
         }
 
-        // ── Step 3: Read prefs and check interval ────────────────────────────────────
         SharedPreferences prefs = context.getSharedPreferences("cloud_backup_prefs", Context.MODE_PRIVATE);
         int intervalType = prefs.getInt("auto_backup_interval", 2);
         Log.d(TAG, "auto_backup_interval pref = " + intervalType);
@@ -101,7 +95,6 @@ public class AutoBackupWorker extends Worker {
             return Result.success();
         }
 
-        // ── Step 4: Verify Google account + Drive scope ──────────────────────────────
         GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(context);
         if (account == null) {
             Log.e(TAG, "Google account not found — user is not signed in. Failing permanently.");
@@ -117,10 +110,8 @@ public class AutoBackupWorker extends Worker {
         }
         Log.d(TAG, "DRIVE_APPDATA scope confirmed.");
 
-        // Stamp last-run time now to avoid tight retry loops if a single upload fails.
         prefs.edit().putLong("last_backup_time", System.currentTimeMillis()).apply();
 
-        // ── Step 5: Build project list ───────────────────────────────────────────────
         CloudBackupManager cloudManager = new CloudBackupManager(context, account);
 
         ArrayList<HashMap<String, Object>> allProjects = lC.a();
@@ -152,7 +143,6 @@ public class AutoBackupWorker extends Worker {
             return Result.success();
         }
 
-        // ── Step 6: Per-project backup + upload loop ─────────────────────────────────
         boolean allSuccess = true;
 
         for (int i = 0; i < total; i++) {
@@ -169,7 +159,6 @@ public class AutoBackupWorker extends Worker {
                     + projectName + "  sc_id=" + scId);
             updateNotification("Backing up: " + projectName, i + 1, total);
 
-            // 6a. Generate .swb zip
             CloudBackupFactory backupFactory = new CloudBackupFactory(scId);
             backupFactory.backup(context, projectName);
             File swbFile = backupFactory.getOutFile();
@@ -188,7 +177,6 @@ public class AutoBackupWorker extends Worker {
             Log.d(TAG, ".swb ready: " + swbFile.getAbsolutePath()
                     + " | " + swbFile.length() + " bytes");
 
-            // 6b. Upload
             try {
                 uploadSync(cloudManager, swbFile, projectName);
                 Log.i(TAG, "Upload SUCCESS for " + projectName);
@@ -201,7 +189,6 @@ public class AutoBackupWorker extends Worker {
             }
         }
 
-        // ── Step 7: Cleanup and report ───────────────────────────────────────────────
         FileUtil.deleteFile(CloudBackupFactory.getCloudBackupDir());
         Log.d(TAG, "Cloud backup temp directory cleaned up.");
 
@@ -216,15 +203,6 @@ public class AutoBackupWorker extends Worker {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Network helpers
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Returns true when there is an active, validated internet connection.
-     * Uses {@link NetworkCapabilities} on Android Q+ and the legacy
-     * {@code getActiveNetworkInfo()} on older devices as a fallback.
-     */
     private boolean isNetworkAvailable(Context context) {
         ConnectivityManager cm =
                 (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -247,7 +225,7 @@ public class AutoBackupWorker extends Worker {
                     + (caps != null ? " | transport flags available" : " | caps null"));
             return ok;
         } else {
-            //noinspection deprecation
+            @SuppressWarnings("deprecation")
             android.net.NetworkInfo info = cm.getActiveNetworkInfo();
             boolean ok = info != null && info.isConnected() && info.isAvailable();
             Log.d(TAG, "isNetworkAvailable [legacy NetworkInfo]: " + ok);
@@ -255,17 +233,6 @@ public class AutoBackupWorker extends Worker {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Upload helper — CountDownLatch replaces raw Object.wait()
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Wraps the async {@link CloudBackupManager#uploadBackupToCloud} in a
-     * {@link CountDownLatch} so that the Worker thread blocks until the upload
-     * completes or times out. This is safer than a raw {@code synchronized}/
-     * {@code wait()} block because CountDownLatch cannot be signalled by spurious
-     * wakeups and its semantics are unambiguous.
-     */
     private void uploadSync(
             CloudBackupManager cloudManager,
             File swbFile,
@@ -304,11 +271,6 @@ public class AutoBackupWorker extends Worker {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Notification helpers
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /** Builds the initial {@link ForegroundInfo} shown as soon as the worker starts. */
     private ForegroundInfo buildForegroundInfo(String text, int current, int total) {
         return new ForegroundInfo(NOTIFICATION_ID, buildNotification(text, current, total, true));
     }

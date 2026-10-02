@@ -24,25 +24,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/**
- * CloudBackupManager
- *
- * Wraps the Google Drive REST API (appDataFolder space) for:
- *  - Uploading a .swb backup file (create or overwrite by filename).
- *  - Listing existing cloud backups.
- *  - Downloading a specific backup.
- *
- * Key fixes applied (v2):
- *  - Detailed per-step logging for every Drive operation.
- *  - Structured Drive API error diagnosis: auth expiry, quota, permission issues.
- *  - {@link #shutdown()} method for safe executor teardown.
- *  - {@link #getCloudBackupCount} for verifying appDataFolder uploads.
- *  - All callbacks posted to the main thread via {@link #mainHandler}.
- */
 public class CloudBackupManager {
 
     private static final String TAG = "CloudBackupManager";
-    /** The Drive space used — isolated from the user's My Drive. */
     private static final String FOLDER_SPACE = "appDataFolder";
 
     private Drive driveService;
@@ -55,22 +39,6 @@ public class CloudBackupManager {
         mainHandler = new Handler(Looper.getMainLooper());
 
         Log.d(TAG, "Initialising Drive service | account=" + account.getEmail());
-        
-        String info =
-"Email = " + account.getEmail() + "\n\n" +
-"Account = " + account.getAccount() + "\n\n" +
-"Display Name = " + account.getDisplayName() + "\n\n" +
-"ID = " + account.getId() + "\n\n" +
-"ID Token = " + account.getIdToken() + "\n\n" +
-"Server Auth Code = " + account.getServerAuthCode();
-
-android.content.ClipboardManager cm =
-(android.content.ClipboardManager)
-context.getSystemService(Context.CLIPBOARD_SERVICE);
-
-cm.setPrimaryClip(
-android.content.ClipData.newPlainText("Drive", info)
-);
 
         try {
             GoogleAccountCredential credential = GoogleAccountCredential.usingOAuth2(
@@ -91,10 +59,6 @@ android.content.ClipData.newPlainText("Drive", info)
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Callbacks
-    // ────────────────────────────────────────────────────────────────────────────────
-
     public interface BackupCallback {
         void onSuccess(String message);
         void onError(String error);
@@ -110,17 +74,6 @@ android.content.ClipData.newPlainText("Drive", info)
         void onError(String error);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Upload
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Uploads {@code swbFile} to the appDataFolder. If a file with the same name
-     * already exists it is overwritten via the Drive update API; otherwise a new
-     * file is created.
-     *
-     * <p>The callback is always delivered on the <b>main thread</b>.</p>
-     */
     public void uploadBackupToCloud(
             final java.io.File swbFile,
             final String projectName,
@@ -142,11 +95,9 @@ android.content.ClipData.newPlainText("Drive", info)
                     + " | space=" + FOLDER_SPACE);
 
             try {
-                // Step 1 — check for existing file with the same name
                 String query = "name = '" + fileName.replace("'", "\\'")
                         + "' and '" + FOLDER_SPACE + "' in parents and trashed = false";
-                Log.d(TAG, "Drive query: " + query);
-
+                
                 FileList result = driveService.files().list()
                         .setSpaces(FOLDER_SPACE)
                         .setQ(query)
@@ -154,69 +105,43 @@ android.content.ClipData.newPlainText("Drive", info)
                         .execute();
 
                 int matchCount = result.getFiles() != null ? result.getFiles().size() : 0;
-                Log.d(TAG, "Drive query result: " + matchCount + " matching file(s).");
-
                 FileContent mediaContent = new FileContent("application/zip", swbFile);
 
                 if (matchCount > 0) {
-                    // Step 2a — overwrite existing
                     String existingId = result.getFiles().get(0).getId();
-                    Log.d(TAG, "Overwriting existing Drive file | id=" + existingId);
-
                     File updateMeta = new File();
-                    updateMeta.setProperties(
-                            Collections.singletonMap("projectName", projectName));
+                    updateMeta.setProperties(Collections.singletonMap("projectName", projectName));
 
                     File updated = driveService.files()
                             .update(existingId, updateMeta, mediaContent)
                             .setFields("id, name, size")
                             .execute();
 
-                    Log.i(TAG, "Drive UPDATE success"
-                            + " | id=" + updated.getId()
-                            + " | name=" + updated.getName()
-                            + " | size=" + updated.getSize());
+                    Log.i(TAG, "Drive UPDATE success | id=" + updated.getId());
                     postSuccess(callback, "Backup overwritten in cloud: " + updated.getName());
-
                 } else {
-                    // Step 2b — create new
-                    Log.d(TAG, "No existing file — creating new entry in " + FOLDER_SPACE);
-
                     File fileMeta = new File();
                     fileMeta.setName(fileName);
                     fileMeta.setParents(Collections.singletonList(FOLDER_SPACE));
-                    fileMeta.setProperties(
-                            Collections.singletonMap("projectName", projectName));
+                    fileMeta.setProperties(Collections.singletonMap("projectName", projectName));
 
                     File created = driveService.files()
                             .create(fileMeta, mediaContent)
                             .setFields("id, name, size")
                             .execute();
 
-                    Log.i(TAG, "Drive CREATE success"
-                            + " | id=" + created.getId()
-                            + " | name=" + created.getName()
-                            + " | size=" + created.getSize());
+                    Log.i(TAG, "Drive CREATE success | id=" + created.getId());
                     postSuccess(callback, "New backup uploaded to cloud: " + created.getName());
                 }
 
             } catch (Exception e) {
                 String diagnosis = diagnoseDriveError(e);
                 Log.e(TAG, "uploadBackupToCloud FAILED | " + diagnosis, e);
-                postError(callback, "Cloud upload failed [" + diagnosis + "]:\n"
-                        + Log.getStackTraceString(e));
+                postError(callback, "Cloud upload failed [" + diagnosis + "]:\n" + Log.getStackTraceString(e));
             }
         });
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // List backups
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Retrieves the list of all backup files stored in the appDataFolder.
-     * Callback delivered on the <b>main thread</b>.
-     */
     public void getCloudBackupsList(final FileListCallback callback) {
         if (driveService == null) {
             String msg = "Drive service not available.\n\nDetails:\n" + initError;
@@ -225,35 +150,21 @@ android.content.ClipData.newPlainText("Drive", info)
         }
 
         executor.execute(() -> {
-            Log.d(TAG, "getCloudBackupsList: fetching from " + FOLDER_SPACE);
             try {
                 FileList result = driveService.files().list()
                         .setSpaces(FOLDER_SPACE)
                         .setFields("files(id, name, createdTime, size, properties)")
                         .execute();
 
-                int count = result.getFiles() != null ? result.getFiles().size() : 0;
-                Log.i(TAG, "getCloudBackupsList: " + count + " file(s) found.");
                 mainHandler.post(() -> callback.onSuccess(result.getFiles()));
-
             } catch (Exception e) {
                 String diagnosis = diagnoseDriveError(e);
                 Log.e(TAG, "getCloudBackupsList FAILED | " + diagnosis, e);
-                mainHandler.post(() -> callback.onError(
-                        "Failed to fetch cloud backups [" + diagnosis + "]:\n"
-                                + Log.getStackTraceString(e)));
+                mainHandler.post(() -> callback.onError("Failed to fetch cloud backups [" + diagnosis + "]:\n" + Log.getStackTraceString(e)));
             }
         });
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Download
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Downloads a specific backup file to {@code downloadPath/fileName}.
-     * Callback delivered on the <b>main thread</b>.
-     */
     public void downloadBackupFromCloud(
             final String fileId,
             final String fileName,
@@ -266,15 +177,10 @@ android.content.ClipData.newPlainText("Drive", info)
         }
 
         executor.execute(() -> {
-            Log.i(TAG, "downloadBackupFromCloud START"
-                    + " | fileId=" + fileId
-                    + " | fileName=" + fileName
-                    + " | dest=" + downloadPath);
             try {
                 java.io.File destFile = new java.io.File(downloadPath, fileName);
                 if (!destFile.getParentFile().exists()) {
-                    boolean mkdirs = destFile.getParentFile().mkdirs();
-                    Log.d(TAG, "Download dest dir created: " + mkdirs);
+                    destFile.getParentFile().mkdirs();
                 }
 
                 OutputStream out = new FileOutputStream(destFile);
@@ -282,31 +188,16 @@ android.content.ClipData.newPlainText("Drive", info)
                 out.flush();
                 out.close();
 
-                Log.i(TAG, "downloadBackupFromCloud SUCCESS"
-                        + " | dest=" + destFile.getAbsolutePath()
-                        + " | size=" + destFile.length() + " B");
-                postSuccess(callback,
-                        "Backup downloaded to " + destFile.getAbsolutePath());
+                postSuccess(callback, "Backup downloaded to " + destFile.getAbsolutePath());
 
             } catch (Exception e) {
                 String diagnosis = diagnoseDriveError(e);
                 Log.e(TAG, "downloadBackupFromCloud FAILED | " + diagnosis, e);
-                postError(callback, "Download failed [" + diagnosis + "]:\n"
-                        + Log.getStackTraceString(e));
+                postError(callback, "Download failed [" + diagnosis + "]:\n" + Log.getStackTraceString(e));
             }
         });
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Verification helper
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Counts the number of files currently stored in the appDataFolder.
-     * Use this after an upload to verify the file actually landed in Drive.
-     *
-     * Callback delivered on the <b>main thread</b>.
-     */
     public void getCloudBackupCount(final CountCallback callback) {
         if (driveService == null) {
             mainHandler.post(() -> callback.onError("Drive service not available."));
@@ -314,7 +205,6 @@ android.content.ClipData.newPlainText("Drive", info)
         }
 
         executor.execute(() -> {
-            Log.d(TAG, "getCloudBackupCount: querying " + FOLDER_SPACE);
             try {
                 FileList result = driveService.files().list()
                         .setSpaces(FOLDER_SPACE)
@@ -322,58 +212,27 @@ android.content.ClipData.newPlainText("Drive", info)
                         .execute();
 
                 int count = result.getFiles() != null ? result.getFiles().size() : 0;
-                Log.i(TAG, "getCloudBackupCount: " + count + " file(s) in appDataFolder.");
-
-                if (result.getFiles() != null) {
-                    for (File f : result.getFiles()) {
-                        Log.d(TAG, "  → " + f.getName()
-                                + " | id=" + f.getId()
-                                + " | size=" + f.getSize());
-                    }
-                }
-
-                final int finalCount = count;
-                mainHandler.post(() -> callback.onResult(finalCount));
-
+                mainHandler.post(() -> callback.onResult(count));
             } catch (Exception e) {
                 String diagnosis = diagnoseDriveError(e);
-                Log.e(TAG, "getCloudBackupCount FAILED | " + diagnosis, e);
-                mainHandler.post(() -> callback.onError(
-                        "Count query failed [" + diagnosis + "]"));
+                mainHandler.post(() -> callback.onError("Count query failed [" + diagnosis + "]"));
             }
         });
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Lifecycle
-    // ────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Shuts down the background executor gracefully.
-     * Call this from {@code onDestroy()} of any Activity or Service that owns
-     * a {@code CloudBackupManager} instance to prevent thread leaks.
-     */
     public void shutdown() {
         if (!executor.isShutdown()) {
             executor.shutdown();
             try {
                 if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
                     executor.shutdownNow();
-                    Log.w(TAG, "Executor did not terminate cleanly — forced shutdown.");
-                } else {
-                    Log.d(TAG, "Executor shut down cleanly.");
                 }
             } catch (InterruptedException e) {
                 executor.shutdownNow();
                 Thread.currentThread().interrupt();
-                Log.w(TAG, "Executor shutdown interrupted.");
             }
         }
     }
-
-    // ────────────────────────────────────────────────────────────────────────────────
-    // Internal helpers
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private void postSuccess(BackupCallback callback, String msg) {
         mainHandler.post(() -> callback.onSuccess(msg));
@@ -383,39 +242,15 @@ android.content.ClipData.newPlainText("Drive", info)
         mainHandler.post(() -> callback.onError(err));
     }
 
-    /**
-     * Inspects a Drive exception and returns a short diagnostic label.
-     * This makes it easier to triage logs without reading full stack traces.
-     *
-     * <p>Covered categories:
-     * <ul>
-     *   <li><b>AUTH_EXPIRED</b>  — 401 / token expired, user must re-sign-in.</li>
-     *   <li><b>PERMISSION_DENIED</b> — 403 scope or access denied.</li>
-     *   <li><b>QUOTA_EXCEEDED</b> — 403 storage/rate limit hit.</li>
-     *   <li><b>NOT_FOUND</b>     — 404 file or folder missing.</li>
-     *   <li><b>NETWORK_ERROR</b> — IOException / connectivity issue.</li>
-     *   <li><b>UNKNOWN</b>       — anything else.</li>
-     * </ul>
-     */
-    private String extractProjectNumber(String rawMessage) {
-        if (rawMessage == null) return null;
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("project(?:s/|\\s+number\\s+|\\s+)?(\\d{6,})").matcher(rawMessage.toLowerCase());
-        if (m.find()) return m.group(1);
-        return null;
-    }
-
     private String diagnoseDriveError(Exception e) {
         if (e == null) return "UNKNOWN";
 
         String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-        String raw = e.getMessage() != null ? e.getMessage() : "";
 
         if (e instanceof com.google.api.client.googleapis.json.GoogleJsonResponseException) {
             com.google.api.client.googleapis.json.GoogleJsonResponseException gje =
                     (com.google.api.client.googleapis.json.GoogleJsonResponseException) e;
             int code = gje.getStatusCode();
-            Log.d(TAG, "GoogleJsonResponseException: HTTP " + code
-                    + " | details=" + gje.getDetails());
 
             return switch (code) {
                 case 401 -> "AUTH_EXPIRED (HTTP 401 — user must re-sign-in)";
@@ -425,13 +260,7 @@ android.content.ClipData.newPlainText("Drive", info)
                     }
                     if (msg.contains("accessnotconfigured") || msg.contains("has not been used in project")
                             || msg.contains("it is disabled") || msg.contains("service_disabled")) {
-                        String projectNum = extractProjectNumber(raw);
-                        yield "DRIVE_API_DISABLED_FOR_PROJECT (HTTP 403 — Google Drive API is not enabled for "
-                                + "project " + (projectNum != null ? projectNum : "the one your app actually uses")
-                                + ". This is usually a DIFFERENT project number than the one in your "
-                                + "google-services.json. Open console.cloud.google.com, switch to project "
-                                + (projectNum != null ? projectNum : "shown in the error") + " specifically, "
-                                + "and enable the Google Drive API there.)";
+                        yield "DRIVE_API_DISABLED (HTTP 403 — Google Drive API is not enabled for your project)";
                     }
                     yield "PERMISSION_DENIED (HTTP 403 — check DRIVE_APPDATA scope)";
                 }
