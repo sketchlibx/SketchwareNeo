@@ -66,3 +66,5 @@ fastlane/readme.md
 .androidide/
 /actions-runner
 release/
+
+/.acside/

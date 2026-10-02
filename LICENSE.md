@@ -1,27 +1,25 @@
 # License
 
-Sketchware Neo is **source-available**, not open source in the formal definition.
+Sketchware Neo is **source-available**. It is not presented as an independently copyrighted open-source project.
 
-The source code is published so the community can view it, contribute to it, and build it locally. However, because the underlying codebase derives from the original Sketchware — whose copyright belongs to its original developers — neither the contributors to this repository nor the maintainers of Sketchware Neo hold a clear, independent copyright over the codebase as a whole.
+The code is published so the community can inspect it, contribute improvements, and build it locally. Sketchware Neo is based on the original Sketchware codebase, whose copyright belongs to its original developers. Because of that, the maintainers and contributors do not claim independent copyright over the codebase as a whole.
 
-### What this means in practice
+## Use
 
-- You **may** view, fork, and build this project for personal use.
-- You **may** submit contributions (bug fixes, features, improvements) via pull requests.
-- You **may not** redistribute Sketchware Neo — original or modified — on the Play Store or any other public app marketplace.
-- You **should not** use substantial portions of this codebase in unrelated commercial or public projects, as doing so would likely infringe on the original Sketchware copyright.
+You may:
+- View and study the source code.
+- Fork the repository for personal use.
+- Build and run your own copy.
+- Submit fixes, features, and other contributions through pull requests.
 
-When in doubt, ask before reusing code from this repository in another project.
+You may not:
+- Publish Sketchware Neo, whether modified or unmodified, on the Google Play Store or another public app marketplace.
+- Reuse substantial parts of the codebase in unrelated commercial or public projects without appropriate permission.
 
----
+When the licensing status of a particular part of the project is unclear, check its local license or ask the maintainers before reusing it.
 
-## Exceptions
+## Third-party components
 
-Since Kotlin compilation support was added to Sketchware Neo projects, two additional modules were introduced to the codebase:
+The `build-logic` and `kotlinc` modules were taken from [CodeAssist](https://github.com/tyron12233/CodeAssist) and are licensed under **GPL-3.0**. Their GPL-3.0 terms apply to those modules; see the relevant directories for details.
 
-- `build-logic`
-- `kotlinc`
-
-Both were taken from [CodeAssist](https://github.com/tyron12233/CodeAssist), which is licensed under **GPL-3.0**. These two modules are therefore licensed under GPL-3.0 as required by that license. See each module's directory for details.
-
-All other parts of this repository remain under the source-available terms described above.
+All other parts of Sketchware Neo remain subject to the source-available terms described above.
