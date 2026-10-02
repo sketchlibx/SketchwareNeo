@@ -14,9 +14,13 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.ViewFlipper;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -36,6 +40,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.Scope;
+import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -57,8 +62,6 @@ import a.a.a.lC;
 import mod.hey.studios.project.backup.BackupFactory;
 import mod.hey.studios.project.backup.BackupRestoreManager;
 import pro.sketchware.R;
-import pro.sketchware.databinding.ActivityCloudBackupManagerBinding;
-import pro.sketchware.databinding.ItemCloudProjectBinding;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 
@@ -66,7 +69,26 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     private static final String PREFS_NAME = "cloud_backup_prefs";
 
-    private ActivityCloudBackupManagerBinding binding;
+    private ViewFlipper viewFlipper;
+    private MaterialToolbar topAppBar;
+
+    private TextView textAccountEmail;
+    private MaterialButton buttonSignInOut;
+    private LinearLayout layoutDashboardStats;
+    private TextView textCloudCount;
+    private TextView textAutoBackupStatus;
+
+    private RecyclerView recyclerBackup;
+    private MaterialButton buttonStartBackup;
+    private EditText editSearchBackup;
+    private CheckBox checkSelectAllBackup;
+    private View progressBackupLoading;
+
+    private RecyclerView recyclerRestore;
+    private MaterialButton buttonStartRestore;
+    private EditText editSearchRestore;
+    private CheckBox checkSelectAllRestore;
+    private View progressRestoreLoading;
 
     private GoogleSignInClient mGoogleSignInClient;
     private GoogleSignInAccount currentAccount;
@@ -96,8 +118,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        binding = ActivityCloudBackupManagerBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        setContentView(R.layout.activity_cloud_backup_manager);
 
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
@@ -105,15 +126,35 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 .build();
         mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        binding.topAppBar.setNavigationOnClickListener(v -> handleBack());
+        viewFlipper = findViewById(R.id.viewFlipper);
+        topAppBar = findViewById(R.id.topAppBar);
+        topAppBar.setNavigationOnClickListener(v -> handleBack());
 
-        binding.recyclerViewBackup.setLayoutManager(new LinearLayoutManager(this));
+        textAccountEmail = findViewById(R.id.textAccountEmail);
+        buttonSignInOut = findViewById(R.id.buttonSignInOut);
+        layoutDashboardStats = findViewById(R.id.layoutDashboardStats);
+        textCloudCount = findViewById(R.id.textCloudCount);
+        textAutoBackupStatus = findViewById(R.id.textAutoBackupStatus);
+
+        recyclerBackup = findViewById(R.id.recyclerViewBackup);
+        buttonStartBackup = findViewById(R.id.buttonStartBackup);
+        editSearchBackup = findViewById(R.id.editSearchBackup);
+        checkSelectAllBackup = findViewById(R.id.checkSelectAllBackup);
+        progressBackupLoading = findViewById(R.id.progressBackupLoading);
+        
+        recyclerBackup.setLayoutManager(new LinearLayoutManager(this));
         backupAdapter = new ProjectAdapter(localProjects, this::updateBackupSelectionState);
-        binding.recyclerViewBackup.setAdapter(backupAdapter);
+        recyclerBackup.setAdapter(backupAdapter);
 
-        binding.recyclerViewRestore.setLayoutManager(new LinearLayoutManager(this));
+        recyclerRestore = findViewById(R.id.recyclerViewRestore);
+        buttonStartRestore = findViewById(R.id.buttonStartRestore);
+        editSearchRestore = findViewById(R.id.editSearchRestore);
+        checkSelectAllRestore = findViewById(R.id.checkSelectAllRestore);
+        progressRestoreLoading = findViewById(R.id.progressRestoreLoading);
+        
+        recyclerRestore.setLayoutManager(new LinearLayoutManager(this));
         restoreAdapter = new ProjectAdapter(cloudProjects, this::updateRestoreSelectionState);
-        binding.recyclerViewRestore.setAdapter(restoreAdapter);
+        recyclerRestore.setAdapter(restoreAdapter);
 
         setupDashboardListeners();
         setupSearchAndFilterListeners();
@@ -121,9 +162,9 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     }
 
     private void handleBack() {
-        if (binding.viewFlipper.getDisplayedChild() != 0) {
-            binding.viewFlipper.setDisplayedChild(0);
-            binding.topAppBar.setTitle("Cloud Backup");
+        if (viewFlipper.getDisplayedChild() != 0) {
+            viewFlipper.setDisplayedChild(0);
+            topAppBar.setTitle("Cloud Backup");
             refreshDashboardData();
         } else {
             finish();
@@ -151,17 +192,15 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     private void onAccountUpdated(GoogleSignInAccount account) {
         currentAccount = account;
         if (account == null) {
-            binding.textAccountEmail.setText("Not signed in");
-            binding.buttonSignInOut.setText("Sign In with Google");
-            binding.layoutDashboardStats.setVisibility(View.GONE);
-            if (cloudManager != null) {
-                cloudManager.shutdown();
-            }
+            textAccountEmail.setText("Not signed in");
+            buttonSignInOut.setText("Sign In with Google");
+            layoutDashboardStats.setVisibility(View.GONE);
+            if (cloudManager != null) cloudManager.shutdown();
             cloudManager = null;
         } else {
-            binding.textAccountEmail.setText("Signed in as: " + account.getEmail());
-            binding.buttonSignInOut.setText("Disconnect Account");
-            binding.layoutDashboardStats.setVisibility(View.VISIBLE);
+            textAccountEmail.setText("Signed in as: " + account.getEmail());
+            buttonSignInOut.setText("Disconnect Account");
+            layoutDashboardStats.setVisibility(View.VISIBLE);
             cloudManager = new CloudBackupManager(this, account);
             refreshDashboardData();
         }
@@ -169,27 +208,27 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     private void refreshDashboardData() {
         if (cloudManager == null) return;
-        binding.textCloudCount.setText("Loading...");
+        textCloudCount.setText("Loading...");
         cloudManager.getCloudBackupCount(new CloudBackupManager.CountCallback() {
             @Override
             public void onResult(int count) {
-                binding.textCloudCount.setText(count + " backup" + (count == 1 ? "" : "s") + " found");
+                textCloudCount.setText(count + " backup" + (count == 1 ? "" : "s") + " found");
             }
 
             @Override
             public void onError(String error) {
-                binding.textCloudCount.setText("Error loading count");
+                textCloudCount.setText("Error loading count");
             }
         });
 
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         int interval = prefs.getInt("auto_backup_interval", 0);
         String txt = interval == 0 ? "Off" : (interval == 1 ? "Daily" : (interval == 2 ? "Weekly" : "Monthly"));
-        binding.textAutoBackupStatus.setText(txt);
+        textAutoBackupStatus.setText(txt);
     }
 
     private void setupDashboardListeners() {
-        binding.buttonSignInOut.setOnClickListener(v -> {
+        buttonSignInOut.setOnClickListener(v -> {
             if (currentAccount == null) {
                 googleSignInLauncher.launch(mGoogleSignInClient.getSignInIntent());
             } else {
@@ -209,14 +248,14 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             }
         });
 
-        binding.buttonManualBackup.setOnClickListener(v -> openManualBackup());
-        binding.buttonRestoreBackup.setOnClickListener(v -> openRestoreBackup());
-        binding.buttonAutoBackupSettings.setOnClickListener(v -> configureAutoBackup());
-        binding.buttonViewDisclaimer.setOnClickListener(v -> showDisclaimerDialog(null));
+        findViewById(R.id.buttonManualBackup).setOnClickListener(v -> openManualBackup());
+        findViewById(R.id.buttonRestoreBackup).setOnClickListener(v -> openRestoreBackup());
+        findViewById(R.id.buttonAutoBackupSettings).setOnClickListener(v -> configureAutoBackup());
+        findViewById(R.id.buttonViewDisclaimer).setOnClickListener(v -> showDisclaimerDialog(null));
     }
 
     private void setupSearchAndFilterListeners() {
-        binding.editSearchBackup.addTextChangedListener(new TextWatcher() {
+        editSearchBackup.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 backupAdapter.filter(s.toString());
@@ -225,18 +264,16 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        binding.checkSelectAllBackup.setOnCheckedChangeListener((btn, isChecked) -> {
+        checkSelectAllBackup.setOnCheckedChangeListener((btn, isChecked) -> {
             if (!btn.isPressed()) return;
-            for (ProjectItem item : backupAdapter.getDisplayedItems()) {
-                item.isSelected = isChecked;
-            }
+            for (ProjectItem item : backupAdapter.getDisplayedItems()) item.isSelected = isChecked;
             backupAdapter.notifyDataSetChanged();
             updateBackupSelectionState();
         });
 
-        binding.buttonStartBackup.setOnClickListener(v -> executeManualBackupSequence());
+        buttonStartBackup.setOnClickListener(v -> executeManualBackupSequence());
 
-        binding.editSearchRestore.addTextChangedListener(new TextWatcher() {
+        editSearchRestore.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 restoreAdapter.filter(s.toString());
@@ -245,43 +282,37 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        binding.checkSelectAllRestore.setOnCheckedChangeListener((btn, isChecked) -> {
+        checkSelectAllRestore.setOnCheckedChangeListener((btn, isChecked) -> {
             if (!btn.isPressed()) return;
-            for (ProjectItem item : restoreAdapter.getDisplayedItems()) {
-                item.isSelected = isChecked;
-            }
+            for (ProjectItem item : restoreAdapter.getDisplayedItems()) item.isSelected = isChecked;
             restoreAdapter.notifyDataSetChanged();
             updateRestoreSelectionState();
         });
 
-        binding.buttonStartRestore.setOnClickListener(v -> executeRestoreSequence());
+        buttonStartRestore.setOnClickListener(v -> executeRestoreSequence());
     }
 
     private void updateBackupSelectionState() {
         int count = 0;
-        for (ProjectItem item : backupAdapter.getDisplayedItems()) {
-            if (item.isSelected) count++;
-        }
-        binding.checkSelectAllBackup.setChecked(count > 0 && count == backupAdapter.getDisplayedItems().size());
-        binding.buttonStartBackup.setText("Backup " + count + " selected");
-        binding.buttonStartBackup.setEnabled(count > 0);
+        for (ProjectItem item : backupAdapter.getDisplayedItems()) if (item.isSelected) count++;
+        checkSelectAllBackup.setChecked(count > 0 && count == backupAdapter.getDisplayedItems().size());
+        buttonStartBackup.setText("Backup " + count + " selected");
+        buttonStartBackup.setEnabled(count > 0);
     }
 
     private void updateRestoreSelectionState() {
         int count = 0;
-        for (ProjectItem item : restoreAdapter.getDisplayedItems()) {
-            if (item.isSelected) count++;
-        }
-        binding.checkSelectAllRestore.setChecked(count > 0 && count == restoreAdapter.getDisplayedItems().size());
-        binding.buttonStartRestore.setText("Restore " + count + " selected");
-        binding.buttonStartRestore.setEnabled(count > 0);
+        for (ProjectItem item : restoreAdapter.getDisplayedItems()) if (item.isSelected) count++;
+        checkSelectAllRestore.setChecked(count > 0 && count == restoreAdapter.getDisplayedItems().size());
+        buttonStartRestore.setText("Restore " + count + " selected");
+        buttonStartRestore.setEnabled(count > 0);
     }
 
     private void openManualBackup() {
-        binding.viewFlipper.setDisplayedChild(1);
-        binding.topAppBar.setTitle("Select for Backup");
-        binding.progressBackupLoading.setVisibility(View.VISIBLE);
-        binding.recyclerViewBackup.setVisibility(View.GONE);
+        viewFlipper.setDisplayedChild(1);
+        topAppBar.setTitle("Select for Backup");
+        progressBackupLoading.setVisibility(View.VISIBLE);
+        recyclerBackup.setVisibility(View.GONE);
 
         new Thread(() -> {
             ArrayList<HashMap<String, Object>> raw = lC.a();
@@ -294,7 +325,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                     item.pkg = (String) map.get("my_sc_pkg_name");
                     item.version = "v" + map.get("sc_ver_name");
                     
-                    String path = new pro.sketchware.utility.FilePathUtil().getProjectDir() + File.separator + item.id + File.separator + "project";
+                    String path = a.a.a.wq.e() + File.separator + item.id + File.separator + "project";
                     File f = new File(path);
                     if (f.exists()) {
                         long diff = System.currentTimeMillis() - f.lastModified();
@@ -307,18 +338,18 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 localProjects.clear();
                 localProjects.addAll(items);
                 backupAdapter.setOriginalList(localProjects);
-                binding.progressBackupLoading.setVisibility(View.GONE);
-                binding.recyclerViewBackup.setVisibility(View.VISIBLE);
+                progressBackupLoading.setVisibility(View.GONE);
+                recyclerBackup.setVisibility(View.VISIBLE);
                 updateBackupSelectionState();
             });
         }).start();
     }
 
     private void openRestoreBackup() {
-        binding.viewFlipper.setDisplayedChild(2);
-        binding.topAppBar.setTitle("Select for Restore");
-        binding.progressRestoreLoading.setVisibility(View.VISIBLE);
-        binding.recyclerViewRestore.setVisibility(View.GONE);
+        viewFlipper.setDisplayedChild(2);
+        topAppBar.setTitle("Select for Restore");
+        progressRestoreLoading.setVisibility(View.VISIBLE);
+        recyclerRestore.setVisibility(View.GONE);
 
         if (cloudManager != null) {
             cloudManager.getCloudBackupsList(new CloudBackupManager.FileListCallback() {
@@ -341,14 +372,14 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                     cloudProjects.clear();
                     cloudProjects.addAll(items);
                     restoreAdapter.setOriginalList(cloudProjects);
-                    binding.progressRestoreLoading.setVisibility(View.GONE);
-                    binding.recyclerViewRestore.setVisibility(View.VISIBLE);
+                    progressRestoreLoading.setVisibility(View.GONE);
+                    recyclerRestore.setVisibility(View.VISIBLE);
                     updateRestoreSelectionState();
                 }
 
                 @Override
                 public void onError(String error) {
-                    binding.progressRestoreLoading.setVisibility(View.GONE);
+                    progressRestoreLoading.setVisibility(View.GONE);
                     showErrorDialog("Failed to fetch backups", error);
                 }
             });
@@ -364,11 +395,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     private void executeManualBackupSequence() {
         List<ProjectItem> toBackup = new ArrayList<>();
-        for (ProjectItem item : backupAdapter.getDisplayedItems()) {
-            if (item.isSelected) {
-                toBackup.add(item);
-            }
-        }
+        for (ProjectItem item : backupAdapter.getDisplayedItems()) if (item.isSelected) toBackup.add(item);
 
         if (toBackup.isEmpty()) return;
 
@@ -384,9 +411,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 if (isOperationCancelled) break;
                 
                 runOnUiThread(() -> {
-                    if (tvProgress != null) {
-                        tvProgress.setText("Creating .swb for " + p.name + "...");
-                    }
+                    if (tvProgress != null) tvProgress.setText("Creating .swb for " + p.name + "...");
                 });
                 
                 CloudBackupFactory factory = new CloudBackupFactory(p.id);
@@ -395,34 +420,19 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 
                 if (swb != null && swb.exists()) {
                     runOnUiThread(() -> {
-                        if (tvProgress != null) {
-                            tvProgress.setText("Uploading " + p.name + " to Drive...");
-                        }
+                        if (tvProgress != null) tvProgress.setText("Uploading " + p.name + " to Drive...");
                     });
                     
                     CountDownLatch latch = new CountDownLatch(1);
                     final boolean[] isSuccess = {false};
                     
                     cloudManager.uploadBackupToCloud(swb, p.name, new CloudBackupManager.BackupCallback() {
-                        @Override 
-                        public void onSuccess(String msg) { 
-                            isSuccess[0] = true; 
-                            latch.countDown(); 
-                        }
-                        @Override 
-                        public void onError(String err) { 
-                            latch.countDown(); 
-                        }
+                        @Override public void onSuccess(String msg) { isSuccess[0] = true; latch.countDown(); }
+                        @Override public void onError(String err) { latch.countDown(); }
                     });
-                    try { 
-                        latch.await(); 
-                    } catch (Exception ignored) { }
+                    try { latch.await(); } catch (Exception ignored) {}
                     
-                    if (isSuccess[0]) {
-                        success++;
-                    } else {
-                        failed++;
-                    }
+                    if (isSuccess[0]) success++; else failed++;
                 } else {
                     failed++;
                 }
@@ -442,11 +452,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     private void executeRestoreSequence() {
         List<ProjectItem> toRestore = new ArrayList<>();
-        for (ProjectItem item : restoreAdapter.getDisplayedItems()) {
-            if (item.isSelected) {
-                toRestore.add(item);
-            }
-        }
+        for (ProjectItem item : restoreAdapter.getDisplayedItems()) if (item.isSelected) toRestore.add(item);
 
         if (toRestore.isEmpty()) return;
 
@@ -482,9 +488,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 if (isOperationCancelled) break;
                 
                 runOnUiThread(() -> {
-                    if (tvProgress != null) {
-                        tvProgress.setText("Downloading " + p.name + "...");
-                    }
+                    if (tvProgress != null) tvProgress.setText("Downloading " + p.name + "...");
                 });
 
                 CountDownLatch latch = new CountDownLatch(1);
@@ -492,33 +496,25 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
                 final String[] downloadedPath = new String[1];
 
                 cloudManager.downloadBackupFromCloud(p.id, p.fileName, tempDir, new CloudBackupManager.BackupCallback() {
-                    @Override 
-                    public void onSuccess(String msg) { 
+                    @Override public void onSuccess(String msg) { 
                         isSuccess[0] = true; 
                         downloadedPath[0] = new File(tempDir, p.fileName).getAbsolutePath();
                         latch.countDown(); 
                     }
-                    @Override 
-                    public void onError(String err) { 
-                        latch.countDown(); 
-                    }
+                    @Override public void onError(String err) { latch.countDown(); }
                 });
-                try { 
-                    latch.await(); 
-                } catch (Exception ignored) { }
+                try { latch.await(); } catch (Exception ignored) {}
 
                 if (isSuccess[0]) {
                     runOnUiThread(() -> {
-                        if (tvProgress != null) {
-                            tvProgress.setText("Extracting " + p.name + "...");
-                        }
+                        if (tvProgress != null) tvProgress.setText("Extracting " + p.name + "...");
                         try {
                             if (safetyCopy && !asNew) {
                                 BackupFactory bf = new BackupFactory(p.id); 
                                 bf.backup(null, p.name + "_SafetyBackup");
                             }
                             new BackupRestoreManager(CloudBackupManagerActivity.this, null).doRestore(downloadedPath[0], asNew);
-                        } catch(Exception ignored) { }
+                        } catch(Exception ignored){}
                     });
                     success++;
                 } else {
@@ -715,45 +711,41 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             notifyDataSetChanged();
         }
 
-        public List<ProjectItem> getDisplayedItems() {
-            return displayedList;
-        }
+        public List<ProjectItem> getDisplayedItems() { return displayedList; }
 
-        @NonNull
-        @Override
+        @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new VH(ItemCloudProjectBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_cloud_project, parent, false);
+            return new VH(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull VH holder, int position) {
             ProjectItem item = displayedList.get(position);
-            holder.itemBinding.textTitle.setText(item.name);
-            holder.itemBinding.textSubtitle.setText((item.pkg != null ? item.pkg : "Unknown Package") + (item.version != null ? " • " + item.version : ""));
-            holder.itemBinding.textDetail.setText(item.detail != null ? item.detail : "");
+            holder.textTitle.setText(item.name);
+            holder.textSubtitle.setText((item.pkg != null ? item.pkg : "Unknown Package") + (item.version != null ? " • " + item.version : ""));
+            holder.textDetail.setText(item.detail != null ? item.detail : "");
             
-            holder.itemBinding.checkboxSelected.setOnCheckedChangeListener(null);
-            holder.itemBinding.checkboxSelected.setChecked(item.isSelected);
-            holder.itemBinding.checkboxSelected.setOnCheckedChangeListener((btn, checked) -> {
+            holder.checkboxSelected.setOnCheckedChangeListener(null);
+            holder.checkboxSelected.setChecked(item.isSelected);
+            holder.checkboxSelected.setOnCheckedChangeListener((btn, checked) -> {
                 item.isSelected = checked;
-                if (onSelectionChanged != null) {
-                    onSelectionChanged.run();
-                }
+                if (onSelectionChanged != null) onSelectionChanged.run();
             });
-            holder.itemView.setOnClickListener(v -> holder.itemBinding.checkboxSelected.setChecked(!item.isSelected));
+            holder.itemView.setOnClickListener(v -> holder.checkboxSelected.setChecked(!item.isSelected));
         }
 
-        @Override
-        public int getItemCount() {
-            return displayedList.size();
-        }
+        @Override public int getItemCount() { return displayedList.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
-            ItemCloudProjectBinding itemBinding;
-
-            VH(@NonNull ItemCloudProjectBinding binding) {
-                super(binding.getRoot());
-                this.itemBinding = binding;
+            TextView textTitle, textSubtitle, textDetail;
+            CheckBox checkboxSelected;
+            VH(@NonNull View itemView) {
+                super(itemView);
+                textTitle = itemView.findViewById(R.id.textTitle);
+                textSubtitle = itemView.findViewById(R.id.textSubtitle);
+                textDetail = itemView.findViewById(R.id.textDetail);
+                checkboxSelected = itemView.findViewById(R.id.checkboxSelected);
             }
         }
     }

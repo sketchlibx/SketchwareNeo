@@ -12,7 +12,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RadioButton;
-import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -31,7 +30,6 @@ import com.besome.sketch.projects.MyProjectSettingActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.transition.MaterialFadeThrough;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,7 +48,6 @@ import pro.sketchware.R;
 import pro.sketchware.activities.main.activities.MainActivity;
 import pro.sketchware.databinding.MyprojectsBinding;
 import pro.sketchware.databinding.SortProjectDialogBinding;
-import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.UI;
 
 public class ProjectsFragment extends DA {
@@ -58,7 +55,6 @@ public class ProjectsFragment extends DA {
     private final List<HashMap<String, Object>> projectsList = new ArrayList<>();
     private MyprojectsBinding binding;
     private ProjectsAdapter projectsAdapter;
-    private FilePathUtil fpu;
     
     private ComposeView composeViewFab;
     private FloatingActionButtonMenuHost.MenuController fabMenuController;
@@ -89,7 +85,6 @@ public class ProjectsFragment extends DA {
         setReturnTransition(new MaterialFadeThrough());
         setExitTransition(new MaterialFadeThrough());
         setReenterTransition(new MaterialFadeThrough());
-        fpu = new FilePathUtil();
     }
 
     @Override
@@ -166,32 +161,7 @@ public class ProjectsFragment extends DA {
 
         binding.swipeRefresh.setOnRefreshListener(() -> refreshProjectsList());
 
-        projectsAdapter = new ProjectsAdapter(this, projectsList) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View v = super.getView(position, convertView, parent);
-                HashMap<String, Object> block = projectsList.get(position);
-                
-                TextView tvUpdatedTime = v.findViewById(R.id.tv_updated_time);
-                if (tvUpdatedTime != null) {
-                    Object scIdObj = block.get("sc_id");
-                    if (scIdObj instanceof String) {
-                        tvUpdatedTime.setText(getUpdatedTime((String) scIdObj));
-                    }
-                }
-                
-                TextView tvVersion = v.findViewById(R.id.tv_version_text);
-                if (tvVersion != null) {
-                    Object vName = block.get("sc_ver_name");
-                    Object vCode = block.get("sc_ver_code");
-                    String vN = vName instanceof String ? (String) vName : "1.0";
-                    String vC = vCode instanceof String ? (String) vCode : "1";
-                    tvVersion.setText("v" + vN + " (" + vC + ")");
-                }
-                return v;
-            }
-        };
-        
+        projectsAdapter = new ProjectsAdapter(this, projectsList);
         binding.myprojects.setAdapter(projectsAdapter);
         
         if (binding.loadingContainer != null) {
@@ -250,19 +220,6 @@ public class ProjectsFragment extends DA {
         setupMenu();
     }
     
-    private String getUpdatedTime(String sc_id) {
-        String path = fpu.getProjectDir() + File.separator + sc_id + File.separator + "project";
-        File file = new File(path);
-        if (!file.exists()) return "Unknown";
-        long diff = System.currentTimeMillis() - file.lastModified();
-        long mins = diff / 60000;
-        if (mins < 60) return "Updated " + (mins == 0 ? 1 : mins) + " mins ago";
-        long hours = mins / 60;
-        if (hours < 24) return "Updated " + hours + " hours ago";
-        long days = hours / 24;
-        return "Updated " + days + " days ago";
-    }
-
     public void openSearch() {
         if (projectsSearchView != null) {
             projectsSearchView.setIconified(false);

@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
 
-    <com.expressive.refresh.ExpressivePullToRefresh
+    <mod.sketchlibx.project.ExpressivePullToRefresh
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -322,6 +322,17 @@
                         android:textColor="?attr/colorOnSurface"
                         android:textStyle="bold" />
 
+                    <ImageView
+                        android:id="@+id/icon_sort"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_sort_24"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -395,5 +406,5 @@
 
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
-    </com.expressive.refresh.ExpressivePullToRefresh>
+    </mod.sketchlibx.project.ExpressivePullToRefresh>
 </androidx.constraintlayout.widget.ConstraintLayout>

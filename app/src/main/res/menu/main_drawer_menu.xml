@@ -31,6 +31,10 @@
             android:icon="@drawable/ic_mtrl_key"
             android:title="App Signing" />
         <item
+            android:id="@+id/create_release_keystore"
+            android:icon="@drawable/ic_mtrl_key"
+            android:title="Create Release Keystore" />
+        <item
             android:id="@+id/keystore_manager"
             android:icon="@drawable/ic_mtrl_key"
             android:title="Keystore Manager" />

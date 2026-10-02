@@ -129,11 +129,11 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, AppSettings.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
-        } else if (id == R.id.ai_settings) {
+        } else if (id == R.id.ai_agents) {
             Intent intent = new Intent(activity, AiSettingsActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
-        } else if (id == R.id.create_release_keystore || id == R.id.keystore_manager) {
+        } else if (id == R.id.create_release_keystore) {
             Intent intent = new Intent(activity, NewKeyStoreActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
@@ -153,6 +153,8 @@ public class MainDrawer extends NavigationView {
             Intent intent = new Intent(activity, CloudBackupManagerActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
             activity.startActivity(intent);
+        } else if (id == R.id.keystore_manager) {
+            SketchwareUtil.toast("Keystore Manager: Coming soon", Toast.LENGTH_SHORT);
         } else if (id == R.id.app_signing) {
             SketchwareUtil.toast("App Signing: Coming soon", Toast.LENGTH_SHORT);
         } else if (id == R.id.nav_home) {

@@ -61,12 +61,6 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
     public void filterData(String query) {
         this.currentQuery = query == null ? "" : query;
-        // Bug fix: NEVER assign allProjects directly to newProjects.
-        // When they share the same reference, any in-place mutation of allProjects
-        // (e.g. deleteProject calling allProjects.remove()) also mutates shownProjects,
-        // so DiffUtil sees identical old/new lists and dispatches zero changes —
-        // the deleted item never disappears from the RecyclerView.
-        // Always build a fresh list so DiffUtil receives genuinely independent snapshots.
         List<HashMap<String, Object>> newProjects;
         if (!currentQuery.isEmpty()) {
             newProjects = new ArrayList<>();
@@ -133,6 +127,19 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         else return R.drawable.project_item_shape_middle;
     }
 
+    private String getUpdatedTime(String sc_id) {
+        String path = wq.e() + File.separator + sc_id + File.separator + "project";
+        File file = new File(path);
+        if (!file.exists()) return "Unknown";
+        long diff = System.currentTimeMillis() - file.lastModified();
+        long mins = diff / 60000;
+        if (mins < 60) return "Updated " + (mins == 0 ? 1 : mins) + " mins ago";
+        long hours = mins / 60;
+        if (hours < 24) return "Updated " + hours + " hours ago";
+        long days = hours / 24;
+        return "Updated " + days + " days ago";
+    }
+
     @Override
     public void onBindViewHolder(@NonNull ProjectViewHolder holder, int position) {
         holder.itemView.setBackgroundResource(getShapedBackgroundForList(shownProjects, position));
@@ -165,12 +172,14 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
         holder.binding.imgPin.setVisibility(isPinned(projectMap) ? View.VISIBLE : View.GONE);
 
-        String version = " - " + yB.c(projectMap, "sc_ver_name") + " (" + yB.c(projectMap, "sc_ver_code") + ")";
-        holder.binding.appName.setText(yB.c(projectMap, "my_ws_name") + version);
+        String vName = yB.c(projectMap, "sc_ver_name");
+        String vCode = yB.c(projectMap, "sc_ver_code");
+        
         holder.binding.projectName.setText(yB.c(projectMap, "my_app_name"));
         holder.binding.packageName.setText(yB.c(projectMap, "my_sc_pkg_name"));
-        holder.binding.tvPublished.setVisibility(View.VISIBLE);
-        holder.binding.tvPublished.setText(scId);
+        holder.binding.tvVersionText.setText("v" + (vName.isEmpty() ? "1.0" : vName) + " (" + (vCode.isEmpty() ? "1" : vCode) + ")");
+        holder.binding.tvUpdatedTime.setText(getUpdatedTime(scId));
+        
         holder.itemView.setTag("custom");
 
         holder.binding.getRoot().setOnClickListener(v -> {
@@ -208,12 +217,6 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
             lC.a(activity, scId);
             activity.runOnUiThread(() -> {
                 progressDialog.dismiss();
-                // Bug fix: delegate refresh to the Fragment instead of mutating
-                // allProjects directly. Direct mutation was the second half of Bug 1 —
-                // the Fragment's projectsList still held the deleted entry, so any
-                // subsequent sort/filter/pull-to-refresh would restore the ghost item.
-                // refreshProjectsList() reads fresh from disk and updates both
-                // projectsList (Fragment) and the adapter in one clean pass.
                 projectsFragment.refreshProjectsList();
             });
         }).start();
