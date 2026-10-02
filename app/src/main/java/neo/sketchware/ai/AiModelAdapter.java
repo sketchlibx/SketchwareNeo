@@ -6,121 +6,70 @@ import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import pro.sketchware.R;
 
 public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHolder> {
-
     public interface Listener {
         void onEditClicked(AiModelConfig config);
         void onDeleteClicked(AiModelConfig config);
         void onDuplicateClicked(AiModelConfig config);
         void onItemClicked(AiModelConfig config);
+        default void onChatClicked(AiModelConfig config) {}
     }
-
     private final List<AiModelConfig> items = new ArrayList<>();
     private String activeId;
     private final Listener listener;
-
-    public AiModelAdapter(Listener listener) {
-        this.listener = listener;
-    }
-
+    public AiModelAdapter(Listener listener) { this.listener = listener; }
     public void submitList(List<AiModelConfig> newItems, String activeConfigId) {
-        items.clear();
-        items.addAll(newItems);
-        this.activeId = activeConfigId;
-        notifyDataSetChanged();
+        items.clear(); if (newItems != null) items.addAll(newItems); activeId = activeConfigId; notifyDataSetChanged();
     }
-
-    @NonNull
-    @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_ai_model, parent, false);
-        return new ViewHolder(view);
+    @NonNull @Override public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        return new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_ai_model, parent, false));
     }
-
-    @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        AiModelConfig config = items.get(position);
-        AiProvider provider = AiProviderRegistry.get(config.providerId);
-
-        holder.textModelName.setText(config.displayName);
-        holder.textModelProvider.setText(
-                (provider != null ? provider.getProviderName() : config.providerId) + " · " + config.modelName
-        );
-
-        boolean active = config.id.equals(activeId);
-        holder.textActiveBadge.setVisibility(active ? View.VISIBLE : View.GONE);
-
-        if (provider != null && provider.isLocal()) {
-            holder.textRuntimeBadge.setText("LOCAL");
-            holder.textRuntimeBadge.setVisibility(View.VISIBLE);
-        } else {
-            holder.textRuntimeBadge.setText("CLOUD");
-            holder.textRuntimeBadge.setVisibility(View.VISIBLE);
-        }
-
-        holder.imageProviderIcon.setImageResource(getProviderIcon(config.providerId));
-        holder.buttonEditModel.setOnClickListener(v -> listener.onEditClicked(config));
-        holder.buttonDeleteModel.setOnClickListener(v -> listener.onDeleteClicked(config));
-        holder.buttonDuplicateModel.setOnClickListener(v -> listener.onDuplicateClicked(config));
-        holder.itemView.setOnClickListener(v -> listener.onItemClicked(config));
+    @Override public void onBindViewHolder(@NonNull ViewHolder h, int position) {
+        AiModelConfig c = items.get(position);
+        AiProvider p = AiProviderRegistry.get(c.providerId);
+        h.textModelName.setText(c.displayName);
+        h.textModelProvider.setText((p != null ? p.getProviderName() : c.providerId) + " · " + c.modelName);
+        h.textActiveBadge.setVisibility(c.id.equals(activeId) ? View.VISIBLE : View.GONE);
+        h.textRuntime.setText(p != null && p.isLocal() ? "LOCAL" : "CLOUD");
+        h.textRuntime.setVisibility(View.VISIBLE);
+        h.imageProviderIcon.setImageResource(getProviderIcon(c.providerId));
+        h.buttonEditModel.setOnClickListener(v -> listener.onEditClicked(c));
+        h.buttonDeleteModel.setOnClickListener(v -> listener.onDeleteClicked(c));
+        h.buttonDuplicateModel.setOnClickListener(v -> listener.onDuplicateClicked(c));
+        h.buttonChatModel.setVisibility(c.enableChat ? View.VISIBLE : View.GONE);
+        h.buttonChatModel.setOnClickListener(v -> listener.onChatClicked(c));
+        h.itemView.setOnClickListener(v -> listener.onItemClicked(c));
     }
-
-    @Override
-    public int getItemCount() {
-        return items.size();
-    }
-
-    private int getProviderIcon(String providerId) {
-        if (providerId == null) return R.drawable.ic_mtrl_ai;
-
-        switch (providerId) {
-            case "openai":
-                return R.drawable.ic_mtrl_openai;
-            case "gemini":
-                return R.drawable.ic_mtrl_gemini;
-            case "claude":
-                return R.drawable.ic_mtrl_claude;
-            case "nvidia":
-                return R.drawable.ic_mtrl_customai;
-            case "deepseek":
-                return R.drawable.ic_mtrl_deepseek;
-            case "custom":
-            case "local":
-                return R.drawable.ic_mtrl_customai;
-            default:
-                return R.drawable.ic_mtrl_ai;
+    @Override public int getItemCount() { return items.size(); }
+    private int getProviderIcon(String id) {
+        if (id == null) return R.drawable.ic_mtrl_ai;
+        switch (id) {
+            case "openai": return R.drawable.ic_mtrl_openai;
+            case "gemini": return R.drawable.ic_mtrl_gemini;
+            case "grok": return R.drawable.ic_mtrl_customai;
+            case "claude": return R.drawable.ic_mtrl_claude;
+            case "nvidia": return R.drawable.ic_mtrl_customai;
+            case "deepseek": return R.drawable.ic_mtrl_deepseek;
+            case "custom": case "local": return R.drawable.ic_mtrl_customai;
+            default: return R.drawable.ic_mtrl_ai;
         }
     }
-
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView textModelName;
-        TextView textModelProvider;
-        TextView textActiveBadge;
-        TextView textRuntimeBadge;
-        ImageView imageProviderIcon;
-        ImageButton buttonEditModel;
-        ImageButton buttonDeleteModel;
-        ImageButton buttonDuplicateModel;
-
-        ViewHolder(View itemView) {
-            super(itemView);
-            textModelName = itemView.findViewById(R.id.textModelName);
-            textModelProvider = itemView.findViewById(R.id.textModelProvider);
-            textActiveBadge = itemView.findViewById(R.id.textActiveBadge);
-            textRuntimeBadge = itemView.findViewById(R.id.textRuntimeBadge);
-            imageProviderIcon = itemView.findViewById(R.id.imageProviderIcon);
-            buttonEditModel = itemView.findViewById(R.id.buttonEditModel);
-            buttonDeleteModel = itemView.findViewById(R.id.buttonDeleteModel);
-            buttonDuplicateModel = itemView.findViewById(R.id.buttonDuplicateModel);
+        TextView textModelName, textModelProvider, textActiveBadge, textRuntime;
+        ImageView imageProviderIcon; ImageButton buttonEditModel, buttonDeleteModel, buttonDuplicateModel, buttonChatModel;
+        ViewHolder(View v) {
+            super(v);
+            textModelName=v.findViewById(R.id.textModelName); textModelProvider=v.findViewById(R.id.textModelProvider);
+            textActiveBadge=v.findViewById(R.id.textActiveBadge); textRuntime=v.findViewById(R.id.textRuntime);
+            imageProviderIcon=v.findViewById(R.id.imageProviderIcon); buttonEditModel=v.findViewById(R.id.buttonEditModel);
+            buttonDeleteModel=v.findViewById(R.id.buttonDeleteModel); buttonDuplicateModel=v.findViewById(R.id.buttonDuplicateModel);
+            buttonChatModel=v.findViewById(R.id.buttonChatModel);
         }
     }
 }
