@@ -114,7 +114,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="8dp"
                     android:text="Generate Blocks"
-                    app:chipIcon="@drawable/ic_mtrl_blocks" />
+                    app:chipIcon="@drawable/ic_mtrl_block" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/chipFixErrors"
