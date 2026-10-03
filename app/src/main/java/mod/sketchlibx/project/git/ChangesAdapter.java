@@ -49,7 +49,7 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     public static final class GitFile {
         public final String path;
         public final String filename;
-        public final String statusLabel; // Modified | Added | Deleted | Untracked | Renamed | Conflict
+        public final String statusLabel; 
         public final boolean isStaged;
         @Nullable public final String oldPath;
 
@@ -95,19 +95,19 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
 
         if (!conflicts.isEmpty()) {
-            newItems.add(new HeaderItem("Conflicts"));
+            newItems.add(new HeaderItem("Conflicts (" + conflicts.size() + ")"));
             newItems.addAll(conflicts);
         }
         if (!staged.isEmpty()) {
-            newItems.add(new HeaderItem("Staged Changes"));
+            newItems.add(new HeaderItem("Staged Files (" + staged.size() + ")"));
             newItems.addAll(staged);
         }
         if (!unstaged.isEmpty()) {
-            newItems.add(new HeaderItem("Unstaged Changes"));
+            newItems.add(new HeaderItem("Unstaged Changes (" + unstaged.size() + ")"));
             newItems.addAll(unstaged);
         }
         if (!untracked.isEmpty()) {
-            newItems.add(new HeaderItem("Untracked Files"));
+            newItems.add(new HeaderItem("Untracked Files (" + untracked.size() + ")"));
             newItems.addAll(untracked);
         }
 
@@ -171,8 +171,8 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         if (viewType == TYPE_HEADER) {
             TextView tv = new TextView(parent.getContext());
             tv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            tv.setPadding(32, 24, 32, 8);
-            tv.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+            tv.setPadding(36, 32, 32, 12);
+            tv.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall);
             tv.setTextColor(ThemeUtils.getColor(parent.getContext(), R.attr.colorPrimary));
             return new RecyclerView.ViewHolder(tv) {};
         }
@@ -193,9 +193,8 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         vh.tvFilename.setText(file.filename);
         vh.tvFilepath.setText(file.oldPath != null ? (file.oldPath + "  \u2192  " + file.path) : file.path);
 
-        // Icon Logic
         int iconRes = R.drawable.ic_mtrl_file;
-        int bgColor = Color.parseColor("#455A64"); // default grey-blue
+        int bgColor = Color.parseColor("#455A64"); 
         if (file.filename.endsWith(".java")) { iconRes = R.drawable.ic_mtrl_java; bgColor = Color.parseColor("#E65100"); }
         else if (file.filename.endsWith(".xml")) { iconRes = R.drawable.ic_mtrl_code; bgColor = Color.parseColor("#2E7D32"); }
         else if (file.filename.endsWith(".gradle")) { iconRes = R.drawable.ic_mtrl_settings_applications; bgColor = Color.parseColor("#0277BD"); }
@@ -204,24 +203,25 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         vh.imgIcon.setImageResource(iconRes);
         vh.cardIcon.setCardBackgroundColor(bgColor);
 
-        // Status Button
         boolean isConflict = "Conflict".equals(file.statusLabel);
         vh.btnStatus.setText(isConflict ? "Resolve" : (file.isStaged ? "Staged" : "Unstaged"));
         
         if (isConflict) {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorError));
             vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorError)));
+            vh.btnStatus.setRippleColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorErrorContainer)));
         } else if (file.isStaged) {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorPrimary));
             vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorPrimary)));
+            vh.btnStatus.setRippleColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorPrimaryContainer)));
         } else {
             vh.btnStatus.setTextColor(ThemeUtils.getColor(ctx, R.attr.colorError));
             vh.btnStatus.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorError)));
+            vh.btnStatus.setRippleColor(ColorStateList.valueOf(ThemeUtils.getColor(ctx, R.attr.colorErrorContainer)));
         }
 
         vh.btnStatus.setOnClickListener(v -> callback.onStageToggle(file));
 
-        // Selection
         vh.checkbox.setOnCheckedChangeListener(null);
         vh.checkbox.setChecked(selectedPaths.contains(file.path));
         vh.checkbox.setOnCheckedChangeListener((btn, isChecked) -> {
@@ -230,7 +230,6 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         });
         vh.itemView.setOnClickListener(v -> vh.checkbox.setChecked(!vh.checkbox.isChecked()));
 
-        // More Menu
         vh.btnMore.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(v.getContext(), v);
             popup.getMenu().add(0, 1, 0, "View Diff");

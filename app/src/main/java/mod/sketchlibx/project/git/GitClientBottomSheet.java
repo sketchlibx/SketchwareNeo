@@ -22,7 +22,6 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -115,7 +114,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private ViewPager viewPager;
     private TabLayout tabLayout;
     
-    // Tab configuration
     private final int[] tabIcons = { R.drawable.ic_mtrl_article, R.drawable.ic_mtrl_history, R.drawable.ic_mtrl_branches, R.drawable.ic_mtrl_cloud, R.drawable.ic_mtrl_settings };
     private final String[] tabTitles = {"Changes", "History", "Branches", "Remotes", "Settings"};
 
@@ -167,6 +165,10 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             BottomSheetDialog bsd = (BottomSheetDialog) d;
             FrameLayout bottomSheet = bsd.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bottomSheet != null) {
+                ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
+                layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                bottomSheet.setLayoutParams(layoutParams);
+                
                 BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
                 behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                 behavior.setSkipCollapsed(true);
@@ -195,7 +197,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         viewPager.setOffscreenPageLimit(Math.max(1, tabTitles.length - 1));
         tabLayout.setupWithViewPager(viewPager);
 
-        // Setup Custom Tab Icons & Titles
         for (int i = 0; i < tabLayout.getTabCount(); i++) {
             TabLayout.Tab tab = tabLayout.getTabAt(i);
             if (tab != null) {
@@ -223,17 +224,18 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private void checkAutoFetch() {
         SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
         if (prefs.getBoolean("auto_fetch", false)) {
-            doFetch(false); // silent fetch
+            doFetch(false); 
         }
     }
 
     private long getFileSizeBytes(File file) {
-        if (file == null || !file.exists()) return 0L;
-        if (file.isFile()) return file.length();
-        File[] children = file.listFiles();
-        if (children == null) return 0L;
-        long size = 0L;
-        for (File child : children) size += getFileSizeBytes(child);
+        if (file == null || !file.exists()) return 0;
+        if (!file.isDirectory()) return file.length();
+        long size = 0;
+        File[] files = file.listFiles();
+        if (files != null) {
+            for (File f : files) size += getFileSizeBytes(f);
+        }
         return size;
     }
 
@@ -844,9 +846,6 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Changes tab
-    // ---------------------------------------------------------------------
     private void setupChangesTab(View view) {
         changesTabView = view;
         RecyclerView rvChanges = view.findViewById(R.id.rv_changes);
