@@ -1,5 +1,6 @@
 package mod.pranav.build
 
+import mod.hey.studios.build.BuildSettings
 import a.a.a.yq
 import android.util.Log
 import com.android.tools.r8.CompilationMode
@@ -59,7 +60,8 @@ class R8Compiler(
         val programSizeMb = programByteSize / (1024 * 1024)
         val sizeAdjustedCap = if (programSizeMb > 40) minOf(heapCap, 2) else heapCap
 
-        return minOf(sizeAdjustedCap, cpuCount).coerceAtLeast(1)
+        val userCap = BuildSettings(yq.sc_id).parallelThreads
+        return minOf(sizeAdjustedCap, cpuCount, userCap).coerceAtLeast(1)
     }
 
     fun compile() {

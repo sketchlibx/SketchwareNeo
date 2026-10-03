@@ -8,20 +8,20 @@
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="10dp">
+    android:paddingVertical="8dp">
 
     <CheckBox
         android:id="@+id/checkbox_file"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="8dp" />
+        android:layout_marginEnd="6dp" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/card_file_icon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         app:cardBackgroundColor="#2E3C43"
-        app:cardCornerRadius="10dp"
+        app:cardCornerRadius="8dp"
         app:cardElevation="0dp">
 
         <ImageView
@@ -36,7 +36,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="12dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -46,7 +46,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
             tools:text="main.xml" />
@@ -66,12 +66,13 @@
         android:id="@+id/btn_stage_status"
         style="@style/Widget.Material3.Button.OutlinedButton"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="36dp"
         android:layout_marginEnd="4dp"
         android:minWidth="0dp"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="12dp"
         android:text="Stage"
-        android:textAppearance="?attr/textAppearanceLabelMedium"
+        android:textSize="11sp"
+        android:textAppearance="?attr/textAppearanceLabelSmall"
         app:cornerRadius="16dp" />
 
     <ImageButton

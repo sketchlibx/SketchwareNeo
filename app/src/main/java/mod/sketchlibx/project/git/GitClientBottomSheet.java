@@ -22,6 +22,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -208,9 +209,9 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         view.findViewById(R.id.btn_action_refresh).setOnClickListener(v -> refreshSourceThenAll());
         view.findViewById(R.id.btn_action_info).setOnClickListener(v -> showProjectInfoDialog());
 
-        View btnClose = view.findViewById(R.id.topAppBar);
+        View btnClose = view.findViewById(R.id.btn_appbar_more);
         if (btnClose != null) {
-            ((androidx.appcompat.widget.Toolbar) btnClose).setNavigationOnClickListener(v -> dismiss());
+            btnClose.setOnClickListener(v -> dismiss());
         }
 
         if (git == null) {
@@ -476,8 +477,11 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             if (tvStatus != null) tvStatus.setText(buildStatusText(summary));
             TextView tvBranch = rootView.findViewById(R.id.tv_hero_branch);
             if (tvBranch != null && data.currentBranch != null) tvBranch.setText(data.currentBranch);
-            TextView tvCommitBranch = rootView.findViewById(R.id.tv_commit_branch);
-            if (tvCommitBranch != null && data.currentBranch != null) tvCommitBranch.setText(data.currentBranch);
+            
+            View commitBranchView = rootView.findViewById(R.id.tv_commit_branch);
+            if (commitBranchView instanceof TextView && data.currentBranch != null) {
+                ((TextView) commitBranchView).setText(data.currentBranch);
+            }
         }
     }
 

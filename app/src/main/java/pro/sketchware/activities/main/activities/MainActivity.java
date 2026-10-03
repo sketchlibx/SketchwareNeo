@@ -284,13 +284,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         navigateToProjectsFragment();
     }
 
-    private void setFabGroupVisible(boolean visible) {
-        View fabGroup = findViewById(R.id.fab_group);
-        if (fabGroup != null) {
-            fabGroup.setVisibility(visible ? View.VISIBLE : View.GONE);
-        }
-    }
-
     private Fragment getFragmentForNavId(int navItemId) {
         if (navItemId == R.id.item_projects) return projectsFragment;
         if (navItemId == R.id.item_sketchub) return projectsStoreFragment;
@@ -309,7 +302,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         FragmentManager fm = getSupportFragmentManager();
         FragmentTransaction transaction = fm.beginTransaction();
         
-        setFabGroupVisible(true);
         if (activeFragment != null) transaction.hide(activeFragment);
         if (fm.findFragmentByTag(PROJECTS_FRAGMENT_TAG) == null) {
             shouldShow = false;
@@ -328,7 +320,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
         FragmentManager fm = getSupportFragmentManager();
         FragmentTransaction transaction = fm.beginTransaction();
         
-        setFabGroupVisible(false);
         if (activeFragment != null) transaction.hide(activeFragment);
         if (fm.findFragmentByTag(PROJECTS_STORE_FRAGMENT_TAG) == null) {
             shouldShow = false;

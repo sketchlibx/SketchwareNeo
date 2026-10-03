@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import mod.hey.studios.build.BuildSettings;
 import pro.sketchware.utility.FileUtil;
 
 public class NativeCompiler {
@@ -108,7 +109,7 @@ public class NativeCompiler {
                 throw new Exception("CMake configuration failed:\n" + logOutput);
             }
 
-            String[] ninjaArgs = {ninjaBin.getAbsolutePath(), "-j4", "-v"};
+            String[] ninjaArgs = {ninjaBin.getAbsolutePath(), "-j" + new BuildSettings(scId).getParallelThreads(), "-v"};
             ProcessBuilder ninjaPb = new ProcessBuilder(ninjaArgs);
             ninjaPb.directory(new File(tempBuildPath));
             ninjaPb.redirectErrorStream(true);

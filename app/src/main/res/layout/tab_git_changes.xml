@@ -11,7 +11,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
-        android:paddingTop="16dp">
+        android:paddingTop="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -29,14 +29,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Changes"
-                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textColor="?attr/colorOnSurface"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Files changed in your working directory"
+                    android:text="Files changed in working directory"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
@@ -45,17 +45,19 @@
                 android:id="@+id/btn_stage_all"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
                 android:layout_marginEnd="8dp"
                 android:text="Stage All"
+                android:textSize="12sp"
                 app:icon="@drawable/ic_mtrl_add" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_unstage_all"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="40dp"
                 android:text="Unstage All"
+                android:textSize="12sp"
                 app:icon="@drawable/ic_mtrl_delete"
                 app:iconTint="?attr/colorError"
                 app:strokeColor="?attr/colorError"
@@ -65,7 +67,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -86,7 +88,8 @@
                     android:id="@+id/et_search_changes"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingVertical="12dp"
+                    android:paddingVertical="10dp"
+                    android:textSize="14sp"
                     android:singleLine="true" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -122,8 +125,8 @@
         android:visibility="gone">
 
         <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:alpha="0.8"
             android:src="@drawable/ic_mtrl_check"
             app:tint="?attr/colorPrimary" />
@@ -133,7 +136,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Working tree clean"
-            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
             android:textColor="?attr/colorOnSurface"
             android:textStyle="bold" />
 
@@ -142,7 +145,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="Nothing to commit."
-            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 
@@ -173,7 +176,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Commit Changes"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textAppearance="?attr/textAppearanceTitleSmall"
                     android:textColor="?attr/colorOnSurface"
                     android:textStyle="bold" />
 
@@ -209,7 +212,8 @@
                         android:layout_height="wrap_content"
                         android:inputType="textMultiLine"
                         android:maxLines="3"
-                        android:paddingVertical="12dp" />
+                        android:paddingVertical="10dp"
+                        android:textSize="14sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.card.MaterialCardView
@@ -242,10 +246,17 @@
                     android:layout_height="wrap_content"
                     android:drawablePadding="6dp"
                     android:text="main"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     app:drawableStartCompat="@drawable/ic_mtrl_branches"
                     app:drawableTint="?attr/colorOnSurfaceVariant" />
+                
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="4dp"
+                    android:src="@drawable/selector_ic_expand_more_24"
+                    app:tint="?attr/colorOnSurfaceVariant" />
 
                 <Space
                     android:layout_width="0dp"
@@ -256,17 +267,19 @@
                     android:id="@+id/btn_commit"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="40dp"
                     android:layout_marginEnd="8dp"
                     android:text="Commit"
+                    android:textSize="12sp"
                     app:icon="@drawable/ic_mtrl_save" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_commit_push"
                     style="@style/Widget.Material3.Button"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="40dp"
                     android:text="Commit &amp; Push"
+                    android:textSize="12sp"
                     app:icon="@drawable/ic_mtrl_upload" />
             </LinearLayout>
         </LinearLayout>

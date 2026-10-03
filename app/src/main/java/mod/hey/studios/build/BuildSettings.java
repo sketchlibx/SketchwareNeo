@@ -14,6 +14,9 @@ public class BuildSettings extends ProjectSettings implements Serializable {
     public static final String SETTING_NO_HTTP_LEGACY = "no_http_legacy";
     public static final String SETTING_NO_WARNINGS = "no_warn";
     public static final String SETTING_ENABLE_LOGCAT = "enable_logcat";
+    public static final String SETTING_OFFLINE_CACHE = "offline_dependency_cache";
+    public static final String SETTING_PARALLEL_THREADS = "parallel_threads";
+    public static final int DEFAULT_PARALLEL_THREADS = 4;
 
     public static final String SETTING_DEXER_D8 = "D8";
     public static final String SETTING_DEXER_DX = "Dx"; 
@@ -27,6 +30,24 @@ public class BuildSettings extends ProjectSettings implements Serializable {
 
     public BuildSettings(String sc_id) {
         super(sc_id);
+    }
+
+    public static int getMaxParallelThreads() {
+        return Math.max(1, Math.min(16, Runtime.getRuntime().availableProcessors()));
+    }
+
+    public int getParallelThreads() {
+        int max = getMaxParallelThreads();
+        try {
+            int requested = Integer.parseInt(getValue(SETTING_PARALLEL_THREADS, String.valueOf(DEFAULT_PARALLEL_THREADS)));
+            return Math.max(1, Math.min(requested, max));
+        } catch (NumberFormatException e) {
+            return Math.min(DEFAULT_PARALLEL_THREADS, max);
+        }
+    }
+
+    public boolean isOfflineCacheEnabled() {
+        return getValue(SETTING_OFFLINE_CACHE, SETTING_GENERIC_VALUE_TRUE).equals(SETTING_GENERIC_VALUE_TRUE);
     }
 
     @Override

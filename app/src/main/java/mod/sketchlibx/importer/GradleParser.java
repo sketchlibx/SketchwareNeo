@@ -10,6 +10,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import mod.hey.studios.build.BuildSettings;
@@ -54,6 +56,9 @@ public class GradleParser {
             "proguardFiles?\\s*\\(?[^)]*getDefaultProguardFile\\([\"']([^\"']+)[\"']\\)");
     private static final Pattern P_CONSUMER_RULES = Pattern.compile(
             "consumerProguardFiles?\\s*\\(?\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern P_DEPENDENCY = Pattern.compile(
+            "^[ \\t]*([A-Za-z][A-Za-z0-9_]*)[ \\t]*\\(?[ \\t]*[\"']([^:\"'\\s]+):([^:\"'\\s]+)(?::([^:\"'\\s@]*))?(?::[^\"'\\s]*)?(?:@[A-Za-z0-9]+)?[\"']",
+            Pattern.MULTILINE);
     private static final Pattern P_FLAVOR_NAME = Pattern.compile(
             "^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\{", Pattern.MULTILINE);
 
@@ -92,7 +97,7 @@ public class GradleParser {
         result.targetSdk     = extractInt(content,    P_TARGET_SDK, result.targetSdk);
         result.compileSdk    = extractInt(content,    P_COMPILE_SDK, result.compileSdk);
         result.namespace     = extractStringOrNull(content, P_NAMESPACE);
-        result.javaVersion   = extractString(content, P_JAVA_VERSION, result.javaVersion);
+        result.javaVersion   = normalizeJavaVersion(extractString(content, P_JAVA_VERSION, result.javaVersion));
 
         if (isPresent(content, P_MIN_SDK))        result.explicitFields.add(ParsedGradle.FIELD_MIN_SDK);
         if (isPresent(content, P_TARGET_SDK))     result.explicitFields.add(ParsedGradle.FIELD_TARGET_SDK);
@@ -198,6 +203,27 @@ public class GradleParser {
                 + " vCode=" + result.versionCode
                 + " minSdk=" + result.minSdk);
         return result;
+    }
+
+    public List<GradleDependency> parseDependencyList(String content) {
+        List<GradleDependency> result = new ArrayList<>();
+        if (content == null) return result;
+        String block = extractDependenciesBlock(content);
+        if (block == null) return result;
+        Matcher m = P_DEPENDENCY.matcher(block);
+        while (m.find()) {
+            String version = m.group(4);
+            result.add(new GradleDependency(m.group(1), m.group(2), m.group(3),
+                    version == null || version.isEmpty() ? null : version));
+        }
+        return result;
+    }
+
+    private static String normalizeJavaVersion(String raw) {
+        if (raw == null) return null;
+        String value = raw.replace('_', '.');
+        if (value.equals("8")) return "1.8";
+        return value;
     }
 
     private boolean isPresent(String content, Pattern p) {

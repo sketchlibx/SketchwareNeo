@@ -171,7 +171,7 @@ public class ChangesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         if (viewType == TYPE_HEADER) {
             TextView tv = new TextView(parent.getContext());
             tv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            tv.setPadding(36, 32, 32, 12);
+            tv.setPadding(32, 24, 32, 8);
             tv.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall);
             tv.setTextColor(ThemeUtils.getColor(parent.getContext(), R.attr.colorPrimary));
             return new RecyclerView.ViewHolder(tv) {};
