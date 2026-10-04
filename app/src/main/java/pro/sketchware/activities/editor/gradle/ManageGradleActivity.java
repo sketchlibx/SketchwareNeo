@@ -176,7 +176,7 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         if (binding != null) {
             try {
                 binding.editor.release();

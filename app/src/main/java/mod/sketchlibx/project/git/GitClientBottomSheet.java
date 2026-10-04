@@ -22,7 +22,6 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -209,7 +208,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         view.findViewById(R.id.btn_action_refresh).setOnClickListener(v -> refreshSourceThenAll());
         view.findViewById(R.id.btn_action_info).setOnClickListener(v -> showProjectInfoDialog());
 
-        View btnClose = view.findViewById(R.id.btn_appbar_more);
+        View btnClose = view.findViewById(R.id.btn_hero_settings);
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> dismiss());
         }

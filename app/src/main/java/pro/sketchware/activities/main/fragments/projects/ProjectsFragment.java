@@ -18,10 +18,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SearchView;
-import androidx.compose.ui.platform.ComposeView;
 import androidx.core.view.MenuProvider;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.core.widget.NestedScrollView;
 
 import com.besome.sketch.adapters.ProjectsAdapter;
 import com.besome.sketch.design.DesignActivity;
@@ -56,8 +54,6 @@ public class ProjectsFragment extends DA {
     private MyprojectsBinding binding;
     private ProjectsAdapter projectsAdapter;
     
-    private ComposeView composeViewFab;
-    private FloatingActionButtonMenuHost.MenuController fabMenuController;
     private SearchView projectsSearchView;
     
     public final ActivityResultLauncher<Intent> openProjectSettings = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -134,30 +130,12 @@ public class ProjectsFragment extends DA {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        fabMenuController = null;
-        composeViewFab = null;
         binding = null; 
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         preference = new DB(requireContext(), "project");
-
-        View fabGroup = requireActivity().findViewById(R.id.fab_group);
-        composeViewFab = requireActivity().findViewById(R.id.compose_view_fab);
-
-        if (composeViewFab != null) {
-            fabMenuController = FloatingActionButtonMenuHost.setupFabMenu(
-                    composeViewFab,
-                    this::toProjectSettingsActivity,
-                    () -> new BackupRestoreManager(getActivity(), this).restore(),
-                    () -> ASProjectImporter.showPicker(getActivity(), this)
-            );
-        }
-
-        if (fabGroup != null) {
-            Insetter.builder().margin(WindowInsetsCompat.Type.navigationBars()).applyToView(fabGroup);
-        }
 
         binding.swipeRefresh.setOnRefreshListener(() -> refreshProjectsList());
 
@@ -192,26 +170,6 @@ public class ProjectsFragment extends DA {
         if (binding.titleContainer != null) {
             UI.addSystemWindowInsetToPadding(binding.titleContainer, true, false, true, false);
         }
-
-        binding.nestedScroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener) (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            int dy = scrollY - oldScrollY;
-            if (fabGroup != null) {
-                if (dy > 8) { 
-                    if (fabMenuController != null && fabMenuController.isExpanded()) {
-                        fabMenuController.collapse();
-                    }
-                    if (fabGroup.getVisibility() == View.VISIBLE) {
-                        fabGroup.animate().translationY(250f).alpha(0f).setDuration(200)
-                            .withEndAction(() -> fabGroup.setVisibility(View.GONE)).start();
-                    }
-                } else if (dy < -8) {
-                    if (fabGroup.getVisibility() == View.GONE) {
-                        fabGroup.setVisibility(View.VISIBLE);
-                        fabGroup.animate().translationY(0f).alpha(1f).setDuration(200).start();
-                    }
-                }
-            }
-        });
 
         if (binding.iconSort != null) {
             binding.iconSort.setOnClickListener(v -> showProjectSortingDialog());
@@ -313,7 +271,6 @@ public class ProjectsFragment extends DA {
                     binding.myprojects.setVisibility(View.VISIBLE);
                     projectsList.add(0, newProject);
                     projectsAdapter.updateData(projectsList);
-                    binding.nestedScroll.smoothScrollTo(0, 0); 
                 });
             }
         });

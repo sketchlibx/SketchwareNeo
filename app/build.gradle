@@ -44,6 +44,7 @@ android {
         resources.excludes += "META-INF/NOTICE"
         resources.excludes += "META-INF/NOTICE.txt"
         resources.excludes += "META-INF/notice.txt"
+        resources.excludes += "META-INF/INDEX.LIST"
         
         resources.pickFirsts += "api_database/*"
     }
