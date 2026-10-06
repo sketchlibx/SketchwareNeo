@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Screen -->
+    <string name="nmb_title">Create Moreblock</string>
+    <string name="nmb_subtitle">Design a custom block for your project</string>
+    <string name="nmb_close">Close</string>
+    <string name="nmb_block_preview">Block Preview</string>
+    <string name="nmb_theme_light">Light Theme</string>
+    <string name="nmb_theme_dark">Dark Theme</string>
+    <string name="nmb_remove_from_block">Remove from block</string>
+    <string name="nmb_syntax_help">Use (moreblockName[type|typeName] or moreblockName[type|typeName|typeCode]) for custom moreblock type(s).</string>
+
+    <string name="nmb_block_name_title">Block Name</string>
+    <string name="nmb_block_name_subtitle">Set a unique name for your moreblock</string>
+    <string name="nmb_block_name_hint">Block name</string>
+
+    <string name="nmb_return_type_title">Select Moreblock type</string>
+    <string name="nmb_return_type_subtitle">Select the return type of your block</string>
+    <string name="nmb_return_void">Void</string>
+    <string name="nmb_return_string">String</string>
+    <string name="nmb_return_number">Number</string>
+    <string name="nmb_return_boolean">Boolean</string>
+    <string name="nmb_return_int">Int</string>
+    <string name="nmb_return_float">Float</string>
+    <string name="nmb_return_map">Map</string>
+    <string name="nmb_return_list_string">List String</string>
+    <string name="nmb_return_list_map">List Map</string>
+    <string name="nmb_return_view">View</string>
+
+    <string name="nmb_variables_title">Add Variable</string>
+    <string name="nmb_variables_subtitle">Define input variables for this block</string>
+    <string name="nmb_add_variable">Add Variable</string>
+    <string name="nmb_variables_empty_title">No variables added yet</string>
+    <string name="nmb_variables_empty_message">Click “Add Variable” to create input variables for this block.</string>
+
+    <string name="nmb_parameters_title">Custom Parameter</string>
+    <string name="nmb_parameters_subtitle" formatted="false">Add custom parameters (without % sign)</string>
+    <string name="nmb_add_parameter">Add Parameter</string>
+    <string name="nmb_parameters_empty_title">No custom parameters added yet</string>
+    <string name="nmb_parameters_empty_message">Click “Add Parameter” to create a new custom parameter.</string>
+    <string name="nmb_parameters_help_title">Custom Parameter</string>
+    <string name="nmb_parameters_help_message" formatted="false">A custom parameter uses the format type.name without the % sign, for example m.view (the type code is one of m, l, d or b followed by a dot and letters). The label is the name shown on the block and used as the variable name in the generated code.\n\nIn the block spec it is written as %m.view.label.</string>
+    <string name="nmb_help">Help</string>
+    <string name="nmb_ok">OK</string>
+
+    <string name="nmb_drag_to_reorder">Drag to reorder</string>
+    <string name="nmb_edit">Edit</string>
+    <string name="nmb_delete">Delete</string>
+    <string name="nmb_label_format">Label: %1$s</string>
+    <string name="nmb_label_default_format">Label: %1$s • Default: %2$s</string>
+    <string name="nmb_no_label">No label</string>
+    <string name="nmb_parameter_caption">Parameter</string>
+    <string name="nmb_variable_removed">Variable removed</string>
+    <string name="nmb_parameter_removed">Parameter removed</string>
+    <string name="nmb_undo">Undo</string>
+    <string name="nmb_preview_failed">This block can\'t be previewed. Check the custom parameter types.</string>
+
+    <!-- Add / Edit Variable dialog -->
+    <string name="nmb_var_dialog_title">Add Variable</string>
+    <string name="nmb_var_dialog_edit_title">Edit Variable</string>
+    <string name="nmb_var_dialog_subtitle">Add a new input variable to this moreblock</string>
+    <string name="nmb_var_dialog_edit_subtitle">Update this input variable</string>
+    <string name="nmb_var_type_title">Variable Type</string>
+    <string name="nmb_var_type_subtitle">Choose the data type for this variable</string>
+    <string name="nmb_more_types">More types</string>
+    <string name="nmb_more_types_desc">Lists, views, components</string>
+    <string name="nmb_type_desc_boolean">true or false value</string>
+    <string name="nmb_type_desc_number">Integer or decimal</string>
+    <string name="nmb_type_desc_string">Text value</string>
+    <string name="nmb_type_desc_map">Key-value pairs</string>
+    <string name="nmb_type_desc_float">Decimal number</string>
+    <string name="nmb_type_desc_int">Integer number</string>
+    <string name="nmb_type_desc_other">Other type</string>
+    <string name="nmb_type_info_title">Type Info</string>
+    <string name="nmb_type_info_boolean">Boolean can only be true or false.</string>
+    <string name="nmb_type_info_number">Number can be used for integer or decimal values (e.g. 0, 1.5, 10).</string>
+    <string name="nmb_type_info_string">String holds text values.</string>
+    <string name="nmb_type_info_map">Map stores key-value pairs.</string>
+    <string name="nmb_type_info_float">Float is a decimal number (Java float). Example default: 1.5 or 1.5f.</string>
+    <string name="nmb_type_info_int">Int is a whole number (Java int). Example default: 0.</string>
+    <string name="nmb_type_info_list">Lists are passed to the block as a reference.</string>
+    <string name="nmb_type_info_component">The block receives a reference to this view or component.</string>
+    <string name="nmb_var_details_title">Variable Details</string>
+    <string name="nmb_var_details_subtitle">Set name and label for this variable</string>
+    <string name="nmb_var_name_hint">Variable name</string>
+    <string name="nmb_var_name_helper">Use a valid Java variable name (e.g. myVariable)</string>
+    <string name="nmb_label_hint">Label text (shown on block)</string>
+    <string name="nmb_var_label_helper">This text will be shown on the moreblock as the variable label</string>
+    <string name="nmb_default_title">Default value (optional)</string>
+    <string name="nmb_default_var_subtitle">Set a default value for this variable (optional)</string>
+    <string name="nmb_default_param_subtitle">Set a default value for this parameter</string>
+    <string name="nmb_default_hint">Default value</string>
+    <string name="nmb_default_helper">Leave empty to use no default value</string>
+    <string name="nmb_default_invalid">Enter a valid %1$s value</string>
+    <string name="nmb_default_invalid_boolean">Use true, false or a boolean expression like 5 == 6</string>
+    <string name="nmb_save">Save</string>
+
+    <!-- Add / Edit Custom Parameter dialog -->
+    <string name="nmb_param_dialog_title">Add Custom Parameter</string>
+    <string name="nmb_param_dialog_edit_title">Edit Custom Parameter</string>
+    <string name="nmb_param_dialog_subtitle">Add a new custom parameter to this moreblock</string>
+    <string name="nmb_param_dialog_edit_subtitle">Update this custom parameter</string>
+    <string name="nmb_param_name_title">Parameter Name</string>
+    <string name="nmb_param_name_subtitle" formatted="false">Enter the parameter name (without % sign)</string>
+    <string name="nmb_param_name_hint">Parameter name</string>
+    <string name="nmb_param_name_helper" formatted="false">Format: m.view (type code, dot, letters) without % sign</string>
+    <string name="nmb_param_details_title">Parameter Details</string>
+    <string name="nmb_param_details_subtitle">Set additional information for this parameter</string>
+    <string name="nmb_param_label_helper">This text will be shown on the moreblock as the parameter label</string>
+    <string name="nmb_param_type_title">Parameter Type (optional)</string>
+    <string name="nmb_param_type_subtitle">Select the expected data type for this parameter</string>
+    <string name="nmb_param_type_hint">Parameter type</string>
+    <string name="nmb_param_type_none">None</string>
+    <string name="nmb_param_type_string">String (Text value)</string>
+    <string name="nmb_param_type_number">Number (Integer or decimal)</string>
+    <string name="nmb_param_type_boolean">Boolean (True or false)</string>
+    <string name="nmb_param_type_map">Map (Key-value pairs)</string>
+    <string name="nmb_param_usage_title">Parameter Usage</string>
+    <string name="nmb_param_usage_message">This parameter is written into the block spec as %1$s. Use the same variable name in your code.</string>
+
+    <!-- Add Event entry -->
+    <string name="nmb_event_launcher_title">Create a Moreblock</string>
+    <string name="nmb_event_launcher_message">Open the Moreblock creator to design a custom block with variables and parameters.</string>
+    <string name="nmb_event_launcher_button">Create Moreblock</string>
+</resources>

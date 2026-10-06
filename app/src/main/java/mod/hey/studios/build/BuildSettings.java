@@ -16,6 +16,7 @@ public class BuildSettings extends ProjectSettings implements Serializable {
     public static final String SETTING_ENABLE_LOGCAT = "enable_logcat";
     public static final String SETTING_OFFLINE_CACHE = "offline_dependency_cache";
     public static final String SETTING_PARALLEL_THREADS = "parallel_threads";
+    public static final String SETTING_SKIP_SUB_DEPENDENCIES = "skip_sub_dependencies";
     public static final int DEFAULT_PARALLEL_THREADS = 4;
 
     public static final String SETTING_DEXER_D8 = "D8";
@@ -44,6 +45,10 @@ public class BuildSettings extends ProjectSettings implements Serializable {
         } catch (NumberFormatException e) {
             return Math.min(DEFAULT_PARALLEL_THREADS, max);
         }
+    }
+
+    public boolean isSkipSubDependencies() {
+        return getValue(SETTING_SKIP_SUB_DEPENDENCIES, SETTING_GENERIC_VALUE_TRUE).equals(SETTING_GENERIC_VALUE_TRUE);
     }
 
     public boolean isOfflineCacheEnabled() {

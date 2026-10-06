@@ -9,7 +9,7 @@
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/til_coordinate"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        style="@style/Widget.SketchwarePro.TextInputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="group:artifact:version">
@@ -25,7 +25,7 @@
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/til_config"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        style="@style/Widget.SketchwarePro.TextInputLayout.ExposedDropdownMenu"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
@@ -38,6 +38,13 @@
             android:inputType="none" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/cb_skip_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/local_library_manager_skip_downloading_dependencies" />
+
     <LinearLayout
         android:id="@+id/search_row"
         android:layout_width="match_parent"
@@ -47,7 +54,7 @@
         android:orientation="horizontal">
 
         <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            style="@style/Widget.SketchwarePro.TextInputLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

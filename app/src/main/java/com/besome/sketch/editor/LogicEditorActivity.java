@@ -61,6 +61,8 @@ import com.besome.sketch.editor.logic.LogicTopMenu;
 import com.besome.sketch.editor.logic.PaletteBlock;
 import com.besome.sketch.editor.logic.PaletteSelector;
 import com.besome.sketch.editor.makeblock.MakeBlockActivity;
+import com.besome.sketch.editor.makeblock.NewMoreBlockCreatorActivity;
+import mod.hey.studios.moreblock.MoreBlockDefaultsStore;
 import com.besome.sketch.editor.manage.ShowBlockCollectionActivity;
 import com.besome.sketch.editor.view.ViewDummy;
 import com.besome.sketch.editor.view.ViewLogicEditor;
@@ -111,6 +113,7 @@ import a.a.a.wB;
 import a.a.a.xB;
 import a.a.a.yq;
 import dev.aldi.sayuti.block.ExtraPaletteBlock;
+import mod.hilal.saif.activities.tools.ConfigActivity;
 import mod.bobur.VectorDrawableLoader;
 import mod.hey.studios.editor.view.IdGenerator;
 import mod.hey.studios.moreblock.ReturnMoreblockManager;
@@ -1868,7 +1871,14 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
         if (resultCode == Activity.RESULT_OK) {
             if (requestCode == 222) {
-                c(data.getStringExtra("block_name"), data.getStringExtra("block_spec"));
+                String blockName = data.getStringExtra("block_name");
+                String blockSpec = data.getStringExtra("block_spec");
+                c(blockName, blockSpec);
+                if (blockName != null && blockSpec != null) {
+                    // Default values of the parameters. The legacy creator sends none, which only clears stale entries.
+                    MoreBlockDefaultsStore.save(scId, M.getJavaName(), blockName, blockSpec,
+                            MoreBlockDefaultsStore.decode(data.getStringExtra("block_defaults")));
+                }
             } else if (requestCode == 224) {
                 a(7, 0xff2ca5e2);
             }
@@ -1908,7 +1918,11 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 } else if (tag.equals("listRemove")) {
                     J();
                 } else if (tag.equals("blockAdd")) {
-                    Intent intent = new Intent(this, MakeBlockActivity.class);
+                    // Feature flag: the legacy creator stays the default; both use the same extras and result contract.
+                    Class<?> moreBlockCreator = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_NEW_MOREBLOCK_CREATOR)
+                            ? NewMoreBlockCreatorActivity.class
+                            : MakeBlockActivity.class;
+                    Intent intent = new Intent(this, moreBlockCreator);
                     intent.putExtra("sc_id", scId);
                     intent.putExtra("project_file", M);
                     intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);

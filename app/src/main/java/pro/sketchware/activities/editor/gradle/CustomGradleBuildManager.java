@@ -1,13 +1,18 @@
 package pro.sketchware.activities.editor.gradle;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
+import a.a.a.Jp;
 import a.a.a.zy;
 import mod.hey.studios.project.ProjectSettings;
 import mod.sketchlibx.importer.GradleDependency;
 import mod.sketchlibx.importer.GradleParser;
 import mod.sketchlibx.importer.ParsedGradle;
+import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
 
@@ -64,11 +69,50 @@ public final class CustomGradleBuildManager {
                 unresolved.append(FILE_APP_BUILD).append(":0: error: Dependency ").append(row.dep.coordinate())
                         .append(" is ").append(row.state.name().toLowerCase());
                 if (row.error != null) unresolved.append(" (").append(row.error).append(')');
+                else if (row.note != null) unresolved.append(" (").append(row.note).append(')');
                 unresolved.append('\n');
             }
         }
         if (unresolved.length() > 0) {
             throw new zy("Custom Gradle dependencies are not synced. Open Gradle Manager and run Gradle Sync.\n" + unresolved);
         }
+
+        String overlap = DuplicateClassGuard.find(scId, dependencies);
+        if (overlap != null) {
+            throw new zy(FILE_APP_BUILD + ":0: error: " + overlap);
+        }
+    }
+
+    public static void addDeclaredBuiltInLibraries(String scId, BuiltInLibraryManager manager) {
+        if (!isEnabled(scId)) return;
+        File app = new File(getDirectory(scId), FILE_APP_BUILD);
+        if (!app.isFile()) return;
+
+        List<GradleDependency> dependencies = new GradleParser().parseDependencyList(FileUtil.readFile(app.getAbsolutePath()));
+        GradleSyncEngine.Store store = GradleSyncEngine.loadStore(scId);
+        Set<String> names = new LinkedHashSet<>();
+        for (GradleDependency dependency : dependencies) {
+            if (!GradleSyncEngine.isConsumedConfiguration(dependency.configuration)) continue;
+            BuiltInArtifacts.Match match = BuiltInArtifacts.findSatisfying(dependency.group, dependency.artifact, dependency.version);
+            if (match != null) names.addAll(BuiltInArtifacts.closure(match.libraryName));
+            List<String> transitive = store.builtIns.get(dependency.coordinate());
+            if (transitive != null) {
+                for (String name : transitive) names.addAll(BuiltInArtifacts.closure(name));
+            }
+        }
+        for (String name : names) {
+            if (!currentNames(manager).contains(name)) manager.addLibrary(name);
+        }
+    }
+
+    private static Set<String> currentNames(BuiltInLibraryManager manager) {
+        Set<String> result = new LinkedHashSet<>();
+        ArrayList<Jp> libraries = manager.getLibraries();
+        if (libraries != null) {
+            for (Jp library : libraries) {
+                if (library != null && library.getName() != null) result.add(library.getName());
+            }
+        }
+        return result;
     }
 }

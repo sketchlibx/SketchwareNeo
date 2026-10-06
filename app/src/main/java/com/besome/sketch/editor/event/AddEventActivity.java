@@ -24,6 +24,8 @@ import com.besome.sketch.beans.EventBean;
 import com.besome.sketch.beans.ProjectFileBean;
 import com.besome.sketch.beans.ViewBean;
 import com.besome.sketch.editor.makeblock.MoreBlockBuilderView;
+import com.besome.sketch.editor.makeblock.NewMoreBlockCreatorView;
+import mod.hey.studios.moreblock.MoreBlockDefaultsStore;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.color.MaterialColors;
 
@@ -41,6 +43,7 @@ import a.a.a.oq;
 import a.a.a.rs;
 import a.a.a.wB;
 import dev.chrisbanes.insetter.Insetter;
+import mod.hilal.saif.activities.tools.ConfigActivity;
 import pro.sketchware.R;
 import pro.sketchware.databinding.LogicPopupAddEventBinding;
 
@@ -49,7 +52,12 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
     private ArrayList<EventBean> eventsToAdd;
     private boolean C;
     private int categoryIndex;
+    /** Legacy builder, only created while the new Moreblock creator setting is OFF. */
     private MoreBlockBuilderView moreBlockView;
+    /** New creator, embedded inline in the Moreblock tab (created lazily) while the setting is ON. */
+    private NewMoreBlockCreatorView newMoreBlockView;
+    private boolean useNewMoreBlockCreator;
+    private Bundle pendingNewMoreBlockState;
     private String sc_id;
     private ProjectFileBean projectFile;
     private CategoryAdapter categoryAdapter;
@@ -212,7 +220,7 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
                 categoryAdapter.notifyItemChanged(categoryIndex);
             }
             if (categoryIndex == 4) {
-                binding.moreblockLayout.setVisibility(View.VISIBLE);
+                showMoreBlockLayout();
                 binding.emptyMessage.setVisibility(View.GONE);
                 binding.eventList.setVisibility(View.GONE);
             } else {
@@ -231,19 +239,22 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
         if (!mB.a()) {
             int id = v.getId();
             if (id == R.id.add_button) {
-                if (!eventsToAdd.isEmpty() || !moreBlockView.a()) {
-                    if (!moreBlockView.a()) {
-                        if (!moreBlockView.b()) {
+                if (!eventsToAdd.isEmpty() || !isMoreBlockDraftEmpty()) {
+                    if (!isMoreBlockDraftEmpty()) {
+                        if (!isMoreBlockValid()) {
                             eventAdapter.setEvents(categories.get(4));
                             categoryAdapter.lastSelectedCategory = 4;
                             binding.tvCategory.setText(rs.a(getApplicationContext(), 4));
                             binding.emptyMessage.setVisibility(View.GONE);
-                            binding.moreblockLayout.setVisibility(View.VISIBLE);
+                            showMoreBlockLayout();
                             categoryAdapter.notifyDataSetChanged();
                             finished = true;
                         } else {
-                            Pair<String, String> blockInformation = moreBlockView.getBlockInformation();
+                            Pair<String, String> blockInformation = getMoreBlockInformation();
                             jC.a(sc_id).a(projectFile.getJavaName(), blockInformation.first, blockInformation.second);
+                            // Default values of the parameters (none with the legacy builder, which only clears stale entries).
+                            MoreBlockDefaultsStore.save(sc_id, projectFile.getJavaName(), blockInformation.first, blockInformation.second,
+                                    newMoreBlockView != null ? newMoreBlockView.getDefaults() : new java.util.LinkedHashMap<>());
                         }
                     }
                     if (!finished) {
@@ -288,8 +299,15 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
             projectFile = savedInstanceState.getParcelable("project_file");
             categoryIndex = savedInstanceState.getInt("category_index");
         }
-        moreBlockView = new MoreBlockBuilderView(this);
-        binding.moreblockLayout.addView(moreBlockView);
+        useNewMoreBlockCreator = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_NEW_MOREBLOCK_CREATOR);
+        if (useNewMoreBlockCreator) {
+            if (savedInstanceState != null) {
+                pendingNewMoreBlockState = savedInstanceState.getBundle("new_moreblock_state");
+            }
+        } else {
+            moreBlockView = new MoreBlockBuilderView(this);
+            binding.moreblockLayout.addView(moreBlockView);
+        }
         binding.moreblockLayout.setVisibility(View.GONE);
         binding.addButton.setOnClickListener(this);
         binding.cancelButton.setOnClickListener(this);
@@ -322,10 +340,41 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
         overridePendingTransition(R.anim.ani_fade_in, R.anim.ani_fade_out);
     }
 
+    /** Shows the Moreblock tab; with the new creator its UI is inflated on first use so the dialog opens fast. */
+    private void showMoreBlockLayout() {
+        if (useNewMoreBlockCreator && newMoreBlockView == null) {
+            float density = getResources().getDisplayMetrics().density;
+            newMoreBlockView = new NewMoreBlockCreatorView(this);
+            newMoreBlockView.setPadding((int) (16 * density), (int) (8 * density), (int) (16 * density), (int) (16 * density));
+            newMoreBlockView.init(sc_id, projectFile);
+            newMoreBlockView.restoreState(pendingNewMoreBlockState);
+            pendingNewMoreBlockState = null;
+            binding.moreblockLayout.addView(newMoreBlockView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        binding.moreblockLayout.setVisibility(View.VISIBLE);
+    }
+
+    private boolean isMoreBlockDraftEmpty() {
+        if (newMoreBlockView != null) return newMoreBlockView.isEmpty();
+        return moreBlockView == null || moreBlockView.a();
+    }
+
+    private boolean isMoreBlockValid() {
+        if (newMoreBlockView != null) return newMoreBlockView.validate();
+        return moreBlockView.b();
+    }
+
+    private Pair<String, String> getMoreBlockInformation() {
+        if (newMoreBlockView != null) return newMoreBlockView.getBlockInformation();
+        return moreBlockView.getBlockInformation();
+    }
+
     @Override
     public void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
-        moreBlockView.setFuncNameValidator(jC.a(sc_id).a(projectFile));
+        if (moreBlockView != null) {
+            moreBlockView.setFuncNameValidator(jC.a(sc_id).a(projectFile));
+        }
     }
 
     @Override
@@ -342,6 +391,11 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
         newState.putString("sc_id", sc_id);
         newState.putParcelable("project_file", projectFile);
         newState.putInt("category_index", categoryIndex);
+        if (newMoreBlockView != null) {
+            Bundle creatorState = new Bundle();
+            newMoreBlockView.saveState(creatorState);
+            newState.putBundle("new_moreblock_state", creatorState);
+        }
         super.onSaveInstanceState(newState);
     }
 
@@ -530,7 +584,7 @@ public class AddEventActivity extends BaseAppCompatActivity implements View.OnCl
                         notifyDataSetChanged();
                         binding.tvCategory.setText(rs.a(getApplicationContext(), lastSelectedCategory));
                         if (lastSelectedCategory == 4) {
-                            binding.moreblockLayout.setVisibility(View.VISIBLE);
+                            showMoreBlockLayout();
                             binding.emptyMessage.setVisibility(View.GONE);
                         } else {
                             binding.moreblockLayout.setVisibility(View.GONE);

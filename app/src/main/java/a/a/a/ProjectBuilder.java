@@ -71,6 +71,7 @@ import mod.jbk.util.LogUtil;
 import mod.jbk.util.TestkeySignBridge;
 import mod.pranav.build.JarBuilder;
 import mod.pranav.viewbinding.ViewBindingBuilder;
+import pro.sketchware.activities.editor.gradle.CustomGradleBuildManager;
 import pro.sketchware.SketchApplication;
 import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FilePathUtil;
@@ -820,6 +821,7 @@ public class ProjectBuilder {
         KotlinCompilerBridge.maybeAddKotlinBuiltInLibraryDependenciesIfPossible(this, builtInLibraryManager);
 
         ExtLibSelected.addUsedDependencies(yq.N.x, builtInLibraryManager);
+        CustomGradleBuildManager.addDeclaredBuiltInLibraries(yq.sc_id, builtInLibraryManager);
     }
 
     public BuiltInLibraryManager getBuiltInLibraryManager() {

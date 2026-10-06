@@ -72,6 +72,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_GIT_DIRECT_PUSH = "git-direct-push";
     
     public static final String SETTING_TERMINAL_PLACEMENT = "terminal-placement";
+    /** When enabled, both Moreblock creation entry points use the new Material 3 creator. Default: off. */
+    public static final String SETTING_NEW_MOREBLOCK_CREATOR = "new-moreblock-creator";
 
     private PreferenceActivityNewBinding binding;
 
@@ -135,7 +137,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH,
                 SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW,
                 SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, SETTING_GIT_DIRECT_PUSH,
-                SETTING_TERMINAL_PLACEMENT);
+                SETTING_TERMINAL_PLACEMENT, SETTING_NEW_MOREBLOCK_CREATOR);
 
         for (String key : keys) {
             settings.put(key, getDefaultValue(key));
@@ -148,7 +150,7 @@ public class ConfigActivity extends BaseAppCompatActivity {
             case SETTING_ALWAYS_SHOW_BLOCKS, SETTING_ROOT_AUTO_INSTALL_PROJECTS, SETTING_SHOW_BUILT_IN_BLOCKS,
                  SETTING_SHOW_EVERY_SINGLE_BLOCK, SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, 
                  SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW, SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, 
-                 SETTING_GIT_DIRECT_PUSH -> false;
+                 SETTING_GIT_DIRECT_PUSH, SETTING_NEW_MOREBLOCK_CREATOR -> false;
             case SETTING_BACKUP_DIRECTORY -> "/.sketchware/backups/";
             case SETTING_TERMINAL_PLACEMENT -> "0"; 
             case SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING -> true;
@@ -186,7 +188,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 createSwitchPreference(R.drawable.ic_mtrl_block, "Always Show Blocks", "Keep code blocks visible even in invalid states", SETTING_ALWAYS_SHOW_BLOCKS),
                 createSwitchPreference(R.drawable.ic_mtrl_puzzle, "Show Built-in Blocks", "Display standard blocks in custom palettes", SETTING_SHOW_BUILT_IN_BLOCKS),
                 createSwitchPreference(R.drawable.ic_mtrl_view_module, "Show Every Single Block", "Unhide experimental and deprecated blocks", SETTING_SHOW_EVERY_SINGLE_BLOCK),
-                createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER)
+                createSwitchPreference(R.drawable.ic_mtrl_code, "ASD Highlighter", "Use advanced syntax highlighting for dialogs", SETTING_USE_ASD_HIGHLIGHTER),
+                createSwitchPreference(R.drawable.ic_mtrl_puzzle, "New Moreblock Creator", "Use the redesigned Material 3 creator when adding Moreblocks", SETTING_NEW_MOREBLOCK_CREATOR)
         ));
         
         content.addView(createCategoryHeader("IDE Tools"));

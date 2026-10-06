@@ -52,6 +52,8 @@ class DependencyResolver(
         """.trimMargin()
     }
 
+    var providedBy: ((Artifact) -> String?)? = null
+
     private val downloadPath: String =
         FileUtil.getExternalStorageDir() + "/.sketchware/libs/local_libs"
 
@@ -115,6 +117,10 @@ class DependencyResolver(
         open fun dexingFailed(artifact: Artifact, e: Exception) {}
         open fun invalidPackaging(artifact: Artifact) {}
         
+        open fun onCacheHit(artifact: Artifact) {}
+        open fun onProvided(artifact: Artifact, provider: String) {}
+        open fun onFolderResolved(artifact: Artifact, folder: String) {}
+
         open fun onDirectDownloadStart(url: String) {}
         open fun onDirectDownloadEnd(fileName: String) {}
         open fun onDirectDownloadError(url: String, error: Throwable) {}
@@ -154,51 +160,60 @@ class DependencyResolver(
             dependencyClasspath.add(Paths.get(it))
         }
 
-        dependency.downloadTo(
-            File(downloadPath + "/${dependency.artifactId}-v${dependency.version}/classes.${dependency.extension}")
-                .apply {
-                    parentFile?.mkdirs()
-                }
-        )
+        val rootFolder = Paths.get(downloadPath, "${dependency.artifactId}-v${dependency.version}")
+        if (isCacheValid(rootFolder, dependency.extension)) {
+            callback.onCacheHit(dependency)
+        } else {
+            discardIncomplete(rootFolder)
+            dependency.downloadTo(
+                File(downloadPath + "/${dependency.artifactId}-v${dependency.version}/classes.${dependency.extension}")
+                    .apply {
+                        parentFile?.mkdirs()
+                    }
+            )
 
-        if (dependency.extension == "aar") {
-            callback.unzipping(dependency)
-            unzip(
-                Paths.get(
-                    downloadPath,
-                    "${dependency.artifactId}-v${dependency.version}",
-                    "classes.aar"
+            if (dependency.extension == "aar") {
+                callback.unzipping(dependency)
+                unzip(
+                    Paths.get(
+                        downloadPath,
+                        "${dependency.artifactId}-v${dependency.version}",
+                        "classes.aar"
+                    )
                 )
-            )
-            Files.delete(
-                Paths.get(
-                    downloadPath,
-                    "${dependency.artifactId}-v${dependency.version}",
-                    "classes.aar"
+                Files.delete(
+                    Paths.get(
+                        downloadPath,
+                        "${dependency.artifactId}-v${dependency.version}",
+                        "classes.aar"
+                    )
                 )
+                val packageName = findPackageName(
+                    Paths.get(downloadPath, "${dependency.artifactId}-v${dependency.version}")
+                        .toAbsolutePath().toString(),
+                    dependency.groupId
+                )
+                Paths.get(downloadPath, "${dependency.artifactId}-v${dependency.version}", "config")
+                    .writeText(packageName)
+            }
+
+            val jar = Paths.get(
+                downloadPath,
+                "${dependency.artifactId}-v${dependency.version}",
+                "classes.jar"
             )
-            val packageName = findPackageName(
-                Paths.get(downloadPath, "${dependency.artifactId}-v${dependency.version}")
-                    .toAbsolutePath().toString(),
-                dependency.groupId
-            )
-            Paths.get(downloadPath, "${dependency.artifactId}-v${dependency.version}", "config")
-                .writeText(packageName)
+
+            callback.dexing(dependency)
+            try {
+                compileJar(jar, dependencyClasspath, libraryJars)
+                callback.onResolutionComplete(dependency)
+            } catch (e: Exception) {
+                callback.dexingFailed(dependency, e)
+                return@runBlocking
+            }
         }
 
-        val jar = Paths.get(
-            downloadPath,
-            "${dependency.artifactId}-v${dependency.version}",
-            "classes.jar"
-        )
-
-        callback.dexing(dependency)
-        try {
-            compileJar(jar, dependencyClasspath, libraryJars)
-            callback.onResolutionComplete(dependency)
-        } catch (e: Exception) {
-            callback.dexingFailed(dependency, e)
-        }
+        callback.onFolderResolved(dependency, "${dependency.artifactId}-v${dependency.version}")
 
         if (skipDependencies) {
             callback.onSkippingResolution(dependency)
@@ -207,15 +222,29 @@ class DependencyResolver(
         }
         dependency.resolveDependencyTree()
 
-        dependency.getAllDependencies().forEach { dep ->
+        val resolvedDependencies = dependency.getAllDependencies().filter { dep ->
+            val provider = providedBy?.invoke(dep)
+            if (provider != null) {
+                callback.onProvided(dep, provider)
+                false
+            } else {
+                true
+            }
+        }
+        val cachedFolders = mutableSetOf<String>()
+        var hadFailure = false
+
+        resolvedDependencies.forEach { dep ->
             println("Resolving dependency: ${dep.artifactId} v${dep.version}")
             if (dep.extension != "jar" && dep.extension != "aar") {
                 callback.invalidPackaging(dep)
+                hadFailure = true
                 return@forEach
             }
 
             if (dep.version.isEmpty()) {
                 callback.onVersionNotFound(dep)
+                hadFailure = true
                 return@forEach
             }
 
@@ -225,6 +254,15 @@ class DependencyResolver(
                 "classes.${dep.extension}"
             )
 
+            if (isCacheValid(path.parent, dep.extension)) {
+                callback.onCacheHit(dep)
+                callback.onFolderResolved(dep, "${dep.artifactId}-v${dep.version}")
+                cachedFolders.add("${dep.artifactId}-v${dep.version}")
+                dependencyClasspath.add(path.parent.resolve("classes.jar"))
+                return@forEach
+            }
+
+            discardIncomplete(path.parent)
             Files.createDirectories(path.parent)
 
             dep.downloadTo(File(path.toString()))
@@ -243,13 +281,15 @@ class DependencyResolver(
             )
             if (Files.notExists(targetJar)) {
                 callback.onDependenciesNotFound(dep)
+                hadFailure = true
                 return@forEach
             }
 
             dependencyClasspath.add(targetJar)
         }
 
-        dependency.getAllDependencies().forEach { dep ->
+        resolvedDependencies.forEach { dep ->
+            if (cachedFolders.contains("${dep.artifactId}-v${dep.version}")) return@forEach
             val targetJar = Paths.get(downloadPath, "${dep.artifactId}-v${dep.version}", "classes.jar")
 
             callback.dexing(dep)
@@ -258,15 +298,45 @@ class DependencyResolver(
                     targetJar, dependencyClasspath.toMutableList().apply { remove(targetJar) }, libraryJars
                 )
                 callback.onResolutionComplete(dep)
+                callback.onFolderResolved(dep, "${dep.artifactId}-v${dep.version}")
             } catch (e: Exception) {
                 callback.dexingFailed(dep, e)
+                hadFailure = true
                 return@forEach
             }
         }
 
+        if (hadFailure) return@runBlocking
+
         val completedList = mutableListOf("${dependency.artifactId}-v${dependency.version}")
-        completedList.addAll(dependency.getAllDependencies().map { "${it.artifactId}-v${it.version}" })
+        completedList.addAll(resolvedDependencies.map { "${it.artifactId}-v${it.version}" })
         callback.onTaskCompleted(completedList)
+    }
+
+    private fun isFolderComplete(folder: Path, extension: String): Boolean {
+        val jar = folder.resolve("classes.jar")
+        val dex = folder.resolve("classes.dex")
+        if (!Files.isRegularFile(jar) || Files.size(jar) == 0L) return false
+        if (!Files.isRegularFile(dex) || Files.size(dex) == 0L) return false
+        if (extension == "aar" && !Files.isRegularFile(folder.resolve("config"))) return false
+        return try {
+            ZipFile(jar.toFile()).use { true }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun isCacheValid(folder: Path, extension: String): Boolean {
+        if (!buildSettings.isOfflineCacheEnabled) return false
+        return isFolderComplete(folder, extension)
+    }
+
+    private fun discardIncomplete(folder: Path) {
+        if (!Files.exists(folder)) return
+        val extension = if (Files.exists(folder.resolve("config"))) "aar" else "jar"
+        if (!isFolderComplete(folder, extension)) {
+            FileUtil.deleteFile(folder.toString())
+        }
     }
 
     private fun handleDirectUrlDownload(urlStr: String, callback: DependencyResolverCallback) {

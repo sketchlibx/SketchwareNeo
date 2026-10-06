@@ -21,20 +21,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
-import a.a.a.Jp;
 import dev.aldi.sayuti.editor.manage.LocalLibrariesUtil;
 import dev.aldi.sayuti.editor.manage.LocalLibrary;
 import mod.hey.studios.build.BuildSettings;
 import mod.jbk.build.BuiltInLibraries;
 import mod.pranav.dependency.resolver.DependencyResolver;
 import mod.sketchlibx.importer.GradleDependency;
-import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FileUtil;
 
 public final class GradleSyncEngine {
@@ -46,19 +46,22 @@ public final class GradleSyncEngine {
         public final DepState state;
         @Nullable
         public final String error;
+        @Nullable
+        public final String note;
         public final List<String> folders;
         public final long cacheBytes;
 
-        public Row(GradleDependency dep, DepState state, @Nullable String error, List<String> folders, long cacheBytes) {
+        public Row(GradleDependency dep, DepState state, @Nullable String error, @Nullable String note, List<String> folders, long cacheBytes) {
             this.dep = dep;
             this.state = state;
             this.error = error;
+            this.note = note;
             this.folders = Collections.unmodifiableList(new ArrayList<>(folders));
             this.cacheBytes = cacheBytes;
         }
 
         public Row withState(DepState newState, @Nullable String newError) {
-            return new Row(dep, newState, newError, folders, cacheBytes);
+            return new Row(dep, newState, newError, newState == DepState.READY ? note : null, folders, cacheBytes);
         }
 
         public boolean isConsumed() {
@@ -94,7 +97,14 @@ public final class GradleSyncEngine {
         public String message = "";
         public String appHash = "";
         public Map<String, List<String>> folders = new HashMap<>();
+        public Map<String, List<String>> builtIns = new HashMap<>();
+        public Map<String, String> artifacts = new HashMap<>();
+        public Map<String, String> superseded = new HashMap<>();
+        public Map<String, Boolean> skipSub = new HashMap<>();
+        public Map<String, Boolean> resolvedSkip = new HashMap<>();
     }
+
+    private static final Object STORE_LOCK = new Object();
 
     private static final Set<String> CONSUMED_CONFIGURATIONS = Set.of("implementation", "api", "runtimeOnly");
 
@@ -121,6 +131,11 @@ public final class GradleSyncEngine {
             Store store = new Gson().fromJson(FileUtil.readFile(file.getAbsolutePath()), Store.class);
             if (store == null) return new Store();
             if (store.folders == null) store.folders = new HashMap<>();
+            if (store.builtIns == null) store.builtIns = new HashMap<>();
+            if (store.artifacts == null) store.artifacts = new HashMap<>();
+            if (store.superseded == null) store.superseded = new HashMap<>();
+            if (store.skipSub == null) store.skipSub = new HashMap<>();
+            if (store.resolvedSkip == null) store.resolvedSkip = new HashMap<>();
             if (store.status == null) store.status = "NONE";
             if (store.message == null) store.message = "";
             if (store.appHash == null) store.appHash = "";
@@ -131,7 +146,17 @@ public final class GradleSyncEngine {
     }
 
     public static void saveStore(String scId, Store store) {
-        FileUtil.writeFile(storeFile(scId).getAbsolutePath(), new Gson().toJson(store));
+        synchronized (STORE_LOCK) {
+            FileUtil.writeFile(storeFile(scId).getAbsolutePath(), new Gson().toJson(store));
+        }
+    }
+
+    private static void updateStore(String scId, Consumer<Store> mutation) {
+        synchronized (STORE_LOCK) {
+            Store store = loadStore(scId);
+            mutation.accept(store);
+            FileUtil.writeFile(storeFile(scId).getAbsolutePath(), new Gson().toJson(store));
+        }
     }
 
     @NonNull
@@ -158,50 +183,11 @@ public final class GradleSyncEngine {
         Store store = loadStore(scId);
         List<LocalLibrary> all = LocalLibrariesUtil.getAllLocalLibraries();
         Set<String> enabledNames = enabledNames(scId);
-        Set<String> builtIns = enabledBuiltIns(scId);
         List<Row> rows = new ArrayList<>();
         for (GradleDependency dep : deps) {
-            rows.add(inspectOne(dep, store, all, enabledNames, builtIns));
+            rows.add(inspectOne(scId, dep, store, all, enabledNames));
         }
         return rows;
-    }
-
-    private static final Set<String> BUILT_IN_GROUP_PREFIXES = Set.of(
-            "androidx.", "com.google.android.material", "com.google.code.gson", "com.squareup.okhttp3", "com.squareup.okio",
-            "org.jetbrains.kotlin", "org.jetbrains.kotlinx", "com.github.bumptech.glide", "com.google.firebase",
-            "com.google.android.gms", "com.airbnb.android", "de.hdodenhof", "com.google.auto.value", "com.google.errorprone", "org.jspecify");
-
-    private static Set<String> enabledBuiltIns(String scId) {
-        Set<String> names = new HashSet<>();
-        try {
-            ArrayList<Jp> libraries = new BuiltInLibraryManager(scId).getLibraries();
-            if (libraries != null) {
-                for (Jp library : libraries) {
-                    if (library != null && library.getName() != null) names.add(library.getName());
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return names;
-    }
-
-    @Nullable
-    private static String builtInProvider(GradleDependency dep, Set<String> builtIns) {
-        boolean knownGroup = false;
-        for (String prefix : BUILT_IN_GROUP_PREFIXES) {
-            if (dep.group.startsWith(prefix)) {
-                knownGroup = true;
-                break;
-            }
-        }
-        if (!knownGroup) return null;
-        String prefix = dep.artifact + "-";
-        for (String name : builtIns) {
-            if (name.startsWith(prefix) && name.length() > prefix.length() && Character.isDigit(name.charAt(prefix.length()))) {
-                return name;
-            }
-        }
-        return null;
     }
 
     private static Set<String> enabledNames(String scId) {
@@ -216,49 +202,117 @@ public final class GradleSyncEngine {
         return names;
     }
 
+    public static boolean isSkipSubDependencies(String scId, String key) {
+        Boolean explicit = loadStore(scId).skipSub.get(key);
+        return explicit != null ? explicit : new BuildSettings(scId).isSkipSubDependencies();
+    }
+
+    public static void setSkipSubDependencies(String scId, String key, boolean skip) {
+        updateStore(scId, store -> store.skipSub.put(key, skip));
+    }
+
+    public static void setSkipSubDependenciesForAll(String scId, boolean skip) {
+        new BuildSettings(scId).setValue(BuildSettings.SETTING_SKIP_SUB_DEPENDENCIES,
+                skip ? BuildSettings.SETTING_GENERIC_VALUE_TRUE : BuildSettings.SETTING_GENERIC_VALUE_FALSE);
+        updateStore(scId, store -> store.skipSub.clear());
+    }
+
+    private static boolean wantsSkip(String scId, Store store, GradleDependency dep) {
+        Boolean explicit = store.skipSub.get(dep.key());
+        return explicit != null ? explicit : new BuildSettings(scId).isSkipSubDependencies();
+    }
+
+    @Nullable
     private static String versionProblem(GradleDependency dep) {
-        String v = dep.version;
-        if (v == null || v.isEmpty() || v.equals("+") || v.contains("$") || v.contains("[") || v.contains("(")) {
+        if (BuiltInArtifacts.normalizeVersion(dep.version) == null) {
             return "A fixed version is required (group:artifact:1.2.3)";
         }
         return null;
     }
 
-    private static Row inspectOne(GradleDependency dep, Store store, List<LocalLibrary> all, Set<String> enabledNames, Set<String> builtIns) {
-        String provider = isConsumedConfiguration(dep.configuration) ? builtInProvider(dep, builtIns) : null;
-        if (provider != null) {
-            return new Row(dep, DepState.READY, "Provided by Neo built-in library " + provider, Collections.emptyList(), 0);
+    @Nullable
+    private static BuiltInArtifacts.Match builtInFor(String scId, GradleDependency dep) {
+        if (!isConsumedConfiguration(dep.configuration)) return null;
+        return BuiltInArtifacts.findSatisfying(scId, dep.group, dep.artifact, dep.version);
+    }
+
+    private static String builtInNote(GradleDependency dep, BuiltInArtifacts.Match match) {
+        String requested = BuiltInArtifacts.normalizeVersion(dep.version);
+        String note = "Provided by Neo built-in " + match.libraryName;
+        if (requested != null && !requested.equals(match.version)) note += " (requested " + requested + ")";
+        return note;
+    }
+
+    @Nullable
+    private static String artifactTag(String folderName) {
+        File tag = new File(localLibsDir() + folderName, LocalLibrariesUtil.ARTIFACT_METADATA_FILE_NAME);
+        if (!tag.isFile()) return null;
+        String value = FileUtil.readFile(tag.getAbsolutePath()).trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    private static boolean folderComplete(String folderName) {
+        File dir = new File(localLibsDir(), folderName);
+        File jar = new File(dir, "classes.jar");
+        File dex = new File(dir, "classes.dex");
+        if (!dir.isDirectory() || !jar.isFile() || jar.length() == 0 || !dex.isFile() || dex.length() == 0) return false;
+        File manifest = new File(dir, "AndroidManifest.xml");
+        return !manifest.isFile() || new File(dir, "config").isFile();
+    }
+
+    private static Row inspectOne(String scId, GradleDependency dep, Store store, List<LocalLibrary> all, Set<String> enabledNames) {
+        if (!isConsumedConfiguration(dep.configuration)) {
+            return new Row(dep, DepState.SKIPPED, null, "'" + dep.configuration + "' is not used by the in-app build", Collections.emptyList(), 0);
         }
         String problem = versionProblem(dep);
-        if (problem != null) return new Row(dep, DepState.FAILED, problem, Collections.emptyList(), 0);
+        if (problem != null) return new Row(dep, DepState.FAILED, problem, null, Collections.emptyList(), 0);
+
+        BuiltInArtifacts.Match builtIn = builtInFor(scId, dep);
+        if (builtIn != null) {
+            return new Row(dep, DepState.READY, null, builtInNote(dep, builtIn), Collections.emptyList(), 0);
+        }
+
         String coordinate = dep.coordinate();
         Set<String> folders = new LinkedHashSet<>();
         List<String> recorded = store.folders.get(coordinate);
-        if (recorded != null) folders.addAll(recorded);
-        for (LocalLibrary library : all) {
-            if (coordinate.equals(library.getMavenDependency())) folders.add(library.getName());
+        if (recorded != null && !recorded.isEmpty()) {
+            folders.addAll(recorded);
+        } else {
+            for (LocalLibrary library : all) {
+                if (coordinate.equals(library.getMavenDependency())) folders.add(library.getName());
+            }
+        }
+        String rootFolder = dep.artifact + "-v" + dep.version;
+        String rootOwner = store.artifacts.get(rootFolder);
+        if (folders.isEmpty() && rootOwner != null && !rootOwner.startsWith(dep.key() + ":") && new File(localLibsDir(), rootFolder).isDirectory()) {
+            return new Row(dep, DepState.PENDING, null, "Cache folder " + rootFolder + " belongs to " + rootOwner + "; sync will refuse to overwrite it",
+                    Collections.emptyList(), 0);
         }
         if (folders.isEmpty()) {
-            return new Row(dep, isConsumedConfiguration(dep.configuration) ? DepState.PENDING : DepState.SKIPPED,
-                    isConsumedConfiguration(dep.configuration) ? null : "'" + dep.configuration + "' is not used by the in-app build",
-                    Collections.emptyList(), 0);
+            return new Row(dep, DepState.PENDING, null, null, Collections.emptyList(), 0);
         }
         long bytes = 0;
         boolean allEnabled = true;
+        String supersededBy = null;
         for (String name : folders) {
-            File dir = new File(localLibsDir(), name);
-            HashMap<String, Object> map = LocalLibrariesUtil.createLibraryMap(name, coordinate);
-            if (!dir.isDirectory() || !map.containsKey("jarPath") || !map.containsKey("dexPath")) {
+            if (store.superseded.containsKey(name)) supersededBy = store.superseded.get(name);
+            if (!folderComplete(name)) {
                 return new Row(dep, DepState.FAILED, "Cached artifact '" + name + "' is incomplete (needs classes.jar and classes.dex). Sync again to repair it.",
-                        new ArrayList<>(folders), bytes);
+                        null, new ArrayList<>(folders), bytes);
             }
-            bytes += directorySize(dir);
-            if (!enabledNames.contains(name)) allEnabled = false;
+            bytes += directorySize(new File(localLibsDir(), name));
+            if (!enabledNames.contains(name) && !store.superseded.containsKey(name)) allEnabled = false;
         }
-        if (!isConsumedConfiguration(dep.configuration)) {
-            return new Row(dep, DepState.SKIPPED, "'" + dep.configuration + "' is not used by the in-app build", new ArrayList<>(folders), bytes);
+        Boolean resolvedSkip = store.resolvedSkip.get(coordinate);
+        if (allEnabled && wantsSkip(scId, store, dep) != (resolvedSkip != null && resolvedSkip)) {
+            return new Row(dep, DepState.PENDING, null, "Sub-dependency option changed; sync to apply", new ArrayList<>(folders), bytes);
         }
-        return new Row(dep, allEnabled ? DepState.READY : DepState.CACHED, null, new ArrayList<>(folders), bytes);
+        String note = null;
+        if (allEnabled) {
+            if (supersededBy != null) note = "Superseded by " + supersededBy + " (highest version wins)";
+            else if (resolvedSkip != null && resolvedSkip) note = "Sub-dependencies skipped";
+        }
+        return new Row(dep, allEnabled ? DepState.READY : DepState.CACHED, null, note, new ArrayList<>(folders), bytes);
     }
 
     private static long directorySize(File dir) {
@@ -284,6 +338,7 @@ public final class GradleSyncEngine {
         int done = 0;
         int failures = 0;
         boolean offlineFailure = false;
+        boolean assetsReady = false;
         listener.onLog("Sync started: " + total + " dependenc" + (total == 1 ? "y" : "ies") + ", offline cache " + (useCache ? "on" : "off"));
 
         for (GradleDependency dep : targets) {
@@ -292,18 +347,11 @@ public final class GradleSyncEngine {
                 return new Result(false, true, false, "Sync cancelled");
             }
             String key = dep.key();
-            listener.onStatus("Resolving " + dep.coordinate(), done, total);
+            listener.onStatus("Checking " + dep.coordinate(), done, total);
 
             if (!isConsumedConfiguration(dep.configuration)) {
                 listener.onLog("Skipping " + dep + ": '" + dep.configuration + "' is not used by the in-app build");
-                listener.onDependencyState(key, DepState.SKIPPED, "'" + dep.configuration + "' is not used by the in-app build");
-                done++;
-                continue;
-            }
-            String provider = builtInProvider(dep, enabledBuiltIns(scId));
-            if (provider != null) {
-                listener.onLog("Provided by Neo built-in library " + provider + ": " + dep.coordinate() + " (no download)");
-                listener.onDependencyState(key, DepState.READY, "Provided by Neo built-in library " + provider);
+                listener.onDependencyState(key, DepState.SKIPPED, null);
                 done++;
                 continue;
             }
@@ -316,18 +364,59 @@ public final class GradleSyncEngine {
                 continue;
             }
 
+            BuiltInArtifacts.Match builtIn = builtInFor(scId, dep);
+            if (builtIn != null) {
+                if (!assetsReady) {
+                    listener.onStatus("Preparing built-in libraries", done, total);
+                    try {
+                        BuiltInLibraries.extractCompileAssets();
+                        assetsReady = true;
+                    } catch (Exception e) {
+                        listener.onLog("error: could not extract built-in libraries: " + describe(e));
+                    }
+                }
+                boolean complete = assetsReady;
+                if (complete) {
+                    for (String name : BuiltInArtifacts.closure(builtIn.libraryName)) {
+                        if (!BuiltInArtifacts.isExtracted(name)) {
+                            complete = false;
+                            listener.onLog("error: built-in library " + name + " is missing its classes.jar or classes.dex");
+                        }
+                    }
+                }
+                if (complete) {
+                    listener.onLog(builtInNote(dep, builtIn) + " for " + dep.coordinate() + " (not downloaded)");
+                    listener.onDependencyState(key, DepState.READY, null);
+                } else {
+                    String message = "Neo built-in " + builtIn.libraryName + " is not available on this device";
+                    listener.onDependencyState(key, DepState.FAILED, message);
+                    failures++;
+                }
+                done++;
+                continue;
+            }
+
             if (useCache) {
-                Row cached = inspectOne(dep, loadStore(scId), LocalLibrariesUtil.getAllLocalLibraries(), enabledNames(scId), enabledBuiltIns(scId));
-                if (cached.state == DepState.READY || (cached.state == DepState.CACHED && cached.error == null)) {
+                Row cached = inspectOne(scId, dep, loadStore(scId), LocalLibrariesUtil.getAllLocalLibraries(), enabledNames(scId));
+                if (cached.state == DepState.READY || cached.state == DepState.CACHED) {
                     enableFolders(scId, cached.folders, dep.coordinate());
-                    listener.onLog("Cache hit: " + dep.coordinate() + " (" + cached.folders.size() + " artifact(s), no download)");
+                    listener.onLog("Cache hit: " + dep.coordinate() + " (" + cached.folders.size() + " artifact(s), not downloaded)");
                     listener.onDependencyState(key, DepState.READY, null);
                     done++;
                     continue;
                 }
-                if (cached.state == DepState.FAILED && cached.error != null && !cached.folders.isEmpty()) {
+                if (cached.state == DepState.FAILED && cached.error != null) {
                     listener.onLog("Cache invalid for " + dep.coordinate() + ": " + cached.error);
                 }
+            }
+
+            String collision = collisionProblem(scId, dep);
+            if (collision != null) {
+                listener.onLog("error: " + collision);
+                listener.onDependencyState(key, DepState.FAILED, collision);
+                failures++;
+                done++;
+                continue;
             }
 
             if (!isNetworkAvailable(context)) {
@@ -340,13 +429,15 @@ public final class GradleSyncEngine {
                 continue;
             }
 
+            boolean skipSubNow = wantsSkip(scId, loadStore(scId), dep);
+            listener.onLog((skipSubNow ? "Skipping sub-dependencies for " : "Including sub-dependencies for ") + dep.coordinate());
             listener.onDependencyState(key, DepState.SYNCING, null);
-            String error = download(scId, dep, buildSettings, listener);
+            String error = download(scId, dep, deps, buildSettings, listener, done, total);
             if (error != null) {
                 listener.onDependencyState(key, DepState.FAILED, error);
                 failures++;
             } else {
-                Row verified = inspectOne(dep, loadStore(scId), LocalLibrariesUtil.getAllLocalLibraries(), enabledNames(scId), enabledBuiltIns(scId));
+                Row verified = inspectOne(scId, dep, loadStore(scId), LocalLibrariesUtil.getAllLocalLibraries(), enabledNames(scId));
                 if (verified.state == DepState.READY) {
                     listener.onDependencyState(key, DepState.READY, null);
                 } else {
@@ -360,30 +451,110 @@ public final class GradleSyncEngine {
         }
 
         listener.onStatus("Verifying", done, total);
+        for (String line : reconcile(scId, deps)) listener.onLog(line);
+        String overlap = DuplicateClassGuard.find(scId, deps);
+        if (overlap != null) {
+            listener.onLog("error: " + overlap);
+            failures++;
+        }
         List<Row> finalRows = inspect(scId, deps);
         int notReady = 0;
         for (Row row : finalRows) {
             if (row.isConsumed() && row.state != DepState.READY) notReady++;
         }
-        Store store = loadStore(scId);
-        store.time = System.currentTimeMillis();
-        store.appHash = hash(appGradleContent);
         boolean success = failures == 0 && notReady == 0;
         String message;
+        String status;
         if (success) {
             message = "All " + countConsumed(finalRows) + " dependencies verified";
-            store.status = "SUCCESS";
+            status = "SUCCESS";
+        } else if (overlap != null) {
+            message = overlap.split("\n")[1].trim();
+            status = "FAILED";
         } else if (offlineFailure) {
             message = "Offline: " + notReady + " dependenc" + (notReady == 1 ? "y is" : "ies are") + " not cached";
-            store.status = "FAILED";
+            status = "FAILED";
         } else {
-            message = failures + " dependenc" + (failures == 1 ? "y" : "ies") + " failed to sync";
-            store.status = "FAILED";
+            int count = failures > 0 ? failures : notReady;
+            message = count + " dependenc" + (count == 1 ? "y" : "ies") + " failed to sync";
+            status = "FAILED";
         }
-        store.message = message;
-        saveStore(scId, store);
+        String finalMessage = message;
+        String appHash = hash(appGradleContent);
+        updateStore(scId, store -> {
+            store.time = System.currentTimeMillis();
+            store.appHash = appHash;
+            store.status = status;
+            store.message = finalMessage;
+        });
         listener.onLog(success ? "Sync finished: " + message : "Sync failed: " + message);
         return new Result(success, false, !success && offlineFailure, message);
+    }
+
+    @NonNull
+    public static List<String> reconcile(String scId, List<GradleDependency> deps) {
+        List<String> log = new ArrayList<>();
+        Store store = loadStore(scId);
+        Set<String> active = new LinkedHashSet<>();
+        for (GradleDependency dep : deps) {
+            if (!isConsumedConfiguration(dep.configuration)) continue;
+            List<String> folders = store.folders.get(dep.coordinate());
+            if (folders != null) active.addAll(folders);
+        }
+        Map<String, List<String>> byModule = new LinkedHashMap<>();
+        for (String folder : active) {
+            String coordinate = store.artifacts.get(folder);
+            if (coordinate == null) continue;
+            int second = coordinate.indexOf(':', coordinate.indexOf(':') + 1);
+            if (second < 0) continue;
+            byModule.computeIfAbsent(coordinate.substring(0, second), k -> new ArrayList<>()).add(folder);
+        }
+        Map<String, String> superseded = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> module : byModule.entrySet()) {
+            if (module.getValue().size() < 2) continue;
+            String winner = null;
+            String winnerVersion = null;
+            for (String folder : module.getValue()) {
+                String coordinate = store.artifacts.get(folder);
+                String version = coordinate.substring(coordinate.lastIndexOf(':') + 1);
+                if (winner == null || BuiltInArtifacts.compareVersions(version, winnerVersion) > 0) {
+                    winner = folder;
+                    winnerVersion = version;
+                }
+            }
+            for (String folder : module.getValue()) {
+                if (!folder.equals(winner)) {
+                    superseded.put(folder, store.artifacts.get(winner));
+                    log.add("Version conflict on " + module.getKey() + ": using " + winnerVersion + ", disabled " + store.artifacts.get(folder));
+                }
+            }
+        }
+        Set<String> declaredKeys = new HashSet<>();
+        for (GradleDependency dep : deps) declaredKeys.add(dep.key());
+        updateStore(scId, current -> {
+            current.superseded = superseded;
+            current.skipSub.keySet().retainAll(declaredKeys);
+        });
+
+        ArrayList<HashMap<String, Object>> enabled = LocalLibrariesUtil.getLocalLibraries(scId);
+        boolean changed = enabled.removeIf(map -> map.get("name") != null && superseded.containsKey(map.get("name").toString()));
+        Set<String> names = new HashSet<>();
+        for (HashMap<String, Object> map : enabled) {
+            if (map.get("name") != null) names.add(map.get("name").toString());
+        }
+        for (String folder : active) {
+            if (superseded.containsKey(folder) || names.contains(folder) || !folderComplete(folder)) continue;
+            if (store.artifacts.containsKey(folder)) {
+                enabled.add(LocalLibrariesUtil.createLibraryMap(folder, store.artifacts.get(folder)));
+                names.add(folder);
+                changed = true;
+            }
+        }
+        if (changed) {
+            LocalLibrariesUtil.rewriteLocalLibFile(scId, new Gson().toJson(enabled));
+            LocalLibrariesUtil.clearCache();
+        }
+        return log;
     }
 
     private static int countConsumed(List<Row> rows) {
@@ -395,77 +566,124 @@ public final class GradleSyncEngine {
     }
 
     @Nullable
-    private static String download(String scId, GradleDependency dep, BuildSettings buildSettings, Listener listener) {
+    private static String collisionProblem(String scId, GradleDependency dep) {
+        String folder = dep.artifact + "-v" + dep.version;
+        String owner = loadStore(scId).artifacts.get(folder);
+        if (owner != null && !owner.startsWith(dep.key() + ":") && new File(localLibsDir(), folder).isDirectory()) {
+            return "Cache folder " + folder + " already belongs to " + owner + "; refusing to overwrite it with " + dep.coordinate()
+                    + ". Remove it from Local Libraries first.";
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String download(String scId, GradleDependency dep, List<GradleDependency> declared, BuildSettings buildSettings, Listener listener, int done, int total) {
         String coordinate = dep.coordinate();
+        boolean skipSub = wantsSkip(scId, loadStore(scId), dep);
         List<String> resolved = new ArrayList<>();
+        List<String> providedBuiltIns = new ArrayList<>();
+        Map<String, String> folderCoordinates = new LinkedHashMap<>();
         String[] failure = new String[1];
-        listener.onLog("Downloading " + coordinate);
         try {
             BuiltInLibraries.maybeExtractAndroidJar((message, progress) -> {
             });
             BuiltInLibraries.maybeExtractCoreLambdaStubsJar();
-            new DependencyResolver(dep.group, dep.artifact, dep.version, false, buildSettings)
-                    .resolveDependency(new DependencyResolver.DependencyResolverCallback() {
-                        @Override
-                        public void onResolving(@NonNull Artifact artifact, @NonNull Artifact dependency) {
-                            listener.onLog("Resolving " + dependency);
-                        }
+            DependencyResolver resolver = new DependencyResolver(dep.group, dep.artifact, dep.version, skipSub, buildSettings);
+            resolver.setProvidedBy(artifact -> {
+                BuiltInArtifacts.Match match = BuiltInArtifacts.findSatisfying(scId, artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
+                return match == null ? null : match.libraryName;
+            });
+            resolver.resolveDependency(new DependencyResolver.DependencyResolverCallback() {
+                @Override
+                public void onResolving(@NonNull Artifact artifact, @NonNull Artifact dependency) {
+                    listener.onStatus("Resolving " + dependency, done, total);
+                    listener.onLog("Resolving " + dependency);
+                }
 
-                        @Override
-                        public void onDownloadStart(@NonNull Artifact artifact) {
-                            listener.onLog("Downloading " + artifact);
-                        }
+                @Override
+                public void onDownloadStart(@NonNull Artifact artifact) {
+                    listener.onStatus("Downloading " + artifact, done, total);
+                    listener.onLog("Downloading " + artifact);
+                }
 
-                        @Override
-                        public void onSkippingResolution(@NonNull Artifact artifact) {
-                            listener.onLog("Already resolved " + artifact);
-                        }
+                @Override
+                public void onCacheHit(@NonNull Artifact artifact) {
+                    listener.onLog("Using cached " + artifact);
+                }
 
-                        @Override
-                        public void unzipping(@NonNull Artifact artifact) {
-                            listener.onLog("Unzipping " + artifact);
-                        }
+                @Override
+                public void onProvided(@NonNull Artifact artifact, @NonNull String provider) {
+                    if (!providedBuiltIns.contains(provider)) providedBuiltIns.add(provider);
+                    listener.onLog("Provided by Neo built-in " + provider + ": " + artifact + " (not downloaded)");
+                }
 
-                        @Override
-                        public void dexing(@NonNull Artifact artifact) {
-                            listener.onLog("Dexing " + artifact);
-                        }
+                @Override
+                public void onFolderResolved(@NonNull Artifact artifact, @NonNull String folder) {
+                    folderCoordinates.put(folder, artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getVersion());
+                }
 
-                        @Override
-                        public void onArtifactNotFound(@NonNull Artifact artifact) {
-                            failure[0] = "Could not find " + artifact + " in any configured repository";
-                        }
+                @Override
+                public void onSkippingResolution(@NonNull Artifact artifact) {
+                    listener.onLog("Skipping dependency resolution for " + artifact);
+                }
 
-                        @Override
-                        public void onVersionNotFound(@NonNull Artifact artifact) {
-                            failure[0] = "Version not found for " + artifact;
-                        }
+                @Override
+                public void unzipping(@NonNull Artifact artifact) {
+                    listener.onStatus("Unzipping " + artifact, done, total);
+                    listener.onLog("Unzipping " + artifact);
+                }
 
-                        @Override
-                        public void onInvalidScope(@NonNull Artifact artifact, @NonNull String scope) {
-                            failure[0] = "Invalid scope '" + scope + "' for " + artifact;
-                        }
+                @Override
+                public void dexing(@NonNull Artifact artifact) {
+                    listener.onStatus("Dexing " + artifact, done, total);
+                    listener.onLog("Dexing " + artifact);
+                }
 
-                        @Override
-                        public void invalidPackaging(@NonNull Artifact artifact) {
-                            failure[0] = "Unsupported packaging for " + artifact + " (only jar and aar are supported)";
-                        }
+                @Override
+                public void onArtifactNotFound(@NonNull Artifact artifact) {
+                    failure[0] = "Could not find " + artifact + " in any configured repository";
+                }
 
-                        @Override
-                        public void onDownloadError(@NonNull Artifact artifact, @NonNull Throwable error) {
-                            failure[0] = "Could not download " + artifact + ": " + describe(error);
-                        }
+                @Override
+                public void onVersionNotFound(@NonNull Artifact artifact) {
+                    failure[0] = "Version not found for " + artifact;
+                }
 
-                        @Override
-                        public void dexingFailed(@NonNull Artifact artifact, @NonNull Exception error) {
-                            failure[0] = "D8 failed to process " + artifact + ": " + describe(error);
-                        }
+                @Override
+                public void onDependenciesNotFound(@NonNull Artifact artifact) {
+                    failure[0] = "No classes.jar was produced for " + artifact;
+                }
 
-                        @Override
-                        public void onTaskCompleted(@NonNull List<String> artifacts) {
-                            resolved.addAll(artifacts);
-                        }
-                    });
+                @Override
+                public void onInvalidPOM(@NonNull Artifact artifact) {
+                    failure[0] = "Invalid POM for " + artifact;
+                }
+
+                @Override
+                public void onInvalidScope(@NonNull Artifact artifact, @NonNull String scope) {
+                    failure[0] = "Invalid scope '" + scope + "' for " + artifact;
+                }
+
+                @Override
+                public void invalidPackaging(@NonNull Artifact artifact) {
+                    failure[0] = "Unsupported packaging for " + artifact + " (only jar and aar are supported)";
+                }
+
+                @Override
+                public void onDownloadError(@NonNull Artifact artifact, @NonNull Throwable error) {
+                    failure[0] = "Could not download " + artifact + ": " + describe(error);
+                }
+
+                @Override
+                public void dexingFailed(@NonNull Artifact artifact, @NonNull Exception error) {
+                    failure[0] = "D8 failed to process " + artifact + ": " + describe(error);
+                }
+
+                @Override
+                public void onTaskCompleted(@NonNull List<String> artifacts) {
+                    resolved.addAll(artifacts);
+                }
+            });
         } catch (Exception e) {
             failure[0] = failure[0] != null ? failure[0] : describe(e);
         }
@@ -479,15 +697,48 @@ public final class GradleSyncEngine {
             return message;
         }
         for (String folder : resolved) {
-            LocalLibrariesUtil.writeArtifactMetadata(folder, coordinate);
+            if (!folderComplete(folder)) {
+                String message = "Resolved artifact '" + folder + "' is incomplete (missing classes.jar or classes.dex)";
+                listener.onLog("error: " + message);
+                return message;
+            }
+        }
+        for (int i = 0; i < resolved.size(); i++) {
+            String folder = resolved.get(i);
+            if (i == 0 || artifactTag(folder) == null) {
+                LocalLibrariesUtil.writeArtifactMetadata(folder, coordinate);
+            }
         }
         LocalLibrariesUtil.clearCache();
-        Store store = loadStore(scId);
-        store.folders.put(coordinate, new ArrayList<>(resolved));
-        saveStore(scId, store);
+        List<String> previous = loadStore(scId).folders.get(coordinate);
+        updateStore(scId, store -> {
+            store.folders.put(coordinate, new ArrayList<>(resolved));
+            store.resolvedSkip.put(coordinate, skipSub);
+            store.artifacts.putAll(folderCoordinates);
+            if (providedBuiltIns.isEmpty()) store.builtIns.remove(coordinate);
+            else store.builtIns.put(coordinate, providedBuiltIns);
+        });
+        if (previous != null) pruneUnused(scId, previous, resolved, dep, declared);
         enableFolders(scId, resolved, coordinate);
-        listener.onLog("Resolved " + coordinate + " into " + resolved.size() + " artifact(s)");
+        listener.onLog(skipSub
+                ? "Resolved " + coordinate + " (sub-dependencies skipped)"
+                : "Resolved " + coordinate + " into " + resolved.size() + " artifact(s)");
         return null;
+    }
+
+    private static void pruneUnused(String scId, List<String> previous, List<String> current, GradleDependency owner, List<GradleDependency> declared) {
+        Store store = loadStore(scId);
+        List<LocalLibrary> all = LocalLibrariesUtil.getAllLocalLibraries();
+        Set<String> stale = new LinkedHashSet<>(previous);
+        stale.removeAll(current);
+        for (GradleDependency other : declared) {
+            if (other.key().equals(owner.key())) continue;
+            stale.removeAll(foldersOf(other, store, all));
+        }
+        if (stale.isEmpty()) return;
+        ArrayList<HashMap<String, Object>> enabled = LocalLibrariesUtil.getLocalLibraries(scId);
+        boolean changed = enabled.removeIf(map -> map.get("name") != null && stale.contains(map.get("name").toString()));
+        if (changed) LocalLibrariesUtil.rewriteLocalLibFile(scId, new Gson().toJson(enabled));
     }
 
     private static String describe(Throwable t) {
@@ -507,8 +758,10 @@ public final class GradleSyncEngine {
             Object name = map.get("name");
             if (name != null) names.add(name.toString());
         }
+        Map<String, String> superseded = loadStore(scId).superseded;
         boolean changed = false;
         for (String folder : folders) {
+            if (superseded.containsKey(folder)) continue;
             if (names.add(folder)) {
                 enabled.add(LocalLibrariesUtil.createLibraryMap(folder, coordinate));
                 changed = true;
@@ -524,22 +777,29 @@ public final class GradleSyncEngine {
         for (GradleDependency other : remaining) {
             toRemove.removeAll(foldersOf(other, store, all));
         }
-        store.folders.remove(removed.coordinate());
-        store.status = "NONE";
-        saveStore(scId, store);
+        updateStore(scId, current -> {
+            current.folders.remove(removed.coordinate());
+            current.builtIns.remove(removed.coordinate());
+            current.resolvedSkip.remove(removed.coordinate());
+            current.status = "NONE";
+        });
         if (toRemove.isEmpty()) return;
         ArrayList<HashMap<String, Object>> enabled = LocalLibrariesUtil.getLocalLibraries(scId);
         boolean changed = enabled.removeIf(map -> map.get("name") != null && toRemove.contains(map.get("name").toString()));
         if (changed) LocalLibrariesUtil.rewriteLocalLibFile(scId, new Gson().toJson(enabled));
+        reconcile(scId, remaining);
     }
 
     private static Set<String> foldersOf(GradleDependency dep, Store store, List<LocalLibrary> all) {
         Set<String> folders = new LinkedHashSet<>();
         String coordinate = dep.coordinate();
         List<String> recorded = store.folders.get(coordinate);
-        if (recorded != null) folders.addAll(recorded);
-        for (LocalLibrary library : all) {
-            if (coordinate.equals(library.getMavenDependency())) folders.add(library.getName());
+        if (recorded != null && !recorded.isEmpty()) {
+            folders.addAll(recorded);
+        } else {
+            for (LocalLibrary library : all) {
+                if (coordinate.equals(library.getMavenDependency())) folders.add(library.getName());
+            }
         }
         return folders;
     }

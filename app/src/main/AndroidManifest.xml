@@ -70,6 +70,10 @@
             android:name="com.besome.sketch.editor.makeblock.MakeBlockActivity"
             android:configChanges="orientation|screenSize" />
         <activity
+            android:name="com.besome.sketch.editor.makeblock.NewMoreBlockCreatorActivity"
+            android:configChanges="orientation|screenSize"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <activity
             android:name="com.besome.sketch.projects.MyProjectSettingActivity"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
@@ -349,7 +353,7 @@
         <activity
             android:name=".activities.editor.gradle.ManageGradleActivity"
             android:configChanges="orientation|screenSize"
-            android:windowSoftInputMode="stateAlwaysHidden" />
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
             
         <activity
             android:name=".activities.editor.component.AddCustomComponentActivity"

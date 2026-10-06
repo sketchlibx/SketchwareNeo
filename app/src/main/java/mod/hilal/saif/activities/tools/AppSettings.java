@@ -90,7 +90,7 @@ public class AppSettings extends BaseAppCompatActivity {
         LibraryCategoryView cloudCategory = new LibraryCategoryView(this);
         cloudCategory.setTitle("Cloud & Sync");
         preferences.add(cloudCategory);
-        cloudCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_sync, "Cloud Backup Dashboard", "Backup and restore projects securely to Google Drive", new ActivityLauncher(new Intent(getApplicationContext(), CloudBackupManagerActivity.class))), false);
+        cloudCategory.addLibraryItem(createPreference(R.drawable.ic_mtrl_cloud, "Cloud Backup Dashboard", "Backup and restore projects securely to Google Drive", new ActivityLauncher(new Intent(getApplicationContext(), CloudBackupManagerActivity.class))), false);
 
         LibraryCategoryView generalCategory = new LibraryCategoryView(this);
         generalCategory.setTitle("General");

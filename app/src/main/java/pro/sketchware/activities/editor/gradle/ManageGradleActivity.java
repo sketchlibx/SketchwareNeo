@@ -26,6 +26,9 @@ import android.widget.TextView;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
@@ -84,6 +87,8 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
     private static final int MENU_CUSTOM = 101;
     private static final int MENU_LOG = 102;
     private static final int MENU_RESET = 103;
+    private static final int MENU_SAVE = 104;
+    private static final int MENU_SYNC = 105;
 
     private static final String[] CONFIGURATIONS = {"implementation", "api", "kapt", "compileOnly", "runtimeOnly", "annotationProcessor"};
     private static final Pattern COORDINATE = Pattern.compile("^[A-Za-z0-9_.\\-]+:[A-Za-z0-9_.\\-]+:[A-Za-z0-9_.\\-]+$");
@@ -103,6 +108,9 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
     private boolean loadingEditor;
     private List<GradleSyncEngine.Row> allRows = new ArrayList<>();
     private String javaChoice;
+    private boolean lastDirty;
+    private boolean imeVisible;
+    private boolean updatingSkipSwitches;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -110,6 +118,13 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         super.onCreate(savedInstanceState);
         binding = ManageGradleActivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+            applyKeyboardState(insets.isVisible(WindowInsetsCompat.Type.ime()));
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         sc_id = getIntent().getStringExtra("sc_id");
         if (sc_id == null) {
@@ -197,9 +212,9 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
     }
 
     private void setupTabs(int selected) {
-        binding.tabs.addTab(binding.tabs.newTab().setText("Gradle Sync").setIcon(R.drawable.ic_mtrl_sync));
-        binding.tabs.addTab(binding.tabs.newTab().setText("Dependencies").setIcon(R.drawable.ic_mtrl_download));
-        binding.tabs.addTab(binding.tabs.newTab().setText("Build Settings").setIcon(R.drawable.ic_mtrl_settings));
+        binding.tabs.addTab(binding.tabs.newTab().setText("Gradle Sync").setIcon(R.drawable.ic_mtrl_gradle));
+        binding.tabs.addTab(binding.tabs.newTab().setText("Dependencies").setIcon(R.drawable.ic_mtrl_dependency));
+        binding.tabs.addTab(binding.tabs.newTab().setText("Build Settings").setIcon(R.drawable.ic_mtrl_configuration));
         binding.tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
@@ -227,7 +242,6 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
     private void setupEditor() {
         binding.editor.setTypefaceText(EditorUtils.getTypeface(this));
-        SrcCodeEditor.loadCESettings(this, binding.editor, "act", false);
         binding.editor.getText().addContentListener(new ContentListener() {
             @Override
             public void beforeReplace(Content content) {
@@ -251,8 +265,6 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
             if (binding.editor.canRedo()) binding.editor.redo();
             refreshEditorState();
         });
-        binding.btnSave.setOnClickListener(v -> saveCurrent(true));
-        binding.btnSync.setOnClickListener(v -> onSyncClicked());
         binding.btnOpenDir.setOnClickListener(v -> openDirectory());
     }
 
@@ -261,8 +273,21 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         refreshEditorState();
     }
 
+    private void applyKeyboardState(boolean visible) {
+        if (visible == imeVisible) return;
+        imeVisible = visible;
+        int visibility = visible ? View.GONE : View.VISIBLE;
+        binding.statusCard.setVisibility(visibility);
+        binding.filesHeader.setVisibility(visibility);
+    }
+
     private void refreshEditorState() {
         boolean dirty = isDirty(currentFile);
+        boolean anyDirty = dirty || otherFilesDirty();
+        if (anyDirty != lastDirty) {
+            lastDirty = anyDirty;
+            invalidateOptionsMenu();
+        }
         binding.editorState.setText(dirty ? "Modified" : "Editable");
         binding.editorState.setBackgroundTintList(ColorStateList.valueOf(ThemeUtils.getColor(this,
                 dirty ? com.google.android.material.R.attr.colorTertiaryContainer : com.google.android.material.R.attr.colorSecondaryContainer)));
@@ -326,9 +351,10 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         try {
             io.github.rosemoe.sora.widget.CodeEditor editor = binding.editor;
             CodeEditorLanguages.LanguageSpec spec = CodeEditorLanguages.resolveLanguageSpec(displayName(name).equals("app/build.gradle") ? "build.gradle" : name);
+            editor.setText(text);
             SrcCodeEditor.applyLanguageSpec(this, editor, spec);
             languageLabel = spec.label;
-            editor.setText(text);
+            SrcCodeEditor.loadCESettings(this, editor, "act", false);
         } finally {
             loadingEditor = false;
         }
@@ -345,16 +371,21 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         return current != null && !current.equals(base);
     }
 
+    private boolean otherFilesDirty() {
+        for (String name : gradleFiles) {
+            if (name.equals(currentFile)) continue;
+            String base = saved.get(name);
+            String current = buffers.get(name);
+            if (base != null && current != null && !current.equals(base)) return true;
+        }
+        return false;
+    }
+
     private boolean anyDirty() {
         for (String name : gradleFiles) {
             if (isDirty(name)) return true;
         }
         return false;
-    }
-
-    private boolean saveCurrent(boolean announce) {
-        stashEditor();
-        return saveFile(currentFile, announce);
     }
 
     private boolean saveFile(String name, boolean announce) {
@@ -378,6 +409,27 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
             else SketchwareUtil.toast("Saved " + displayName(name));
         }
         return true;
+    }
+
+    private void saveDirtyFiles() {
+        stashEditor();
+        List<String> names = new ArrayList<>();
+        for (String name : gradleFiles) {
+            if (isDirty(name)) names.add(name);
+        }
+        if (names.isEmpty()) return;
+        for (String name : names) saveFile(name, false);
+        List<GradleFileValidator.Issue> issues = GradleFileValidator.validate(new File(customGradleDir));
+        GradleFileValidator.Issue error = null;
+        for (GradleFileValidator.Issue issue : issues) {
+            if (issue.severity == GradleFileValidator.Severity.ERROR) {
+                error = issue;
+                break;
+            }
+        }
+        if (error != null) SketchwareUtil.toastError("Saved with error: " + error);
+        else SketchwareUtil.toast(names.size() == 1 ? "Saved " + displayName(names.get(0)) : "Saved " + names.size() + " files");
+        invalidateOptionsMenu();
     }
 
     private void saveAllDirty() {
@@ -466,6 +518,19 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         binding.depsList.setItemAnimator(null);
         binding.btnAddDep.setOnClickListener(v -> showDependencyDialog(null));
         binding.btnSyncNow.setOnClickListener(v -> onSyncClicked());
+        updatingSkipSwitches = true;
+        binding.switchSkipDeps.setChecked(new BuildSettings(sc_id).isSkipSubDependencies());
+        updatingSkipSwitches = false;
+        binding.switchSkipDeps.setOnCheckedChangeListener((button, checked) -> {
+            if (updatingSkipSwitches) return;
+            GradleSyncEngine.setSkipSubDependenciesForAll(sc_id, checked);
+            buildSettings = new BuildSettings(sc_id);
+            updatingSkipSwitches = true;
+            binding.switchSkipSub.setChecked(checked);
+            updatingSkipSwitches = false;
+            viewModel.reload();
+            SketchwareUtil.toast(checked ? "Only listed dependencies will be downloaded. Run Sync to apply." : "Sub-dependencies will be downloaded too. Run Sync to apply.");
+        });
         binding.depsSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -540,9 +605,11 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         menu.getMenu().add(0, 1, 0, "Edit");
         menu.getMenu().add(0, 2, 1, "Change configuration");
         if (row.state == GradleSyncEngine.DepState.FAILED) menu.getMenu().add(0, 3, 2, "Retry");
-        menu.getMenu().add(0, 4, 3, "Details");
-        menu.getMenu().add(0, 5, 4, "Copy coordinate");
-        menu.getMenu().add(0, 6, 5, "Remove");
+        boolean skipping = GradleSyncEngine.isSkipSubDependencies(sc_id, row.dep.key());
+        menu.getMenu().add(0, 7, 3, skipping ? "Include sub-dependencies" : "Skip sub-dependencies");
+        menu.getMenu().add(0, 4, 4, "Details");
+        menu.getMenu().add(0, 5, 5, "Copy coordinate");
+        menu.getMenu().add(0, 6, 6, "Remove");
         menu.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case 1 -> showDependencyDialog(row);
@@ -559,6 +626,11 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
                     SketchwareUtil.toast("Copied");
                 }
                 case 6 -> confirmRemove(row);
+                case 7 -> {
+                    GradleSyncEngine.setSkipSubDependencies(sc_id, row.dep.key(), !skipping);
+                    viewModel.reload();
+                    SketchwareUtil.toast("Run Sync to apply for " + row.dep.key());
+                }
             }
             return true;
         });
@@ -614,8 +686,12 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
                 .setTitle("Configuration")
                 .setSingleChoiceItems(CONFIGURATIONS, checked, (d, which) -> choice[0] = which)
                 .setPositiveButton("Apply", (d, w) -> {
-                    if (!CONFIGURATIONS[choice[0]].equals(row.dep.configuration)) {
-                        mutateAppBuild(content -> GradleDependencyEditor.update(content, row.dep.key(), CONFIGURATIONS[choice[0]], row.dep.coordinate()), row.dep, null);
+                    String configuration = CONFIGURATIONS[choice[0]];
+                    if (!configuration.equals(row.dep.configuration)) {
+                        boolean skip = GradleSyncEngine.isSkipSubDependencies(sc_id, row.dep.key());
+                        mutateAppBuild(content -> GradleDependencyEditor.update(content, row.dep.key(), configuration, row.dep.coordinate()),
+                                row.dep.key(), replacedFor(row, configuration, row.dep.coordinate()),
+                                () -> GradleSyncEngine.setSkipSubDependencies(sc_id, row.dep.key(), skip));
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -626,7 +702,7 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Remove dependency")
                 .setMessage("Remove " + row.dep.key() + " from app/build.gradle? Downloaded files stay in the cache.")
-                .setPositiveButton("Remove", (d, w) -> mutateAppBuild(content -> GradleDependencyEditor.remove(content, row.dep.key()), row.dep, null))
+                .setPositiveButton("Remove", (d, w) -> mutateAppBuild(content -> GradleDependencyEditor.remove(content, row.dep.key()), row.dep.key(), row.dep, null))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
@@ -635,7 +711,7 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         String apply(String content);
     }
 
-    private void mutateAppBuild(Mutation mutation, @Nullable GradleDependency replaced, @Nullable Runnable after) {
+    private void mutateAppBuild(Mutation mutation, @Nullable String requiredKey, @Nullable GradleDependency replaced, @Nullable Runnable after) {
         if (viewModel.isRunning()) {
             SketchwareUtil.toast("Wait for the running sync to finish");
             return;
@@ -647,7 +723,7 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
                     .setMessage("Save app/build.gradle before changing dependencies?")
                     .setPositiveButton("Save", (d, w) -> {
                         saveFile(FILE_APP_BUILD, false);
-                        mutateAppBuild(mutation, replaced, after);
+                        mutateAppBuild(mutation, requiredKey, replaced, after);
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
@@ -657,6 +733,10 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         String path = customGradleDir + FILE_APP_BUILD;
         if (!FileUtil.isExistFile(path)) ensureGradleFilesExist(false);
         String content = FileUtil.readFile(path);
+        if (requiredKey != null && !GradleDependencyEditor.has(content, requiredKey)) {
+            SketchwareUtil.toastError(requiredKey + " is not declared as a single quoted dependency inside the dependencies block, so it cannot be edited here. Edit it directly in app/build.gradle.");
+            return;
+        }
         String updated = mutation.apply(content);
         if (updated.equals(content)) {
             SketchwareUtil.toast("No change made to app/build.gradle");
@@ -672,15 +752,30 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         FileUtil.writeFile(path, updated);
         saved.put(FILE_APP_BUILD, updated);
         buffers.remove(FILE_APP_BUILD);
+        if (after != null) after.run();
         if (currentFile.equals(FILE_APP_BUILD)) loadFile(FILE_APP_BUILD, true);
         viewModel.reload();
-        if (after != null) after.run();
+    }
+
+    @Nullable
+    private GradleDependency replacedFor(GradleSyncEngine.Row row, String newConfiguration, String newCoordinate) {
+        boolean coordinateChanged = !row.dep.coordinate().equals(newCoordinate);
+        boolean consumedChanged = GradleSyncEngine.isConsumedConfiguration(row.dep.configuration) != GradleSyncEngine.isConsumedConfiguration(newConfiguration);
+        return coordinateChanged || consumedChanged ? row.dep : null;
+    }
+
+    private static String keyOf(String coordinate) {
+        String[] parts = coordinate.split(":");
+        return parts[0] + ":" + parts[1];
     }
 
     private void showDependencyDialog(@Nullable GradleSyncEngine.Row editing) {
         DialogGradleDependencyBinding d = DialogGradleDependencyBinding.inflate(getLayoutInflater());
         d.actvConfig.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, CONFIGURATIONS));
         d.actvConfig.setText(editing != null ? editing.dep.configuration : "implementation", false);
+        d.cbSkipSub.setChecked(editing != null
+                ? GradleSyncEngine.isSkipSubDependencies(sc_id, editing.dep.key())
+                : new BuildSettings(sc_id).isSkipSubDependencies());
         if (editing != null) {
             d.etCoordinate.setText(editing.dep.coordinate());
             d.searchRow.setVisibility(View.GONE);
@@ -734,12 +829,25 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
                 return;
             }
             if (configuration.isEmpty()) configuration = "implementation";
-            dialog.dismiss();
             String finalConfiguration = configuration;
+            boolean skip = d.cbSkipSub.isChecked();
+            String newKey = keyOf(coordinate);
+            dialog.dismiss();
             if (editing == null) {
-                mutateAppBuild(content -> GradleDependencyEditor.add(content, finalConfiguration, coordinate), null, null);
+                mutateAppBuild(content -> GradleDependencyEditor.add(content, finalConfiguration, coordinate), null, null,
+                        () -> GradleSyncEngine.setSkipSubDependencies(sc_id, newKey, skip));
+            } else if (coordinate.equals(editing.dep.coordinate()) && finalConfiguration.equals(editing.dep.configuration)) {
+                if (skip != GradleSyncEngine.isSkipSubDependencies(sc_id, editing.dep.key())) {
+                    GradleSyncEngine.setSkipSubDependencies(sc_id, editing.dep.key(), skip);
+                    viewModel.reload();
+                    SketchwareUtil.toast("Sub-dependency option updated. Run Sync to apply it.");
+                } else {
+                    SketchwareUtil.toast("No changes made");
+                }
             } else {
-                mutateAppBuild(content -> GradleDependencyEditor.update(content, editing.dep.key(), finalConfiguration, coordinate), editing.dep, null);
+                mutateAppBuild(content -> GradleDependencyEditor.update(content, editing.dep.key(), finalConfiguration, coordinate),
+                        editing.dep.key(), replacedFor(editing, finalConfiguration, coordinate),
+                        () -> GradleSyncEngine.setSkipSubDependencies(sc_id, newKey, skip));
             }
         }));
         dialog.show();
@@ -762,6 +870,7 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
     private void setupBuildSettings() {
         binding.switchOffline.setChecked(buildSettings.isOfflineCacheEnabled());
+        binding.switchSkipSub.setChecked(new BuildSettings(sc_id).isSkipSubDependencies());
 
         int max = BuildSettings.getMaxParallelThreads();
         boolean adjustable = max >= 2;
@@ -804,6 +913,14 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
     }
 
     private void applyBuildSettings() {
+        boolean skipSub = binding.switchSkipSub.isChecked();
+        if (skipSub != new BuildSettings(sc_id).isSkipSubDependencies()) {
+            GradleSyncEngine.setSkipSubDependenciesForAll(sc_id, skipSub);
+        }
+        buildSettings = new BuildSettings(sc_id);
+        updatingSkipSwitches = true;
+        binding.switchSkipDeps.setChecked(skipSub);
+        updatingSkipSwitches = false;
         buildSettings.setValue(BuildSettings.SETTING_OFFLINE_CACHE, binding.switchOffline.isChecked()
                 ? ProjectSettings.SETTING_GENERIC_VALUE_TRUE : ProjectSettings.SETTING_GENERIC_VALUE_FALSE);
         int threads = Math.max(1, Math.min((int) binding.sliderThreads.getValue(), BuildSettings.getMaxParallelThreads()));
@@ -836,49 +953,49 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
     private void renderSyncUi(GradleManagerViewModel.SyncUi ui) {
         String title;
-        String icon;
+        int icon;
         int container;
         int content;
         switch (ui.status) {
             case SYNCED -> {
                 title = "Gradle is Synced";
-                icon = "✓";
+                icon = R.drawable.ic_mtrl_check;
                 container = com.google.android.material.R.attr.colorPrimaryContainer;
                 content = com.google.android.material.R.attr.colorOnPrimaryContainer;
             }
             case STALE -> {
                 title = "Sync required";
-                icon = "!";
+                icon = R.drawable.ic_mtrl_warning;
                 container = com.google.android.material.R.attr.colorTertiaryContainer;
                 content = com.google.android.material.R.attr.colorOnTertiaryContainer;
             }
             case SYNCING -> {
                 title = "Syncing...";
-                icon = "";
+                icon = R.drawable.ic_mtrl_sync;
                 container = com.google.android.material.R.attr.colorSecondaryContainer;
                 content = com.google.android.material.R.attr.colorOnSecondaryContainer;
             }
             case FAILED -> {
                 title = "Sync failed";
-                icon = "✕";
+                icon = R.drawable.ic_mtrl_cancel;
                 container = com.google.android.material.R.attr.colorErrorContainer;
                 content = com.google.android.material.R.attr.colorOnErrorContainer;
             }
             case OFFLINE -> {
                 title = "Offline";
-                icon = "!";
+                icon = R.drawable.ic_mtrl_warning;
                 container = com.google.android.material.R.attr.colorErrorContainer;
                 content = com.google.android.material.R.attr.colorOnErrorContainer;
             }
             case INVALID -> {
                 title = "Invalid configuration";
-                icon = "✕";
+                icon = R.drawable.ic_mtrl_cancel;
                 container = com.google.android.material.R.attr.colorErrorContainer;
                 content = com.google.android.material.R.attr.colorOnErrorContainer;
             }
             default -> {
                 title = "Not synced yet";
-                icon = "•";
+                icon = R.drawable.ic_mtrl_info;
                 container = com.google.android.material.R.attr.colorSurfaceContainerHighest;
                 content = com.google.android.material.R.attr.colorOnSurface;
             }
@@ -886,9 +1003,9 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
         boolean syncing = ui.status == GradleManagerViewModel.Status.SYNCING;
         binding.statusTitle.setText(title);
         binding.statusMessage.setText(ui.message);
-        binding.statusIcon.setText(icon);
+        binding.statusIcon.setImageResource(icon);
         binding.statusIcon.setBackgroundTintList(ColorStateList.valueOf(ThemeUtils.getColor(this, container)));
-        binding.statusIcon.setTextColor(ThemeUtils.getColor(this, content));
+        binding.statusIcon.setImageTintList(ColorStateList.valueOf(ThemeUtils.getColor(this, content)));
         binding.statusIcon.setVisibility(syncing ? View.INVISIBLE : View.VISIBLE);
         binding.statusProgress.setVisibility(syncing ? View.VISIBLE : View.GONE);
         binding.statusAgp.setText(ui.agpVersion != null ? "AGP " + ui.agpVersion : "AGP n/a");
@@ -902,16 +1019,21 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
                 binding.syncProgress.setProgress(ui.done);
             }
         }
-        binding.btnSync.setText(syncing ? "Cancel" : "Sync Gradle");
         binding.btnSyncNow.setText(syncing ? "Cancel" : "Sync Now");
         invalidateOptionsMenu();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        MenuItem save = menu.add(Menu.NONE, MENU_SAVE, Menu.NONE, "Save");
+        save.setIcon(R.drawable.ic_mtrl_save);
+        save.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        MenuItem sync = menu.add(Menu.NONE, MENU_SYNC, Menu.NONE, "Sync Gradle");
+        sync.setIcon(R.drawable.ic_mtrl_sync);
+        sync.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
         MenuItem refresh = menu.add(Menu.NONE, MENU_REFRESH, Menu.NONE, "Refresh");
         refresh.setIcon(R.drawable.ic_mtrl_refresh);
-        refresh.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        refresh.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         MenuItem custom = menu.add(Menu.NONE, MENU_CUSTOM, Menu.NONE, "Use Custom Gradle");
         custom.setCheckable(true);
         custom.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
@@ -924,16 +1046,32 @@ public class ManageGradleActivity extends BaseAppCompatActivity {
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
+        boolean running = viewModel.isRunning();
+        MenuItem save = menu.findItem(MENU_SAVE);
+        if (save != null) save.setVisible(anyDirty());
+        MenuItem sync = menu.findItem(MENU_SYNC);
+        if (sync != null) {
+            sync.setTitle(running ? "Cancel sync" : "Sync Gradle");
+            sync.setIcon(running ? R.drawable.ic_mtrl_stop : R.drawable.ic_mtrl_sync);
+        }
         MenuItem custom = menu.findItem(MENU_CUSTOM);
         if (custom != null) custom.setChecked(isCustomGradleEnabled());
         MenuItem refresh = menu.findItem(MENU_REFRESH);
-        if (refresh != null) refresh.setEnabled(!viewModel.isRunning());
+        if (refresh != null) refresh.setEnabled(!running);
         return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
+            case MENU_SAVE -> {
+                saveDirtyFiles();
+                return true;
+            }
+            case MENU_SYNC -> {
+                onSyncClicked();
+                return true;
+            }
             case MENU_REFRESH -> {
                 refreshFromDisk();
                 return true;

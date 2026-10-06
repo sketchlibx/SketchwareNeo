@@ -22,6 +22,7 @@ import mod.agus.jcoderz.beans.ViewBeans;
 import mod.agus.jcoderz.editor.manage.library.locallibrary.ManageLocalLibrary;
 import mod.agus.jcoderz.handle.component.ConstVarComponent;
 import mod.hey.studios.build.BuildSettings;
+import mod.hey.studios.moreblock.MoreBlockOverloads;
 import mod.hey.studios.project.ProjectSettings;
 import mod.hilal.saif.android_manifest.AndroidManifestInjector;
 import mod.hilal.saif.blocks.CommandBlock;
@@ -192,7 +193,7 @@ public class Jx {
             addImport("android.Manifest");
             addImport("android.content.pm.PackageManager");
         }
-        if (isAndroidStudioExport && isViewBindingEnabled) {
+        if (isViewBindingEnabled) {
             addImport(packageName + ".databinding.*");
         }
 
@@ -858,6 +859,8 @@ public class Jx {
             Pair<String, String> next = pairs.get(index);
             String name = next.first + "_moreBlock";
             String code = Lx.getMoreBlockCode(next.first, next.second, new Fx(projectFileBean.getActivityName(), name, buildConfig, projectDataManager.a(javaName, name), isViewBindingEnabled).a());
+            // Overloads for parameters with a default value; returns the code unchanged for MoreBlocks without defaults.
+            code = MoreBlockOverloads.append(projectDataManager.a, javaName, next.first, next.second, code);
             if (index < (pairsSize - 1)) {
                 moreBlocks.add(code);
             } else {

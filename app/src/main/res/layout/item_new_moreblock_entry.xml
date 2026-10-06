@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/bg_new_moreblock_row"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <ImageView
+        android:id="@+id/drag_handle"
+        android:layout_width="32dp"
+        android:layout_height="48dp"
+        android:contentDescription="@string/nmb_drag_to_reorder"
+        android:scaleType="center"
+        android:src="@drawable/ic_mtrl_drag"
+        android:tint="?attr/colorOutline" />
+
+    <!-- Variable: type pill -->
+    <LinearLayout
+        android:id="@+id/type_pill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:background="@drawable/bg_new_moreblock_tile"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
+        <ImageView
+            android:id="@+id/type_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:importantForAccessibility="no"
+            tools:src="@drawable/numbers_48" />
+
+        <TextView
+            android:id="@+id/type_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="4dp"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            tools:text="Number" />
+    </LinearLayout>
+
+    <!-- Parameter: code tile -->
+    <ImageView
+        android:id="@+id/param_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="4dp"
+        android:background="@drawable/bg_new_moreblock_tile"
+        android:backgroundTint="?attr/colorPrimaryContainer"
+        android:importantForAccessibility="no"
+        android:padding="8dp"
+        android:src="@drawable/ic_mtrl_code"
+        android:tint="?attr/colorOnPrimaryContainer"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/nmb_parameter_caption"
+            android:textAppearance="?attr/textAppearanceLabelSmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="?attr/colorOnSurface"
+            tools:text="isTrue" />
+
+        <TextView
+            android:id="@+id/subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="Label: isTrue" />
+    </LinearLayout>
+
+    <!-- Fixed 40dp round buttons: the old icon-button style stretched into wide pills and squeezed the text. -->
+    <ImageView
+        android:id="@+id/btn_edit"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_new_moreblock_icon_button"
+        android:contentDescription="@string/nmb_edit"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="center"
+        android:src="@drawable/ic_mtrl_edit"
+        android:tint="?attr/colorOnSecondaryContainer" />
+
+    <ImageView
+        android:id="@+id/btn_delete"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_new_moreblock_icon_button"
+        android:backgroundTint="?attr/colorErrorContainer"
+        android:contentDescription="@string/nmb_delete"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:scaleType="center"
+        android:src="@drawable/ic_mtrl_delete"
+        android:tint="?attr/colorOnErrorContainer" />
+</LinearLayout>
