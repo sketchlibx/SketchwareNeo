@@ -226,6 +226,7 @@ public class ManageLocalLibraryActivity extends BaseAppCompatActivity {
         bundle.putBoolean("notAssociatedWithProject", notAssociatedWithProject);
         bundle.putSerializable("buildSettings", buildSettings);
         bundle.putString("localLibFile", getLocalLibFile(scId).getAbsolutePath());
+        bundle.putString("scId", scId);
         
         if (predefinedDependencyUrl != null && !predefinedDependencyUrl.isEmpty()) {
             bundle.putString("prefillDependency", predefinedDependencyUrl);

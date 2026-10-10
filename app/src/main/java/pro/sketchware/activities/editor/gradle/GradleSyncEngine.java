@@ -34,6 +34,7 @@ import dev.aldi.sayuti.editor.manage.LocalLibrary;
 import mod.hey.studios.build.BuildSettings;
 import mod.jbk.build.BuiltInLibraries;
 import mod.pranav.dependency.resolver.DependencyResolver;
+import mod.pranav.dependency.resolver.ResolverFailure;
 import mod.sketchlibx.importer.GradleDependency;
 import pro.sketchware.utility.FileUtil;
 
@@ -282,12 +283,6 @@ public final class GradleSyncEngine {
                 if (coordinate.equals(library.getMavenDependency())) folders.add(library.getName());
             }
         }
-        String rootFolder = dep.artifact + "-v" + dep.version;
-        String rootOwner = store.artifacts.get(rootFolder);
-        if (folders.isEmpty() && rootOwner != null && !rootOwner.startsWith(dep.key() + ":") && new File(localLibsDir(), rootFolder).isDirectory()) {
-            return new Row(dep, DepState.PENDING, null, "Cache folder " + rootFolder + " belongs to " + rootOwner + "; sync will refuse to overwrite it",
-                    Collections.emptyList(), 0);
-        }
         if (folders.isEmpty()) {
             return new Row(dep, DepState.PENDING, null, null, Collections.emptyList(), 0);
         }
@@ -408,15 +403,6 @@ public final class GradleSyncEngine {
                 if (cached.state == DepState.FAILED && cached.error != null) {
                     listener.onLog("Cache invalid for " + dep.coordinate() + ": " + cached.error);
                 }
-            }
-
-            String collision = collisionProblem(scId, dep);
-            if (collision != null) {
-                listener.onLog("error: " + collision);
-                listener.onDependencyState(key, DepState.FAILED, collision);
-                failures++;
-                done++;
-                continue;
             }
 
             if (!isNetworkAvailable(context)) {
@@ -566,17 +552,6 @@ public final class GradleSyncEngine {
     }
 
     @Nullable
-    private static String collisionProblem(String scId, GradleDependency dep) {
-        String folder = dep.artifact + "-v" + dep.version;
-        String owner = loadStore(scId).artifacts.get(folder);
-        if (owner != null && !owner.startsWith(dep.key() + ":") && new File(localLibsDir(), folder).isDirectory()) {
-            return "Cache folder " + folder + " already belongs to " + owner + "; refusing to overwrite it with " + dep.coordinate()
-                    + ". Remove it from Local Libraries first.";
-        }
-        return null;
-    }
-
-    @Nullable
     private static String download(String scId, GradleDependency dep, List<GradleDependency> declared, BuildSettings buildSettings, Listener listener, int done, int total) {
         String coordinate = dep.coordinate();
         boolean skipSub = wantsSkip(scId, loadStore(scId), dep);
@@ -588,7 +563,7 @@ public final class GradleSyncEngine {
             BuiltInLibraries.maybeExtractAndroidJar((message, progress) -> {
             });
             BuiltInLibraries.maybeExtractCoreLambdaStubsJar();
-            DependencyResolver resolver = new DependencyResolver(dep.group, dep.artifact, dep.version, skipSub, buildSettings);
+            DependencyResolver resolver = new DependencyResolver(dep.group, dep.artifact, resolverVersion(dep), skipSub, buildSettings);
             resolver.setProvidedBy(artifact -> {
                 BuiltInArtifacts.Match match = BuiltInArtifacts.findSatisfying(scId, artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
                 return match == null ? null : match.libraryName;
@@ -640,43 +615,23 @@ public final class GradleSyncEngine {
                 }
 
                 @Override
-                public void onArtifactNotFound(@NonNull Artifact artifact) {
-                    failure[0] = "Could not find " + artifact + " in any configured repository";
-                }
-
-                @Override
-                public void onVersionNotFound(@NonNull Artifact artifact) {
-                    failure[0] = "Version not found for " + artifact;
-                }
-
-                @Override
-                public void onDependenciesNotFound(@NonNull Artifact artifact) {
-                    failure[0] = "No classes.jar was produced for " + artifact;
-                }
-
-                @Override
-                public void onInvalidPOM(@NonNull Artifact artifact) {
-                    failure[0] = "Invalid POM for " + artifact;
-                }
-
-                @Override
-                public void onInvalidScope(@NonNull Artifact artifact, @NonNull String scope) {
-                    failure[0] = "Invalid scope '" + scope + "' for " + artifact;
-                }
-
-                @Override
-                public void invalidPackaging(@NonNull Artifact artifact) {
-                    failure[0] = "Unsupported packaging for " + artifact + " (only jar and aar are supported)";
+                public void onDependencySkipped(@NonNull Artifact artifact, @NonNull String reason) {
+                    listener.onLog("Skipped " + artifact + ": " + reason);
                 }
 
                 @Override
                 public void onDownloadError(@NonNull Artifact artifact, @NonNull Throwable error) {
-                    failure[0] = "Could not download " + artifact + ": " + describe(error);
+                    listener.onLog("error: download of " + artifact + " failed: " + describe(error));
                 }
 
                 @Override
                 public void dexingFailed(@NonNull Artifact artifact, @NonNull Exception error) {
-                    failure[0] = "D8 failed to process " + artifact + ": " + describe(error);
+                    listener.onLog("error: D8 failed for " + artifact + ": " + describe(error));
+                }
+
+                @Override
+                public void onFailure(@NonNull ResolverFailure resolverFailure) {
+                    failure[0] = resolverFailure.toUserMessage();
                 }
 
                 @Override
@@ -739,6 +694,11 @@ public final class GradleSyncEngine {
         ArrayList<HashMap<String, Object>> enabled = LocalLibrariesUtil.getLocalLibraries(scId);
         boolean changed = enabled.removeIf(map -> map.get("name") != null && stale.contains(map.get("name").toString()));
         if (changed) LocalLibrariesUtil.rewriteLocalLibFile(scId, new Gson().toJson(enabled));
+    }
+
+    private static String resolverVersion(GradleDependency dep) {
+        String normalized = BuiltInArtifacts.normalizeVersion(dep.version);
+        return normalized != null ? normalized : String.valueOf(dep.version);
     }
 
     private static String describe(Throwable t) {

@@ -1,9 +1,13 @@
 package dev.aldi.sayuti.editor.manage;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import java.util.Locale;
 import java.util.Objects;
+
 import org.cosmic.ide.dependency.resolver.api.Artifact;
+
 public class DependencyDownloadItem {
 
     public enum DownloadState {
@@ -20,10 +24,12 @@ public class DependencyDownloadItem {
     private final String displayName;
     private DownloadState state;
     private String statusMessage;
-    private final long bytesDownloaded;
-    private final long totalBytes;
-    private final int progress;
+    private long bytesDownloaded;
+    private long totalBytes;
+    private int progress;
     private String errorMessage;
+    @Nullable
+    private String note;
     private final Artifact artifact;
 
     public DependencyDownloadItem(@NonNull Artifact artifact) {
@@ -31,8 +37,8 @@ public class DependencyDownloadItem {
         this.name = artifact.toString();
         this.displayName = artifact.getArtifactId() + "-" + artifact.getVersion();
         setState(DownloadState.PENDING);
-        bytesDownloaded = 0;
-        totalBytes = 0;
+        this.bytesDownloaded = 0;
+        this.totalBytes = 0;
         this.progress = 0;
         this.errorMessage = null;
     }
@@ -57,12 +63,29 @@ public class DependencyDownloadItem {
         return progress;
     }
 
+    public long getTotalBytes() {
+        return totalBytes;
+    }
+
     public Artifact getArtifact() {
         return artifact;
     }
 
     public void setState(DownloadState state) {
         this.state = state;
+        if (state != DownloadState.ERROR) this.errorMessage = null;
+        updateStatusMessage();
+    }
+
+    public void setProgress(long bytes, long total) {
+        this.bytesDownloaded = bytes;
+        this.totalBytes = total;
+        this.progress = total > 0 ? (int) Math.min(100, (bytes * 100) / total) : 0;
+        if (state == DownloadState.DOWNLOADING) updateStatusMessage();
+    }
+
+    public void setNote(@Nullable String note) {
+        this.note = note;
         updateStatusMessage();
     }
 
@@ -83,6 +106,8 @@ public class DependencyDownloadItem {
             case DOWNLOADING:
                 if (totalBytes > 0) {
                     statusMessage = formatBytes(bytesDownloaded) + " / " + formatBytes(totalBytes);
+                } else if (bytesDownloaded > 0) {
+                    statusMessage = "Downloading... " + formatBytes(bytesDownloaded);
                 } else {
                     statusMessage = "Downloading...";
                 }
@@ -94,7 +119,7 @@ public class DependencyDownloadItem {
                 statusMessage = "Processing (DEX)...";
                 break;
             case COMPLETED:
-                statusMessage = "Completed";
+                statusMessage = note != null ? note : "Completed";
                 break;
             case ERROR:
                 statusMessage = "Error: " + (errorMessage != null ? errorMessage : "Unknown error");
@@ -104,7 +129,8 @@ public class DependencyDownloadItem {
 
     private String formatBytes(long bytes) {
         if (bytes < 1024) {
-            return bytes + " B";    } else if (bytes < 1048576) { // 1024 * 1024
+            return bytes + " B";
+        } else if (bytes < 1048576) {
             return String.format(Locale.getDefault(), "%.1f KB", bytes / 1024.0);
         } else {
             return String.format(Locale.getDefault(), "%.1f MB", bytes / 1048576.0);
@@ -131,6 +157,7 @@ public class DependencyDownloadItem {
     public int hashCode() {
         return Objects.hash(name);
     }
+
     @Override
     @NonNull
     public String toString() {
@@ -145,5 +172,4 @@ public class DependencyDownloadItem {
                 + ", errorMessage='" + errorMessage + '\''
                 + '}';
     }
-
 }

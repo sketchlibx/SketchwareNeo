@@ -90,8 +90,12 @@ public class DependencyDownloadAdapter extends RecyclerView.Adapter<DependencyDo
                     break;
 
                 case DOWNLOADING:
-                    binding.progressIndicator.setIndeterminate(false);
-                    binding.progressIndicator.setProgress(item.getProgress());
+                    if (item.getTotalBytes() > 0) {
+                        binding.progressIndicator.setIndeterminate(false);
+                        binding.progressIndicator.setProgress(item.getProgress());
+                    } else {
+                        binding.progressIndicator.setIndeterminate(true);
+                    }
                     binding.progressIndicator.setVisibility(View.VISIBLE);
                     break;
 

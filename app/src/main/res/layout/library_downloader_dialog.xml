@@ -58,22 +58,6 @@
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/btn_help_docs"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/selector_ic_my_library_book_24"
-            app:tint="?attr/colorOnSurfaceVariant" />
-
-        <ImageButton
-            android:id="@+id/btn_overflow_menu"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_more_vert"
-            app:tint="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 
     <!-- Tabs -->
@@ -138,6 +122,7 @@
             android:orientation="vertical">
 
             <androidx.core.widget.NestedScrollView
+                android:id="@+id/tabs_scroll"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
@@ -153,7 +138,9 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="24dp">
+                        android:paddingHorizontal="16dp"
+                        android:paddingTop="20dp"
+                        android:paddingBottom="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -185,7 +172,7 @@
                                     android:id="@+id/search_input"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:hint="org.eclipse.jgit"
+                                    android:hint="org.eclipse.jgit or group:artifact"
                                     android:imeOptions="actionSearch"
                                     android:paddingVertical="14dp"
                                     android:singleLine="true" />
@@ -204,7 +191,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:text="Search for a groupId, artifactId or library name"
+                            android:text="Library name, group:artifact or group:artifact:version"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -221,38 +208,120 @@
                                 android:orientation="horizontal">
 
                                 <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_sort"
                                     style="@style/Widget.Material3.Button.OutlinedButton"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginEnd="8dp"
-                                    android:text="Popularity"
+                                    android:text="Relevance"
                                     app:icon="@drawable/ic_mtrl_sort"
                                     app:iconGravity="textStart" />
 
                                 <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_version_mode"
                                     style="@style/Widget.Material3.Button.OutlinedButton"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginEnd="8dp"
-                                    android:text="Any Version"
-                                    app:icon="@drawable/ic_mtrl_box"
+                                    android:text="Any version"
+                                    app:icon="@drawable/ic_mtrl_version_control"
                                     app:iconGravity="textStart" />
 
                                 <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btn_type_filter"
                                     style="@style/Widget.Material3.Button.OutlinedButton"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="Filter"
+                                    android:text="Any type"
                                     app:icon="@drawable/ic_mtrl_filter"
                                     app:iconGravity="textStart" />
                             </LinearLayout>
                         </HorizontalScrollView>
 
+                        <CheckBox
+                            android:id="@+id/cb_include_sources_maven"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="Include sources (if available)"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <LinearLayout
+                            android:id="@+id/layout_selection_bar"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/tv_selection_summary"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_select_all"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Select all"
+                                app:icon="@drawable/ic_mtrl_checklist" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_clear_all"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Clear"
+                                app:icon="@drawable/ic_mtrl_clear_all" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/layout_search_error"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_outline"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="12dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/tv_search_error"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorError" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btn_search_retry"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Retry"
+                                app:icon="@drawable/ic_mtrl_refresh" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_search_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:visibility="gone" />
+
                         <com.google.android.material.progressindicator.LinearProgressIndicator
                             android:id="@+id/search_progress"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
+                            android:layout_marginTop="12dp"
                             android:indeterminate="true"
                             android:visibility="gone" />
 
@@ -608,7 +677,6 @@
                 android:background="?attr/colorSurfaceContainerLow"
                 android:orientation="vertical">
 
-                <!-- The Maven Tab needs its own "Skip" checkbox here since it doesn't have an Advanced Options section -->
                 <LinearLayout
                     android:id="@+id/layout_maven_bottom_options"
                     android:layout_width="match_parent"
@@ -629,9 +697,11 @@
                         android:textColor="?attr/colorOnSurface" />
 
                     <ImageButton
+                        android:id="@+id/btn_skip_info"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="About skipping sub-dependencies"
                         android:src="@drawable/ic_mtrl_info"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
@@ -739,13 +809,31 @@
                 android:clipToPadding="false"
                 android:paddingBottom="24dp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_cancel_processing"
-                style="@style/Widget.Material3.Button.TonalButton"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Cancel Operation" />
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_retry_failed"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:text="Retry failed"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_mtrl_refresh" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_cancel_processing"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="Cancel Operation" />
+            </LinearLayout>
         </LinearLayout>
     </ViewFlipper>
 </LinearLayout>
