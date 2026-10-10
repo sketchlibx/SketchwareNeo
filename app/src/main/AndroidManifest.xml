@@ -386,7 +386,9 @@
             android:configChanges="orientation|screenSize" />
         <activity
             android:name="com.besome.sketch.editor.manage.view.ScreenImportActivity"
-            android:configChanges="orientation|screenSize" />
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.SketchwarePro.ScreenImportOverlay"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name="mod.sketchlibx.project.backup.CloudBackupManagerActivity"

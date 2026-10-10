@@ -25,6 +25,7 @@ import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 
 import java.lang.ref.WeakReference;
@@ -187,9 +188,33 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         ProjectFileBean projectFileBean;
-        if (requestCode == REQUEST_CODE_ADD_ACTIVITY) {
+        if (requestCode == AddViewActivity.REQUEST_CODE_EDIT) {
+            if (resultCode == RESULT_OK && data != null && data.hasExtra("project_file")) {
+                ProjectFileBean updated = data.getParcelableExtra("project_file");
+                boolean changed = false;
+                if (updated != null && activitiesFragment != null) {
+                    for (ProjectFileBean current : activitiesFragment.c()) {
+                        if (current != null && current.fileName != null && current.fileName.equals(updated.fileName)) {
+                            current.copy(updated);
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+                if (changed) {
+                    m();
+                    activitiesFragment.g();
+                }
+            }
+        } else if (requestCode == REQUEST_CODE_CLONE_SCREEN) {
             if (resultCode == RESULT_OK) {
+                if (activitiesFragment != null) activitiesFragment.g();
+                if (customViewsFragment != null) customViewsFragment.g();
+            }
+        } else if (requestCode == REQUEST_CODE_ADD_ACTIVITY) {
+            if (resultCode == RESULT_OK && data != null) {
                 projectFileBean = data.getParcelableExtra("project_file");
+                if (projectFileBean == null) return;
                 activitiesFragment.a(projectFileBean);
                 if (projectFileBean.hasActivityOption(ProjectFileBean.OPTION_ACTIVITY_DRAWER)) {
                     b(projectFileBean.getDrawerName());
@@ -203,16 +228,15 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
                     a(projectFileBean, data.getParcelableArrayListExtra("preset_views"));
                 }
             }
-        } else if (requestCode == REQUEST_CODE_ADD_CUSTOM_VIEW && resultCode == RESULT_OK) {
+        } else if (requestCode == REQUEST_CODE_ADD_CUSTOM_VIEW && resultCode == RESULT_OK && data != null) {
             projectFileBean = data.getParcelableExtra("project_file");
-            customViewsFragment.a(projectFileBean);
-            customViewsFragment.g();
-            if (data.hasExtra("preset_views")) {
-                a(projectFileBean, data.getParcelableArrayListExtra("preset_views"));
+            if (projectFileBean != null) {
+                customViewsFragment.a(projectFileBean);
+                customViewsFragment.g();
+                if (data.hasExtra("preset_views")) {
+                    a(projectFileBean, data.getParcelableArrayListExtra("preset_views"));
+                }
             }
-        } else if (requestCode == REQUEST_CODE_CLONE_SCREEN && resultCode == RESULT_OK) {
-            activitiesFragment.g();
-            customViewsFragment.g();
         }
     }
 
@@ -306,6 +330,7 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
         getMenuInflater().inflate(R.menu.manage_screen_menu, menu);
         menu.findItem(R.id.menu_screen_delete).setVisible(!selecting);
         menu.findItem(R.id.menu_screen_clone).setVisible(!selecting);
+        menu.findItem(R.id.menu_screen_edit).setVisible(!selecting);
         return true;
     }
 
@@ -313,6 +338,10 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
     public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
         if (menuItem.getItemId() == R.id.menu_screen_delete) {
             a(!selecting);
+            return true;
+        }
+        if (menuItem.getItemId() == R.id.menu_screen_edit) {
+            if (!selecting) showEditScreenPicker();
             return true;
         }
         if (menuItem.getItemId() == R.id.menu_screen_clone) {
@@ -327,6 +356,40 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
             return true;
         }
         return super.onOptionsItemSelected(menuItem);
+    }
+
+    private void showEditScreenPicker() {
+        if (activitiesFragment == null) return;
+        ArrayList<ProjectFileBean> editableScreens = new ArrayList<>();
+        ArrayList<String> labels = new ArrayList<>();
+        for (ProjectFileBean bean : activitiesFragment.c()) {
+            if (bean == null || bean.fileType != ProjectFileBean.PROJECT_FILE_TYPE_ACTIVITY) continue;
+            editableScreens.add(bean);
+            String type = bean.fileName.endsWith("_bottomdialog_fragment") ? "Bottom Sheet DialogFragment"
+                    : bean.fileName.endsWith("_dialog_fragment") ? "DialogFragment"
+                    : bean.fileName.endsWith("_fragment") ? "Fragment" : "Activity";
+            labels.add(bean.fileName + "  ·  " + type);
+        }
+        if (editableScreens.isEmpty()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Edit screen settings")
+                    .setMessage("No editable screens were found in this project.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Choose screen to edit")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    ProjectFileBean selected = editableScreens.get(which);
+                    Intent intent = new Intent(this, AddViewActivity.class);
+                    intent.putExtra("request_code", AddViewActivity.REQUEST_CODE_EDIT);
+                    intent.putExtra("project_file", selected);
+                    intent.putStringArrayListExtra("screen_names", l());
+                    startActivityForResult(intent, AddViewActivity.REQUEST_CODE_EDIT);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override

@@ -310,9 +310,24 @@ public class Fw extends qA {
                             }
                         } else {
                             Intent intent = new Intent(getContext(), AddViewActivity.class);
-                            intent.putExtra("project_file", projectFileBean);
-                            intent.putExtra("request_code", REQUEST_CODE_ADD_VIEW_ACTIVITY);
-                            startActivityForResult(intent, REQUEST_CODE_ADD_VIEW_ACTIVITY);
+                             intent.putExtra("project_file", projectFileBean);
+                             intent.putExtra("request_code", REQUEST_CODE_ADD_VIEW_ACTIVITY);
+                            intent.putExtra("sc_id", sc_id);
+                            ArrayList<String> editableScreenNames = new ArrayList<>();
+                            ArrayList<ProjectFileBean> existingActivities = jC.b(sc_id).b();
+                            if (existingActivities != null) {
+                                for (ProjectFileBean existing : existingActivities) {
+                                    if (existing != null) editableScreenNames.add(existing.fileName);
+                                }
+                            }
+                            ArrayList<ProjectFileBean> existingOtherFiles = jC.b(sc_id).c();
+                            if (existingOtherFiles != null) {
+                                for (ProjectFileBean existing : existingOtherFiles) {
+                                    if (existing != null) editableScreenNames.add(existing.fileName);
+                                }
+                            }
+                            intent.putStringArrayListExtra("screen_names", editableScreenNames);
+                             startActivityForResult(intent, REQUEST_CODE_ADD_VIEW_ACTIVITY);
                         }
                     }
                 });

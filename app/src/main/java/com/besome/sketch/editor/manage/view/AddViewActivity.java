@@ -4,6 +4,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
@@ -12,12 +14,14 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.besome.sketch.beans.ProjectFileBean;
 import com.besome.sketch.beans.ViewBean;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.ArrayList;
 
@@ -39,6 +43,8 @@ public class AddViewActivity extends BaseAppCompatActivity {
     public static final int VIEW_TYPE_FRAGMENT = 1;
     public static final int VIEW_TYPE_DIALOG_FRAGMENT = 2;
     public static final int VIEW_TYPE_BOTTOM_DIALOG_FRAGMENT = 3;
+    private static final int MENU_EDIT_DETAILS = 0x00E0D001;
+    private static final String EXTRA_PROJECT_ID = "sc_id";
     private static final int FEATURE_TYPE_STATUS_BAR = 0;
     private static final int FEATURE_TYPE_TOOLBAR = 1;
     private static final int FEATURE_TYPE_DRAWER = 2;
@@ -52,6 +58,8 @@ public class AddViewActivity extends BaseAppCompatActivity {
     private FeaturesAdapter featuresAdapter;
     private ArrayList<String> screenNames;
     private ManageScreenActivityAddTempBinding binding;
+    private String projectId;
+    private boolean editDetailsEnabled;
 
     private void handleFeatureAnimation(FeatureItem featureItem) {
         int type = featureItem.type;
@@ -199,8 +207,22 @@ public class AddViewActivity extends BaseAppCompatActivity {
         screenNames = intent1.getStringArrayListExtra("screen_names");
         requestCode = intent1.getIntExtra("request_code", REQUEST_CODE_ADD);
         projectFileBean = intent1.getParcelableExtra("project_file");
+        projectId = intent1.getStringExtra(EXTRA_PROJECT_ID);
         if (projectFileBean != null) {
             binding.toolbar.setTitle("Edit " + projectFileBean.fileName);
+        }
+        if (requestCode == REQUEST_CODE_EDIT && projectFileBean != null) {
+            MenuItem editItem = binding.toolbar.getMenu().add(Menu.NONE, MENU_EDIT_DETAILS, Menu.NONE, "Edit screen");
+            editItem.setIcon(R.drawable.ic_mtrl_edit);
+            editItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            binding.toolbar.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == MENU_EDIT_DETAILS) {
+                    enableEditDetails();
+                    item.setVisible(false);
+                    return true;
+                }
+                return false;
+            });
         }
 
         featuresAdapter = new FeaturesAdapter();
@@ -244,27 +266,165 @@ public class AddViewActivity extends BaseAppCompatActivity {
     }
 
     private void handleEditFile() {
-        int options = ProjectFileBean.OPTION_ACTIVITY_TOOLBAR;
-        projectFileBean.orientation = getSelectedButtonIndex(binding.screenOrientationSelector);
-        projectFileBean.keyboardSetting = getSelectedButtonIndex(binding.keyboardSettingsSelector);
-        if (!featureToolbar) {
-            options = 0;
+        int options = getCurrentOptions();
+        int orientation = getSelectedButtonIndex(binding.screenOrientationSelector);
+        int keyboardSetting = getSelectedButtonIndex(binding.keyboardSettingsSelector);
+        if (orientation < 0) orientation = projectFileBean.orientation;
+        if (keyboardSetting < 0) keyboardSetting = projectFileBean.keyboardSetting;
+
+        if (!editDetailsEnabled) {
+            projectFileBean.orientation = orientation;
+            projectFileBean.keyboardSetting = keyboardSetting;
+            projectFileBean.options = options;
+            finishEditSuccessfully(projectFileBean);
+            return;
         }
-        if (!featureStatusBar) {
-            options = options | ProjectFileBean.OPTION_ACTIVITY_FULLSCREEN;
+
+        String baseName = Helper.getText(binding.edName).trim();
+        if (!baseName.matches("[a-z][a-z0-9_]*")) {
+            binding.tiName.setError("Use lowercase letters; start with a letter and use numbers or underscores only.");
+            return;
         }
-        if (featureFab) {
-            options = options | ProjectFileBean.OPTION_ACTIVITY_FAB;
+        if (hasReservedSuffix(baseName)) {
+            binding.tiName.setError("Do not include a screen-type suffix in the name; choose the type below.");
+            return;
         }
-        if (featureDrawer) {
-            options = options | ProjectFileBean.OPTION_ACTIVITY_DRAWER;
+        if (!isValid(nameValidator)) return;
+        binding.tiName.setError(null);
+
+        String newFileName = baseName + getSuffix(binding.viewTypeSelector);
+        boolean nameOrTypeChanged = !newFileName.equals(projectFileBean.fileName);
+        if ("main".equalsIgnoreCase(projectFileBean.fileName) && nameOrTypeChanged) {
+            binding.tiName.setError("The main screen name and type cannot be changed safely.");
+            return;
         }
-        projectFileBean.options = options;
+        if (nameOrTypeChanged && !isScreenNameAvailable(newFileName, projectFileBean.fileName)) {
+            binding.tiName.setError("A screen or custom view with this name already exists.");
+            return;
+        }
+        if (nameOrTypeChanged && (projectFileBean.hasActivityOption(ProjectFileBean.OPTION_ACTIVITY_DRAWER) != featureDrawer)) {
+            showEditError("Save the Drawer option separately before renaming or changing the screen type.");
+            return;
+        }
+        if (!getSuffix(binding.viewTypeSelector).isEmpty() && (featureDrawer || featureFab)) {
+            showEditError("Disable Drawer and FAB before changing this screen to a Fragment type.");
+            return;
+        }
+
+        ProjectFileBean updated = new ProjectFileBean(
+                projectFileBean.fileType, newFileName, orientation, keyboardSetting, options);
+        updated.presetName = projectFileBean.presetName;
+        updated.theme = projectFileBean.theme;
+
+        if (!nameOrTypeChanged) {
+            projectFileBean.copy(updated);
+            finishEditSuccessfully(projectFileBean);
+            return;
+        }
+        if (projectId == null || projectId.trim().isEmpty()) {
+            showEditError("The project ID is missing. Reopen this screen from View Manager and try again; no changes were saved.");
+            return;
+        }
+
+        AlertDialog progress = new MaterialAlertDialogBuilder(this)
+                .setTitle("Updating screen")
+                .setMessage("Renaming the screen and updating linked project data…")
+                .setCancelable(false)
+                .create();
+        progress.show();
+        new Thread(() -> {
+            ScreenTransferManager.Result result = ScreenTransferManager.renameScreen(projectId, projectFileBean, updated);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    progress.dismiss();
+                    return;
+                }
+                progress.dismiss();
+                if (result.success) {
+                    projectFileBean.copy(updated);
+                    finishEditSuccessfully(projectFileBean);
+                } else {
+                    showEditError(result.message);
+                }
+            });
+        }, "RenameSketchwareScreen").start();
+    }
+
+    private int getCurrentOptions() {
+        int options = featureToolbar ? ProjectFileBean.OPTION_ACTIVITY_TOOLBAR : 0;
+        if (!featureStatusBar) options |= ProjectFileBean.OPTION_ACTIVITY_FULLSCREEN;
+        if (featureFab) options |= ProjectFileBean.OPTION_ACTIVITY_FAB;
+        if (featureDrawer) options |= ProjectFileBean.OPTION_ACTIVITY_DRAWER;
+        return options;
+    }
+
+    private void finishEditSuccessfully(ProjectFileBean resultBean) {
         Intent intent = new Intent();
-        intent.putExtra("project_file", projectFileBean);
+        intent.putExtra("project_file", resultBean);
         setResult(RESULT_OK, intent);
         bB.a(getApplicationContext(), getString(R.string.design_manager_message_edit_complete, new Object[0]), bB.TOAST_NORMAL).show();
         finish();
+    }
+
+    private void showEditError(String message) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Could not update screen")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private boolean isScreenNameAvailable(String candidate, String currentName) {
+        if (screenNames == null) return false;
+        for (String existing : screenNames) {
+            if (existing == null || existing.equalsIgnoreCase(currentName)) continue;
+            if (existing.equalsIgnoreCase(candidate)) return false;
+        }
+        return true;
+    }
+
+    private boolean hasReservedSuffix(String name) {
+        return name.endsWith("_fragment") || name.endsWith("_dialog_fragment")
+                || name.endsWith("_bottomdialog_fragment");
+    }
+
+    private String stripScreenSuffix(String fileName) {
+        if (fileName == null) return "";
+        if (fileName.endsWith("_bottomdialog_fragment")) return fileName.substring(0, fileName.length() - "_bottomdialog_fragment".length());
+        if (fileName.endsWith("_dialog_fragment")) return fileName.substring(0, fileName.length() - "_dialog_fragment".length());
+        if (fileName.endsWith("_fragment")) return fileName.substring(0, fileName.length() - "_fragment".length());
+        return fileName;
+    }
+
+    private int getTypeIndexFromFileName(String fileName) {
+        if (fileName != null && fileName.endsWith("_bottomdialog_fragment")) return VIEW_TYPE_BOTTOM_DIALOG_FRAGMENT;
+        if (fileName != null && fileName.endsWith("_dialog_fragment")) return VIEW_TYPE_DIALOG_FRAGMENT;
+        if (fileName != null && fileName.endsWith("_fragment")) return VIEW_TYPE_FRAGMENT;
+        return VIEW_TYPE_ACTIVITY;
+    }
+
+    private int getTypeButtonId(int typeIndex) {
+        return switch (typeIndex) {
+            case VIEW_TYPE_FRAGMENT -> R.id.select_fragment;
+            case VIEW_TYPE_DIALOG_FRAGMENT -> R.id.select_dialogfragment;
+            case VIEW_TYPE_BOTTOM_DIALOG_FRAGMENT -> R.id.select_bottomsheetdialogfragment;
+            default -> R.id.select_activity;
+        };
+    }
+
+    private void enableEditDetails() {
+        if (editDetailsEnabled || projectFileBean == null) return;
+        editDetailsEnabled = true;
+        binding.edName.setEnabled(true);
+        binding.tiName.setHint("Screen name (without type suffix)");
+        binding.tiName.setError(null);
+        binding.addViewTypeSelectorLayout.setVisibility(View.VISIBLE);
+        binding.viewOrientationSelectorLayout.setVisibility(View.VISIBLE);
+        binding.viewKeyboardSettingsSelectorLayout.setVisibility(View.VISIBLE);
+        binding.edName.setText(stripScreenSuffix(projectFileBean.fileName));
+        binding.edName.setSelection(binding.edName.length());
+        binding.viewTypeSelector.check(getTypeButtonId(getTypeIndexFromFileName(projectFileBean.fileName)));
+        setManifestViewState(getTypeIndexFromFileName(projectFileBean.fileName) == VIEW_TYPE_ACTIVITY);
     }
 
     private void handleCreateFile() {
@@ -282,17 +442,23 @@ public class AddViewActivity extends BaseAppCompatActivity {
 
     private void handleEditModeInitialization() {
         nameValidator = new YB(getApplicationContext(), binding.tiName, uq.b, new ArrayList<>(), projectFileBean.fileName);
-        binding.edName.setText(projectFileBean.fileName);
+        binding.edName.setText(stripScreenSuffix(projectFileBean.fileName));
         binding.edName.setEnabled(false);
         binding.edName.setBackgroundResource(R.color.transparent);
+        binding.tiName.setHint("Screen name");
         initItem(projectFileBean.options);
         binding.addViewTypeSelectorLayout.setVisibility(View.GONE);
-        if (projectFileBean.fileName.endsWith("_fragment")) {
+        if (getTypeIndexFromFileName(projectFileBean.fileName) != VIEW_TYPE_ACTIVITY) {
             binding.viewOrientationSelectorLayout.setVisibility(View.GONE);
             binding.viewKeyboardSettingsSelectorLayout.setVisibility(View.GONE);
         }
-        binding.screenOrientationSelector.check(binding.screenOrientationSelector.getChildAt(projectFileBean.orientation).getId());
-        binding.keyboardSettingsSelector.check(binding.keyboardSettingsSelector.getChildAt(projectFileBean.keyboardSetting).getId());
+        int orientation = projectFileBean.orientation;
+        if (orientation < 0 || orientation >= binding.screenOrientationSelector.getChildCount()) orientation = 2;
+        int keyboardSetting = projectFileBean.keyboardSetting;
+        if (keyboardSetting < 0 || keyboardSetting >= binding.keyboardSettingsSelector.getChildCount()) keyboardSetting = 0;
+        binding.screenOrientationSelector.check(binding.screenOrientationSelector.getChildAt(orientation).getId());
+        binding.keyboardSettingsSelector.check(binding.keyboardSettingsSelector.getChildAt(keyboardSetting).getId());
+        binding.viewTypeSelector.check(getTypeButtonId(getTypeIndexFromFileName(projectFileBean.fileName)));
 
         binding.imgKeyboard.post(() -> {
             if (binding.keyboardSettingsSelector.getCheckedButtonId() == R.id.select_hidden) {

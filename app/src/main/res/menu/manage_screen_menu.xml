@@ -6,14 +6,13 @@
         android:icon="@drawable/ic_mtrl_copy"
         android:orderInCategory="1"
         android:title="Clone screen"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
     <item
         android:id="@+id/menu_screen_edit"
         android:icon="@drawable/ic_mtrl_edit"
         android:orderInCategory="2"
-        android:title="edit"
-        android:visible="false"
-        app:showAsAction="always" />
+        android:title="Edit screen settings"
+        app:showAsAction="never" />
     <item
         android:id="@+id/menu_screen_delete"
         android:icon="@drawable/ic_mtrl_delete"

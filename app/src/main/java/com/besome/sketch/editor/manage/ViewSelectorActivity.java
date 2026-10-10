@@ -415,6 +415,8 @@ public class ViewSelectorActivity extends BaseAppCompatActivity {
                         Intent intent = new Intent(getApplicationContext(), AddViewActivity.class);
                         intent.putExtra("project_file", jC.b(sc_id).b().get(getLayoutPosition()));
                         intent.putExtra("request_code", 265);
+                        intent.putExtra("sc_id", sc_id);
+                        intent.putStringArrayListExtra("screen_names", getScreenNames());
                         startActivityForResult(intent, 265);
                     }
                 });
