@@ -127,19 +127,6 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         else return R.drawable.project_item_shape_middle;
     }
 
-    private String getUpdatedTime(String sc_id) {
-        String path = wq.e() + File.separator + sc_id + File.separator + "project";
-        File file = new File(path);
-        if (!file.exists()) return "Unknown";
-        long diff = System.currentTimeMillis() - file.lastModified();
-        long mins = diff / 60000;
-        if (mins < 60) return "Updated " + (mins == 0 ? 1 : mins) + " mins ago";
-        long hours = mins / 60;
-        if (hours < 24) return "Updated " + hours + " hours ago";
-        long days = hours / 24;
-        return "Updated " + days + " days ago";
-    }
-
     @Override
     public void onBindViewHolder(@NonNull ProjectViewHolder holder, int position) {
         holder.itemView.setBackgroundResource(getShapedBackgroundForList(shownProjects, position));
@@ -175,10 +162,10 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         String vName = yB.c(projectMap, "sc_ver_name");
         String vCode = yB.c(projectMap, "sc_ver_code");
         
-        holder.binding.projectName.setText(yB.c(projectMap, "my_app_name"));
+        holder.binding.appName.setText(yB.c(projectMap, "my_app_name"));
         holder.binding.packageName.setText(yB.c(projectMap, "my_sc_pkg_name"));
         holder.binding.tvVersionText.setText("v" + (vName.isEmpty() ? "1.0" : vName) + " (" + (vCode.isEmpty() ? "1" : vCode) + ")");
-        holder.binding.tvUpdatedTime.setText(getUpdatedTime(scId));
+        holder.binding.tvProjectName.setText(yB.c(projectMap, "my_ws_name"));
         
         holder.itemView.setTag("custom");
 

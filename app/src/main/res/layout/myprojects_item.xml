@@ -56,7 +56,7 @@
         app:tint="?attr/colorPrimary" />
 
     <TextView
-        android:id="@+id/project_name"
+        android:id="@+id/app_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -71,7 +71,7 @@
         app:layout_constraintStart_toEndOf="@id/img_icon_view"
         app:layout_constraintTop_toTopOf="@id/img_icon_view"
         app:layout_constraintVertical_chainStyle="packed"
-        tools:text="UNWANTED ONE" />
+        tools:text="My App" />
 
     <TextView
         android:id="@+id/package_name"
@@ -82,26 +82,26 @@
         android:maxLines="1"
         android:textAppearance="?attr/textAppearanceBodySmall"
         android:textColor="?attr/colorOnSurfaceVariant"
-        app:layout_constraintBottom_toTopOf="@+id/tv_updated_time"
+        app:layout_constraintBottom_toTopOf="@+id/tv_project_name"
         app:layout_constraintEnd_toStartOf="@id/tv_version"
-        app:layout_constraintStart_toStartOf="@id/project_name"
-        app:layout_constraintTop_toBottomOf="@id/project_name"
+        app:layout_constraintStart_toStartOf="@id/app_name"
+        app:layout_constraintTop_toBottomOf="@id/app_name"
         tools:text="com.rennmatrix" />
 
     <TextView
-        android:id="@+id/tv_updated_time"
+        android:id="@+id/tv_project_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textAppearance="?attr/textAppearanceLabelSmall"
-        android:textColor="?attr/colorOutline"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
         app:layout_constraintBottom_toBottomOf="@id/img_icon_view"
         app:layout_constraintEnd_toStartOf="@id/tv_version"
-        app:layout_constraintStart_toStartOf="@id/project_name"
+        app:layout_constraintStart_toStartOf="@id/app_name"
         app:layout_constraintTop_toBottomOf="@id/package_name"
-        tools:text="Updated 3 hours ago" />
+        tools:text="My Project" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/tv_version"
