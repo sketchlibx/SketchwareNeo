@@ -1,9 +1,10 @@
 package com.besome.sketch.editor.manage.library;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Objects;
-
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import a.a.a.yB;
 
@@ -16,36 +17,54 @@ public class ProjectComparator implements Comparator<HashMap<String, Object>> {
     public static final int DEFAULT = SORT_BY_ID | SORT_ORDER_DESCENDING;
 
     private int sortBy = 0;
-    private String pinned_scid;
+    private Set<String> pinnedScids = Collections.emptySet();
 
     public ProjectComparator() {
     }
 
-    public ProjectComparator(int sortBy, String pinned_scid) {
+    public ProjectComparator(int sortBy, String pinnedScids) {
         this.sortBy = sortBy;
-        this.pinned_scid = pinned_scid;
+        this.pinnedScids = parsePinnedScids(pinnedScids);
+    }
+
+    private Set<String> parsePinnedScids(String value) {
+        Set<String> result = new LinkedHashSet<>();
+        if (value == null || value.trim().isEmpty() || "-1".equals(value.trim())) {
+            return result;
+        }
+        for (String item : value.split(",")) {
+            String scId = item.trim();
+            if (!scId.isEmpty() && !"-1".equals(scId)) {
+                result.add(scId);
+            }
+        }
+        return result;
     }
 
     @Override
     public int compare(HashMap<String, Object> first, HashMap<String, Object> second) {
         boolean isSortOrderAscending = (sortBy & SORT_ORDER_ASCENDING) == SORT_ORDER_ASCENDING;
+        boolean firstPinned = pinnedScids.contains(yB.c(first, "sc_id"));
+        boolean secondPinned = pinnedScids.contains(yB.c(second, "sc_id"));
 
-        if (Objects.equals(pinned_scid, yB.c(first, "sc_id"))) {
-            return -1;
-        } else if (Objects.equals(pinned_scid, yB.c(second, "sc_id"))) {
-            return 1;
+        if (firstPinned != secondPinned) {
+            return firstPinned ? -1 : 1;
         }
 
         if ((sortBy & SORT_BY_ID) == SORT_BY_ID) {
-            return Integer.compare(
-                    Integer.parseInt(yB.c(first, "sc_id")),
-                    Integer.parseInt(yB.c(second, "sc_id"))) * (isSortOrderAscending ? 1 : -1);
+            return compareIds(yB.c(first, "sc_id"), yB.c(second, "sc_id")) * (isSortOrderAscending ? 1 : -1);
         } else if ((sortBy & SORT_BY_NAME) == SORT_BY_NAME) {
             return yB.c(first, "my_ws_name").compareTo(yB.c(second, "my_ws_name")) * (isSortOrderAscending ? 1 : -1);
         } else {
-            return Integer.compare(
-                    Integer.parseInt(yB.c(first, "sc_id")),
-                    Integer.parseInt(yB.c(second, "sc_id"))) * -1;
+            return compareIds(yB.c(first, "sc_id"), yB.c(second, "sc_id")) * -1;
+        }
+    }
+
+    private int compareIds(String first, String second) {
+        try {
+            return Integer.compare(Integer.parseInt(first), Integer.parseInt(second));
+        } catch (NumberFormatException ignored) {
+            return first.compareTo(second);
         }
     }
 }

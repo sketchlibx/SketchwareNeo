@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.besome.sketch.export.ExportProjectActivity;
+import com.besome.sketch.editor.manage.view.ScreenImportActivity;
 import com.besome.sketch.lib.ui.LoadingDialog;
 import com.besome.sketch.projects.MyProjectSettingActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -24,7 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import a.a.a.DB;
 import a.a.a.lC;
@@ -202,6 +204,10 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         String scId = yB.c(projectMap, "sc_id");
         new Thread(() -> {
             lC.a(activity, scId);
+            Set<String> pinnedProjectIds = getPinnedProjectIds();
+            if (pinnedProjectIds.remove(scId)) {
+                preference.a("pinnedProject", pinnedProjectIds.isEmpty() ? "-1" : String.join(",", pinnedProjectIds), true);
+            }
             activity.runOnUiThread(() -> {
                 progressDialog.dismiss();
                 projectsFragment.refreshProjectsList();
@@ -235,17 +241,38 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
         activity.startActivity(intent);
     }
 
-    private void changePinState(HashMap<String, Object> projectMap) {
-        if (isPinned(projectMap)) {
-            preference.a("pinnedProject", "-1", true);
-        } else {
-            preference.a("pinnedProject", yB.c(projectMap, "sc_id"), true);
+    private Set<String> getPinnedProjectIds() {
+        Set<String> pinnedProjectIds = new LinkedHashSet<>();
+        String savedPins = preference.a("pinnedProject", "-1");
+        if (savedPins == null || savedPins.trim().isEmpty() || "-1".equals(savedPins.trim())) {
+            return pinnedProjectIds;
         }
+        for (String value : savedPins.split(",")) {
+            String scId = value.trim();
+            if (!scId.isEmpty() && !"-1".equals(scId)) {
+                pinnedProjectIds.add(scId);
+            }
+        }
+        return pinnedProjectIds;
+    }
+
+    private void changePinState(HashMap<String, Object> projectMap) {
+        String scId = yB.c(projectMap, "sc_id").trim();
+        if (scId.isEmpty()) {
+            return;
+        }
+        Set<String> pinnedProjectIds = getPinnedProjectIds();
+        if (!pinnedProjectIds.add(scId)) {
+            pinnedProjectIds.remove(scId);
+        }
+        String savedPins = pinnedProjectIds.isEmpty() ? "-1" : String.join(",", pinnedProjectIds);
+        preference.a("pinnedProject", savedPins, true);
+        notifyItemRangeChanged(0, getItemCount());
         projectsFragment.refreshProjectsList();
     }
 
     private boolean isPinned(HashMap<String, Object> projectMap) {
-        return Objects.equals(yB.c(projectMap, "sc_id"), preference.a("pinnedProject", "-1"));
+        return getPinnedProjectIds().contains(yB.c(projectMap, "sc_id"));
     }
 
     private void showProjectOptionsBottomSheet(HashMap<String, Object> projectMap, int position) {
@@ -263,6 +290,14 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
 
         binding.projectBackup.setOnClickListener(v -> {
             backupProject(projectMap);
+            projectOptionsBSD.dismiss();
+        });
+
+        binding.importActivity.setOnClickListener(v -> {
+            Intent intent = new Intent(activity, ScreenImportActivity.class);
+            intent.putExtra(ScreenImportActivity.EXTRA_TARGET_PROJECT_ID, yB.c(projectMap, "sc_id"));
+            intent.putExtra(ScreenImportActivity.EXTRA_CLONE_MODE, false);
+            activity.startActivity(intent);
             projectOptionsBSD.dismiss();
         });
 

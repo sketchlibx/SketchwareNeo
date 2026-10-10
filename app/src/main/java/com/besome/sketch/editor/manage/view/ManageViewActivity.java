@@ -46,6 +46,7 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
     private static final int TAB_COUNT = 2;
     private static final int REQUEST_CODE_ADD_ACTIVITY = 264;
     private static final int REQUEST_CODE_ADD_CUSTOM_VIEW = 266;
+    private static final int REQUEST_CODE_CLONE_SCREEN = 268;
     private final int[] x = new int[19];
     // signature mustn't be changed: used in La/a/a/Bw;->a(Landroidx/recyclerview/widget/RecyclerView;II)V, La/a/a/tw;->a(Landroidx/recyclerview/widget/RecyclerView;II)V
     public FloatingActionButton s;
@@ -209,6 +210,9 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
             if (data.hasExtra("preset_views")) {
                 a(projectFileBean, data.getParcelableArrayListExtra("preset_views"));
             }
+        } else if (requestCode == REQUEST_CODE_CLONE_SCREEN && resultCode == RESULT_OK) {
+            activitiesFragment.g();
+            customViewsFragment.g();
         }
     }
 
@@ -301,6 +305,7 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.manage_screen_menu, menu);
         menu.findItem(R.id.menu_screen_delete).setVisible(!selecting);
+        menu.findItem(R.id.menu_screen_clone).setVisible(!selecting);
         return true;
     }
 
@@ -308,6 +313,18 @@ public class ManageViewActivity extends BaseAppCompatActivity implements OnClick
     public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
         if (menuItem.getItemId() == R.id.menu_screen_delete) {
             a(!selecting);
+            return true;
+        }
+        if (menuItem.getItemId() == R.id.menu_screen_clone) {
+            if (selecting) {
+                return true;
+            }
+            Intent intent = new Intent(this, ScreenImportActivity.class);
+            intent.putExtra(ScreenImportActivity.EXTRA_TARGET_PROJECT_ID, sc_id);
+            intent.putExtra(ScreenImportActivity.EXTRA_SOURCE_PROJECT_ID, sc_id);
+            intent.putExtra(ScreenImportActivity.EXTRA_CLONE_MODE, true);
+            startActivityForResult(intent, REQUEST_CODE_CLONE_SCREEN);
+            return true;
         }
         return super.onOptionsItemSelected(menuItem);
     }
