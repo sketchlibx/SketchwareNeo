@@ -38,7 +38,7 @@ public class ScreenImportActivity extends BaseAppCompatActivity {
     private boolean cloneMode;
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (!super.isStoragePermissionGranted()) {
             finish();
