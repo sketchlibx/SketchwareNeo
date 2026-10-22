@@ -5,6 +5,7 @@ import androidx.fragment.app.Fragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
 import pro.sketchware.activities.resourceseditor.ResourcesEditorActivity;
+import pro.sketchware.activities.resourceseditor.components.fragments.DimensionsEditor;
 
 public class EditorsAdapter extends FragmentStateAdapter {
 
@@ -24,12 +25,13 @@ public class EditorsAdapter extends FragmentStateAdapter {
             case 2 -> activity.stylesEditor;
             case 3 -> activity.themesEditor;
             case 4 -> activity.arraysEditor;
+            case 5 -> activity.dimensionsEditor;
             default -> throw new IllegalArgumentException("Invalid position");
         };
     }
 
     @Override
     public int getItemCount() {
-        return 5;
+        return 6;
     }
 }

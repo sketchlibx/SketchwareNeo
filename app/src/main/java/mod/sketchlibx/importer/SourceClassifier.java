@@ -68,7 +68,8 @@ public class SourceClassifier {
 
     // Kotlin: "class Foo : Bar()" or "class Foo : Bar<T>()"
     private static final Pattern KT_CLASS = Pattern.compile(
-            "(?:open\\s+|abstract\\s+|data\\s+)?class\\s+(\\w+)\\s*(?:[^:]*)?:\\s*([\\w.]+)");
+            "(?:(?:public|private|protected|internal|open|abstract|data|sealed|inner|enum|annotation|expect|actual)\\s+)*"
+          + "class\\s+(\\w+)\\s*(?:<[^>]*>\\s*)?(?:\\([^)]*\\)\\s*)?:\\s*([\\w.]+)");
 
     // setContentView(R.layout.xxx)
     private static final Pattern SET_CONTENT_VIEW = Pattern.compile(
@@ -119,57 +120,46 @@ public class SourceClassifier {
         List<String> lines = readLines(f);
         if (lines == null) return null;
 
-        String packageName    = "";
-        String simpleClass    = null;
-        String superClass     = null;
-        String layoutFromSCV  = null;   // from setContentView(R.layout.xxx)
-        String layoutFromVB   = null;   // from ViewBinding convention
-        String layoutFromRLayout = null; // any R.layout.xxx reference
+        StringBuilder sourceBuilder = new StringBuilder();
+        for (String line : lines) sourceBuilder.append(line).append('\n');
+        String source = maskCommentsAndLiterals(sourceBuilder.toString(), isKotlin);
 
-        for (String raw : lines) {
-            String line = raw.trim();
+        String packageName = "";
+        String simpleClass = null;
+        String superClass = null;
+        String layoutFromSCV = null;
+        String layoutFromVB = null;
+        String layoutFromRLayout = null;
 
-            // Skip empty lines and comments
-            if (line.isEmpty() || line.startsWith("//") || line.startsWith("*") || line.startsWith("/*")) {
-                continue;
-            }
+        Matcher packageMatcher = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)").matcher(source);
+        if (packageMatcher.find()) packageName = packageMatcher.group(1);
 
-            // Package declaration
-            if (line.startsWith("package ") && packageName.isEmpty()) {
-                packageName = line.replace("package", "").replace(";", "").trim();
-                // Kotlin package can have no semicolon — that's fine
-            }
-
-            // Class declaration (only take the first one per file)
+        Matcher classMatcher = (isKotlin ? KT_CLASS : JAVA_CLASS).matcher(source);
+        String expectedClassName = f.getName();
+        int extension = expectedClassName.lastIndexOf('.');
+        if (extension > 0) expectedClassName = expectedClassName.substring(0, extension);
+        while (classMatcher.find()) {
             if (simpleClass == null) {
-                Matcher m = isKotlin ? KT_CLASS.matcher(line) : JAVA_CLASS.matcher(line);
-                if (m.find()) {
-                    simpleClass = m.group(1);
-                    superClass  = simplifyClassName(m.group(2));
-                }
+                simpleClass = classMatcher.group(1);
+                superClass = simplifyClassName(classMatcher.group(2));
             }
-
-            // setContentView(R.layout.xxx)
-            if (layoutFromSCV == null) {
-                Matcher m = SET_CONTENT_VIEW.matcher(line);
-                if (m.find()) layoutFromSCV = m.group(1);
-            }
-
-            // ViewBinding: XxxBinding.inflate → strip "Binding", convert CamelCase → snake
-            if (layoutFromVB == null) {
-                Matcher m = VIEW_BINDING.matcher(line);
-                if (m.find()) {
-                    String bindingName = m.group(1); // e.g. "ActivityMainBinding"
-                    layoutFromVB = bindingNameToLayout(bindingName);
-                }
-            }
-
-            // Any R.layout.xxx reference (fallback)
-            if (layoutFromRLayout == null) {
-                Matcher m = R_LAYOUT.matcher(line);
-                if (m.find()) layoutFromRLayout = m.group(1);
+            // A source file can contain helper/nested types before its primary class.
+            // Prefer the type matching the filename when it is available.
+            if (expectedClassName.equals(classMatcher.group(1))) {
+                simpleClass = classMatcher.group(1);
+                superClass = simplifyClassName(classMatcher.group(2));
+                break;
             }
         }
+
+        Matcher setContentViewMatcher = SET_CONTENT_VIEW.matcher(source);
+        if (setContentViewMatcher.find()) layoutFromSCV = setContentViewMatcher.group(1);
+
+        Matcher viewBindingMatcher = VIEW_BINDING.matcher(source);
+        if (viewBindingMatcher.find()) layoutFromVB = bindingNameToLayout(viewBindingMatcher.group(1));
+
+        Matcher layoutMatcher = R_LAYOUT.matcher(source);
+        if (layoutMatcher.find()) layoutFromRLayout = layoutMatcher.group(1);
 
         if (simpleClass == null) {
             Log.d(TAG, "No class declaration found in: " + f.getName());
@@ -299,6 +289,61 @@ public class SourceClassifier {
         if (name == null) return null;
         int dot = name.lastIndexOf('.');
         return (dot >= 0) ? name.substring(dot + 1) : name;
+    }
+
+    // Masks comments and string/character literals while preserving source offsets and
+    // newlines. This prevents fake class/resource matches inside examples or URLs and
+    // permits declarations split across multiple lines to be recognized.
+    private String maskCommentsAndLiterals(String source, boolean isKotlin) {
+        final int NORMAL = 0, STRING = 1, CHAR = 2, TRIPLE = 3, LINE = 4, BLOCK = 5;
+        StringBuilder out = new StringBuilder(source.length());
+        int state = NORMAL;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i);
+            char next = i + 1 < source.length() ? source.charAt(i + 1) : 0;
+            char next2 = i + 2 < source.length() ? source.charAt(i + 2) : 0;
+            if (state == LINE) {
+                if (c == '\n' || c == '\r') { out.append(c); state = NORMAL; }
+                else out.append(' ');
+                continue;
+            }
+            if (state == BLOCK) {
+                if (c == '*' && next == '/') { out.append("  "); i++; state = NORMAL; }
+                else out.append(c == '\n' || c == '\r' ? c : ' ');
+                continue;
+            }
+            if (state == TRIPLE) {
+                if (!isKotlin && c == '\\' && i + 1 < source.length()) {
+                    out.append(' ');
+                    char escapedChar = source.charAt(++i);
+                    out.append(escapedChar == '\n' || escapedChar == '\r' ? escapedChar : ' ');
+                } else if (c == '"' && next == '"' && next2 == '"') {
+                    out.append("   "); i += 2; state = NORMAL;
+                } else out.append(c == '\n' || c == '\r' ? c : ' ');
+                continue;
+            }
+            if (state == STRING || state == CHAR) {
+                if (c == '\\' && i + 1 < source.length()) {
+                    out.append(' ');
+                    char escapedChar = source.charAt(++i);
+                    out.append(escapedChar == '\n' || escapedChar == '\r' ? escapedChar : ' ');
+                    continue;
+                }
+                if ((state == STRING && c == '"') || (state == CHAR && c == '\'')) {
+                    out.append(' '); state = NORMAL;
+                } else out.append(c == '\n' || c == '\r' ? c : ' ');
+                continue;
+            }
+            if (c == '/' && next == '/') { out.append("  "); i++; state = LINE; continue; }
+            if (c == '/' && next == '*') { out.append("  "); i++; state = BLOCK; continue; }
+            if (c == '"' && next == '"' && next2 == '"') {
+                out.append("   "); i += 2; state = TRIPLE; continue;
+            }
+            if (c == '"') { out.append(' '); state = STRING; continue; }
+            if (c == '\'') { out.append(' '); state = CHAR; continue; }
+            out.append(c);
+        }
+        return out.toString();
     }
 
     // ── Line reader ───────────────────────────────────────────────────────────

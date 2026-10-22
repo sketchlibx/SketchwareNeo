@@ -28,8 +28,17 @@ public class Fx {
             "%m.view", "%m.layout", "%m.textview", "%m.button", "%m.edittext", "%m.imageview", "%m.recyclerview",
             "%m.listview", "%m.gridview", "%m.cardview", "%m.viewpager", "%m.webview", "%m.videoview", "%m.progressbar",
             "%m.seekbar", "%m.switch", "%m.checkbox", "%m.spinner", "%m.tablayout", "%m.bottomnavigation", "%m.adview",
-            "%m.swiperefreshlayout", "%m.textinputlayout", "%m.ratingbar", "%m.datepicker", "%m.otpview", "%m.lottie",
-            "%m.badgeview", "%m.codeview", "%m.patternview", "%m.signinbutton", "%m.youtubeview"
+            "%m.swiperefreshlayout", "%m.textinputlayout", "%m.textinputedittext", "%m.ratingbar", "%m.datepicker", "%m.otpview", "%m.lottie",
+            "%m.badgeview", "%m.codeview", "%m.patternview", "%m.signinbutton", "%m.youtubeview",
+            // Material 3 widget selectors may appear in custom/plugin block specs.
+            // They still reference the same view ID and must participate in ViewBinding conversion.
+            "%m.materialbutton", "%m.materialiconbutton", "%m.materialtextview",
+            "%m.materialautocompletetextview", "%m.extendedfloatingactionbutton",
+            "%m.materialcardview", "%m.materialslider", "%m.slider",
+            "%m.materialswitch", "%m.materialcheckbox", "%m.materialradiobutton",
+            "%m.chip", "%m.chipgroup", "%m.materialbuttontogglegroup",
+            "%m.shapeableimageview", "%m.materialprogressindicator", "%m.materialdivider",
+            "%m.floatingactionbutton"
     ));
     public String[] operators = {"repeat", "+", "-", "*", "/", "%", ">", "=", "<", "&&", "||", "not"};
     public String[] arithmetic = {"+", "-", "*", "/", "%", ">", "=", "<", "&&", "||"};
@@ -435,6 +444,11 @@ public class Fx {
                 String elseBlock = stack >= 0 ? a(String.valueOf(stack), "") : "";
                 opcode = String.format("if (%s) {\r\n%s\r\n} else {\r\n%s\r\n}", params.get(0), ifBlock, elseBlock);
                 break;
+            case "elseIf":
+                stack = bean.subStack1;
+                opcode = String.format("else if (%s) {\r\n%s\r\n}", params.get(0),
+                        stack >= 0 ? a(String.valueOf(stack), "") : "");
+                break;
             case "break":
                 opcode = "break;";
                 break;
@@ -468,7 +482,9 @@ public class Fx {
                 opcode = String.format("%s.length()", params.get(0));
                 break;
             case "stringJoin":
-                opcode = String.format("%s.concat(%s)", params.get(0), params.get(1));
+                // Java's + converts null to the text "null"; String.concat throws
+                // for a null operand. String.valueOf preserves Java concatenation semantics.
+                opcode = String.format("String.valueOf(%s) + String.valueOf(%s)", params.get(0), params.get(1));
                 break;
             case "stringIndex":
                 opcode = String.format("%s.indexOf(%s)", params.get(1), params.get(0));
@@ -523,6 +539,14 @@ public class Fx {
             case "addSourceDirectly":
                 String asd = bean.parameters.get(0);
                 opcode = (asd != null) ? asd : opcode;
+                break;
+            case "comment":
+                // A comment block must stay on one source line; pasted newlines
+                // could otherwise turn subsequent text into executable Java.
+                String commentText = params.isEmpty() ? "" : params.get(0);
+                if (commentText == null) commentText = "";
+                commentText = commentText.replace('\r', ' ').replace('\n', ' ');
+                opcode = "// " + commentText;
                 break;
             case "strToMap":
                 opcode = String.format("%s = new Gson().fromJson(%s, new TypeToken<HashMap<String, Object>>(){}.getType());", params.get(1), params.get(0));

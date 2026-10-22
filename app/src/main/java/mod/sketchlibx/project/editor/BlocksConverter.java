@@ -43,6 +43,8 @@ public final class BlocksConverter {
     private final List<BlockBean> exprBlocks = new ArrayList<>();
     /** MoreBlock input name -> Sketchware type token (s/b/d). Empty for ordinary events. */
     private Map<String, String> argumentTypes = Collections.emptyMap();
+    /** Source-level scalar types inferred from method arguments and local declarations. */
+    private final Map<String, ExprType> variableTypes = new HashMap<>();
 
     // ── Custom block matching ──────────────────────────────────────────────────
     // Loaded once per convert() call via lazy init from ExtraBlockFile.
@@ -264,6 +266,7 @@ public final class BlocksConverter {
             BlocksConverter c = new BlocksConverter();
             if (argumentTypes != null && !argumentTypes.isEmpty()) c.argumentTypes = new HashMap<>(argumentTypes);
             List<String> lines = c.preprocess(javaCode);
+            c.collectVariableTypes(lines);
             if (lines.isEmpty())
                 return new ConversionResult(new ArrayList<>(),
                         "No statements found after stripping comments and annotations.", 0, 0);
@@ -283,6 +286,11 @@ public final class BlocksConverter {
             // stmtBlocks first so index-0 is always the sequence root
             ArrayList<BlockBean> all = new ArrayList<>(stmtBlocks);
             all.addAll(c.exprBlocks);
+            String graphError = c.validateBlockGraph(all);
+            if (graphError != null) {
+                return new ConversionResult(new ArrayList<>(), graphError,
+                        c.recognizedCount, c.fallbackCount);
+            }
             return new ConversionResult(all, null, c.recognizedCount, c.fallbackCount);
         } catch (Exception e) {
             return new ConversionResult(new ArrayList<>(),
@@ -300,18 +308,39 @@ public final class BlocksConverter {
           + "\\s+[\\w<>\\[\\]]+\\s+\\w+\\s*\\(.*");
 
     private List<String> preprocess(String code) {
-        // Strip block comments and line comments safely
-        code = code.replaceAll("/\\*[\\s\\S]*?\\*/", "");
-        code = code.replaceAll("//.*", "");
+        // Strip comments lexically so URLs, escaped quotes and comment markers
+        // inside ordinary strings, chars, and Java text blocks remain untouched.
+        code = stripJavaComments(code);
 
         List<String> out = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
         boolean inString = false;
         boolean inChar = false;
+        boolean inTextBlock = false;
         int parenDepth = 0;
 
         for (int i = 0; i < code.length(); i++) {
             char c = code.charAt(i);
+            char next = i + 1 < code.length() ? code.charAt(i + 1) : 0;
+            char next2 = i + 2 < code.length() ? code.charAt(i + 2) : 0;
+            if (inTextBlock) {
+                if (c == '\\' && i + 1 < code.length()) {
+                    sb.append(c).append(code.charAt(++i));
+                } else if (c == '"' && next == '"' && next2 == '"') {
+                    sb.append("\"\"\"");
+                    i += 2;
+                    inTextBlock = false;
+                } else {
+                    sb.append(c);
+                }
+                continue;
+            }
+            if (!inString && !inChar && c == '"' && next == '"' && next2 == '"') {
+                sb.append("\"\"\"");
+                i += 2;
+                inTextBlock = true;
+                continue;
+            }
             if (c == '\\') {
                 sb.append(c);
                 if (i + 1 < code.length()) sb.append(code.charAt(++i));
@@ -1467,6 +1496,182 @@ public final class BlocksConverter {
         return asd(newId(), ensureSemicolon(line));
     }
 
+    private static final Pattern LOCAL_SCALAR_DECL = Pattern.compile(
+            "^(?:(?:final|volatile|transient)\\s+)*(String|CharSequence|boolean|Boolean|byte|short|int|long|float|double|Integer|Long|Float|Double)\\s+(?:\\[\\]\\s*)?([A-Za-z_$][A-Za-z0-9_$]*)\\b");
+
+    private void collectVariableTypes(List<String> lines) {
+        variableTypes.clear();
+        if (argumentTypes != null) {
+            for (Map.Entry<String, String> entry : argumentTypes.entrySet()) {
+                String token = entry.getValue();
+                variableTypes.put(entry.getKey(), "s".equals(token) ? ExprType.STRING
+                        : "b".equals(token) ? ExprType.BOOLEAN : ExprType.NUMBER);
+            }
+        }
+        for (String line : lines) {
+            Matcher declaration = LOCAL_SCALAR_DECL.matcher(line.trim());
+            if (!declaration.find()) continue;
+            String type = declaration.group(1);
+            ExprType exprType = "String".equals(type) || "CharSequence".equals(type)
+                    ? ExprType.STRING
+                    : ("boolean".equals(type) || "Boolean".equals(type))
+                    ? ExprType.BOOLEAN : ExprType.NUMBER;
+            variableTypes.put(declaration.group(2), exprType);
+        }
+    }
+
+    private ExprType inferExprType(String rawExpr) {
+        if (rawExpr == null) return ExprType.UNKNOWN;
+        String expr = rawExpr.trim();
+        if (expr.isEmpty()) return ExprType.UNKNOWN;
+        if (expr.startsWith("(") && matchingClose(expr, 0) == expr.length() - 1) {
+            return inferExprType(expr.substring(1, expr.length() - 1));
+        }
+        if (expr.startsWith("\"") && expr.endsWith("\"") && expr.length() >= 2) return ExprType.STRING;
+        if (expr.startsWith("'") && expr.endsWith("'") && expr.length() >= 3) return ExprType.NUMBER;
+        if ("true".equals(expr) || "false".equals(expr)
+                || expr.startsWith("!") || expr.contains(" instanceof ")) return ExprType.BOOLEAN;
+        if (expr.matches("-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)[fFdDlL]?")
+                || expr.matches("0[xX][0-9A-Fa-f]+[lL]?")) return ExprType.NUMBER;
+
+        int op = topLevelOp(expr, "||");
+        if (op >= 0) return ExprType.BOOLEAN;
+        op = topLevelOp(expr, "&&");
+        if (op >= 0) return ExprType.BOOLEAN;
+        for (String comparison : new String[]{"==", "!=", ">=", "<=", ">", "<"}) {
+            if (topLevelOp(expr, comparison) >= 0) return ExprType.BOOLEAN;
+        }
+        op = topLevelOp(expr, "+");
+        if (op >= 0) {
+            ExprType left = inferExprType(expr.substring(0, op));
+            ExprType right = inferExprType(expr.substring(op + 1));
+            if (left == ExprType.STRING || right == ExprType.STRING) return ExprType.STRING;
+            if (left == ExprType.NUMBER && right == ExprType.NUMBER) return ExprType.NUMBER;
+        }
+        for (String arithmetic : new String[]{"-", "*", "/", "%"}) {
+            if (topLevelOp(expr, arithmetic) >= 0) return ExprType.NUMBER;
+        }
+        if (expr.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
+            String argType = argumentTypes.get(expr);
+            if ("s".equals(argType)) return ExprType.STRING;
+            if ("b".equals(argType)) return ExprType.BOOLEAN;
+            ExprType known = variableTypes.get(expr);
+            if (known != null) return known;
+        }
+        if (expr.endsWith(".getText().toString()") || expr.startsWith("getString(")
+                || expr.contains(".getStringExtra(") || expr.contains(".concat(")
+                || expr.endsWith(".toString()")) return ExprType.STRING;
+        if (expr.contains(".equals(") || expr.contains(".isEnabled()")
+                || expr.contains(".isChecked()")) return ExprType.BOOLEAN;
+        if (expr.startsWith("Math.") || expr.startsWith("Double.parseDouble(")
+                || expr.startsWith("Integer.parseInt(") || expr.startsWith("Float.parseFloat(")) return ExprType.NUMBER;
+        return ExprType.UNKNOWN;
+    }
+
+    private String toStringExpression(String expression) {
+        ExprType type = inferExprType(expression);
+        if (type == ExprType.STRING) return parseExpr(expression, ExprType.STRING);
+        if (type == ExprType.NUMBER) {
+            String numeric = parseExpr(expression, ExprType.NUMBER);
+            return exprRef(exprB1("%d to string with decimal", "s", "toStringWithDecimal", numeric));
+        }
+        // Boolean/object/unknown operands must retain Java String.valueOf semantics.
+        // The typed expression fallback is deliberately safer than String.concat(int)
+        // or assigning an unknown variable to a mismatched native socket.
+        return exprRef(exprB1("string %s.inputOnly", "s", "asdString", "String.valueOf(" + expression + ")"));
+    }
+
+    private String blockTypeFor(ExprType type) {
+        if (type == ExprType.STRING) return "s";
+        if (type == ExprType.BOOLEAN) return "b";
+        return "d";
+    }
+
+    private String stripJavaComments(String source) {
+        StringBuilder out = new StringBuilder(source.length());
+        final int NORMAL = 0, STRING = 1, CHAR = 2, TEXT_BLOCK = 3, LINE = 4, BLOCK = 5;
+        int state = NORMAL;
+        boolean escaped = false;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i);
+            char next = i + 1 < source.length() ? source.charAt(i + 1) : 0;
+            char next2 = i + 2 < source.length() ? source.charAt(i + 2) : 0;
+            if (state == LINE) {
+                if (c == '\n' || c == '\r') { state = NORMAL; out.append(c); }
+                else out.append(' ');
+                continue;
+            }
+            if (state == BLOCK) {
+                if (c == '*' && next == '/') { out.append("  "); i++; state = NORMAL; }
+                else out.append(c == '\n' || c == '\r' ? c : ' ');
+                continue;
+            }
+            if (state == TEXT_BLOCK) {
+                out.append(c);
+                if (c == '\\' && i + 1 < source.length()) {
+                    out.append(source.charAt(++i));
+                } else if (c == '\"' && next == '\"' && next2 == '\"') {
+                    out.append("\"\""); i += 2; state = NORMAL;
+                }
+                continue;
+            }
+            if (state == STRING || state == CHAR) {
+                out.append(c);
+                if (escaped) escaped = false;
+                else if (c == '\\') escaped = true;
+                else if (state == STRING && c == '\"') state = NORMAL;
+                else if (state == CHAR && c == '\'') state = NORMAL;
+                continue;
+            }
+            if (c == '\"' && next == '\"' && next2 == '\"') {
+                out.append("\"\"\""); i += 2; state = TEXT_BLOCK; continue;
+            }
+            if (c == '\"') { out.append(c); state = STRING; continue; }
+            if (c == '\'') { out.append(c); state = CHAR; continue; }
+            if (c == '/' && next == '/') { out.append("  "); i++; state = LINE; continue; }
+            if (c == '/' && next == '*') { out.append("  "); i++; state = BLOCK; continue; }
+            out.append(c);
+        }
+        return out.toString();
+    }
+
+    private String validateBlockGraph(List<BlockBean> blocks) {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (BlockBean block : blocks) {
+            if (block == null || block.id == null || block.opCode == null || block.spec == null
+                    || block.type == null || block.parameters == null) return "Invalid block graph: a generated block is incomplete.";
+            if (!ids.add(block.id)) return "Invalid block graph: duplicate block ID " + block.id + ".";
+        }
+        Pattern refPattern = Pattern.compile("^@([0-9]+)$");
+        for (BlockBean block : blocks) {
+            for (String parameter : block.parameters) {
+                if (parameter == null) return "Invalid block graph: block " + block.id + " has a null parameter.";
+                Matcher refs = refPattern.matcher(parameter);
+                if (refs.matches()) {
+                    try {
+                        int candidateId = Integer.parseInt(refs.group(1));
+                        // Only this converter's reserved ID range can represent generated value
+                        // blocks. Ordinary string literals such as "@123" must remain text.
+                        if (candidateId >= 99_000_001 && candidateId < idCounter
+                                && !ids.contains(refs.group(1))) {
+                            return "Invalid block graph: block " + block.id
+                                    + " references missing value block " + refs.group(1) + ".";
+                        }
+                    } catch (NumberFormatException ignored) {
+                        // A value that is not a numeric block ID is plain text.
+                    }
+                }
+            }
+            if (block.nextBlock >= 0 && !ids.contains(String.valueOf(block.nextBlock)))
+                return "Invalid block graph: block " + block.id + " points to a missing next block.";
+            if (block.subStack1 >= 0 && !ids.contains(String.valueOf(block.subStack1)))
+                return "Invalid block graph: block " + block.id + " points to a missing first stack block.";
+            if (block.subStack2 >= 0 && !ids.contains(String.valueOf(block.subStack2)))
+                return "Invalid block graph: block " + block.id + " points to a missing second stack block.";
+        }
+        return null;
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // EXPRESSION PARSER  –  converts Java expr to param string or @blockId
     // ══════════════════════════════════════════════════════════════════════════
@@ -1508,17 +1713,39 @@ public final class BlocksConverter {
 
         op = topLevelOp(expr, "==");
         if (op >= 0) {
-            String l = parseExpr(expr.substring(0, op).trim(), ExprType.UNKNOWN);
-            String r = parseExpr(expr.substring(op + 2).trim(), ExprType.UNKNOWN);
-            return exprRef(exprB2("%d = %d", "b", "=", l, r));
+            String leftExpr = expr.substring(0, op).trim();
+            String rightExpr = expr.substring(op + 2).trim();
+            ExprType leftType = inferExprType(leftExpr);
+            ExprType rightType = inferExprType(rightExpr);
+            // Java String/reference equality is not String.equals(). Preserve its
+            // exact semantics in a typed source-expression block instead of lying
+            // to the user with a value-equality block.
+            if (leftType == ExprType.STRING || rightType == ExprType.STRING
+                    || leftType == ExprType.UNKNOWN || rightType == ExprType.UNKNOWN) {
+                return exprRef(exprB1("boolean %s.inputOnly", "b", "asdBoolean", expr));
+            }
+            String l = parseExpr(leftExpr, leftType);
+            String r = parseExpr(rightExpr, rightType);
+            String paramType = leftType == ExprType.BOOLEAN && rightType == ExprType.BOOLEAN
+                    ? "%b = %b" : "%d = %d";
+            return exprRef(exprB2(paramType, "b", "=", l, r));
         }
 
         op = topLevelOp(expr, "!=");
         if (op >= 0) {
-            // Sketchware has no != block natively; wrap in not(=(...))
-            String l = parseExpr(expr.substring(0, op).trim(), ExprType.UNKNOWN);
-            String r = parseExpr(expr.substring(op + 2).trim(), ExprType.UNKNOWN);
-            String eqBlock = exprRef(exprB2("%d = %d", "b", "=", l, r));
+            String leftExpr = expr.substring(0, op).trim();
+            String rightExpr = expr.substring(op + 2).trim();
+            ExprType leftType = inferExprType(leftExpr);
+            ExprType rightType = inferExprType(rightExpr);
+            if (leftType == ExprType.STRING || rightType == ExprType.STRING
+                    || leftType == ExprType.UNKNOWN || rightType == ExprType.UNKNOWN) {
+                return exprRef(exprB1("boolean %s.inputOnly", "b", "asdBoolean", expr));
+            }
+            String l = parseExpr(leftExpr, leftType);
+            String r = parseExpr(rightExpr, rightType);
+            String paramType = leftType == ExprType.BOOLEAN && rightType == ExprType.BOOLEAN
+                    ? "%b = %b" : "%d = %d";
+            String eqBlock = exprRef(exprB2(paramType, "b", "=", l, r));
             return exprRef(exprB1("not %b", "b", "not", eqBlock));
         }
 
@@ -1554,17 +1781,30 @@ public final class BlocksConverter {
             return exprRef(exprB2("%d < %d", "b", "<", l, r));
         }
 
-        // Arithmetic +
+        // Java '+' is both arithmetic and string concatenation. Resolve it from
+        // operand types instead of the caller's UI hint alone; e.g. setText("Coins: " + coins)
+        // must not create a string socket for an integer variable or emit String.concat(int).
         op = topLevelOp(expr, "+");
         if (op >= 0) {
-            String l = parseExpr(expr.substring(0, op).trim(), hint);
-            String r = parseExpr(expr.substring(op + 1).trim(), hint);
-            if (hint == ExprType.STRING) {
-                // String concat block
-                return exprRef(exprB2("%s.concat(%s)", "s", "+", l, r));
-            } else {
-                return exprRef(exprB2("%d + %d", "d", "+", l, r));
+            String leftExpr = expr.substring(0, op).trim();
+            String rightExpr = expr.substring(op + 1).trim();
+            ExprType leftType = inferExprType(leftExpr);
+            ExprType rightType = inferExprType(rightExpr);
+            // Known numeric + known numeric must remain arithmetic even when the
+            // surrounding API accepts a string-like value (for example overloads).
+            // Use the caller's string hint only when at least one operand's type is
+            // genuinely unknown; a known String operand always means concatenation.
+            boolean concatenation = leftType == ExprType.STRING || rightType == ExprType.STRING
+                    || (hint == ExprType.STRING
+                    && (leftType == ExprType.UNKNOWN || rightType == ExprType.UNKNOWN));
+            if (concatenation) {
+                String l = toStringExpression(leftExpr);
+                String r = toStringExpression(rightExpr);
+                return exprRef(exprB2("%s.concat(%s)", "s", "stringJoin", l, r));
             }
+            String l = parseExpr(leftExpr, ExprType.NUMBER);
+            String r = parseExpr(rightExpr, ExprType.NUMBER);
+            return exprRef(exprB2("%d + %d", "d", "+", l, r));
         }
 
         op = topLevelOp(expr, "-");
@@ -1889,11 +2129,14 @@ public final class BlocksConverter {
             return exprRef(exprB1("add source directly %s.inputOnly", "d", "asdNumber", expr));
 
         // ── Simple identifier → getVar ─────────────────────────────────────────
-        if (expr.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+        if (expr.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
             String argumentType = argumentTypes.get(expr);
-            String bType = argumentType != null ? argumentType
-                    : hint == ExprType.STRING ? "s"
-                    : hint == ExprType.BOOLEAN ? "b" : "d";
+            ExprType knownType = variableTypes.get(expr);
+            String bType;
+            if (argumentType != null) bType = argumentType;
+            else if (knownType != null) bType = blockTypeFor(knownType);
+            else bType = hint == ExprType.STRING ? "s"
+                        : hint == ExprType.BOOLEAN ? "b" : "d";
             BlockBean b = new BlockBean(String.valueOf(newId()), expr, bType,
                     argumentType != null ? "getArg" : "getVar");
             exprBlocks.add(b);
@@ -1980,24 +2223,60 @@ public final class BlocksConverter {
      */
     private int topLevelOp(String expr, String op) {
         int depth = 0;
-        boolean inStr = false;
+        boolean inString = false;
+        boolean inChar = false;
+        boolean inTextBlock = false;
+        boolean escaped = false;
         int result = -1;
         for (int i = 0; i <= expr.length() - op.length(); i++) {
             char c = expr.charAt(i);
-            if (inStr) {
-                if (c == '"' && (i == 0 || expr.charAt(i - 1) != '\\')) inStr = false;
+            if (inTextBlock) {
+                if (c == '\\' && i + 1 < expr.length()) { i++; continue; }
+                if (c == '\"' && i + 2 < expr.length()
+                        && expr.charAt(i + 1) == '\"' && expr.charAt(i + 2) == '\"') {
+                    i += 2;
+                    inTextBlock = false;
+                }
                 continue;
             }
-            if (c == '"') { inStr = true; continue; }
-            if (c == '(' || c == '[') { depth++; continue; }
-            if (c == ')' || c == ']') { depth--; continue; }
-            if (depth == 0 && expr.startsWith(op, i)) {
-                // Make sure it's not part of a larger operator (e.g., > vs >=)
-                int after = i + op.length();
-                boolean nextIsOp = (after < expr.length()) &&
-                        "=><&|".indexOf(expr.charAt(after)) >= 0;
-                if (!nextIsOp) result = i;
+            if (inString || inChar) {
+                if (escaped) escaped = false;
+                else if (c == '\\') escaped = true;
+                else if (inString && c == '"') inString = false;
+                else if (inChar && c == '\'') inChar = false;
+                continue;
             }
+            if (c == '"' && i + 2 < expr.length()
+                    && expr.charAt(i + 1) == '"' && expr.charAt(i + 2) == '"') {
+                i += 2;
+                inTextBlock = true;
+                continue;
+            }
+            if (c == '"') { inString = true; continue; }
+            if (c == '\'') { inChar = true; continue; }
+            if (c == '(' || c == '[' || c == '{') { depth++; continue; }
+            if (c == ')' || c == ']' || c == '}') { depth--; continue; }
+            if (depth != 0 || !expr.startsWith(op, i)) continue;
+
+            int before = i - 1;
+            while (before >= 0 && Character.isWhitespace(expr.charAt(before))) before--;
+            int after = i + op.length();
+            while (after < expr.length() && Character.isWhitespace(expr.charAt(after))) after++;
+            char previous = before >= 0 ? expr.charAt(before) : 0;
+            char next = after < expr.length() ? expr.charAt(after) : 0;
+
+            // Do not mistake unary +/- or increment/decrement for binary operators.
+            if (("+".equals(op) || "-".equals(op))
+                    && (before < 0 || "([{,=!?<>+-*/%&|:".indexOf(previous) >= 0
+                    || ("+".equals(op) && (previous == '+' || next == '+'))
+                    || ("-".equals(op) && (previous == '-' || next == '-')))) {
+                continue;
+            }
+            // A shorter operator must not match a part of ==, !=, <=, >=, && or ||.
+            boolean nextIsOperator = after < expr.length() && "=><&|".indexOf(next) >= 0;
+            boolean previousIsOperator = before >= 0 && "=><!&|".indexOf(previous) >= 0;
+            if (nextIsOperator || previousIsOperator) continue;
+            result = i;
         }
         return result;
     }
@@ -2037,7 +2316,11 @@ public final class BlocksConverter {
         for (int i = 0; i < blocks.size() - 1; i++) {
             BlockBean current = blocks.get(i);
             BlockBean next = blocks.get(i + 1);
-            if ("addSourceDirectly".equals(current.opCode) && "addSourceDirectly".equals(next.opCode)) {
+            // Flattened order contains nested branches/stacks. Only merge blocks
+            // that are actually connected by nextBlock; adjacency in the flattened
+            // list alone can cross an if/loop boundary and corrupt stack references.
+            if ("addSourceDirectly".equals(current.opCode) && "addSourceDirectly".equals(next.opCode)
+                    && current.nextBlock == Integer.parseInt(next.id)) {
                 String mergedCode = current.parameters.get(0) + "\n" + next.parameters.get(0);
                 current.parameters.set(0, mergedCode);
                 current.nextBlock = next.nextBlock;

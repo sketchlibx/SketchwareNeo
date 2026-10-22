@@ -44,7 +44,7 @@ public class kq {
             case "repeat", "forever", "break", "if", "ifElse" ->
                     harmonizeWithPrimary(context, 0xffe1a92a);
             case "true", "false", "<", "=", ">", "&&", "||", "not", "+", "-", "*", "/", "%",
-                 "random", "stringLength", "stringJoin", "stringIndex", "stringLastIndex",
+                 "random", "stringLength", "stringJoin", "stringIndex", "stringLastIndex", "comment",
                  "stringSub", "stringEquals", "stringContains", "stringReplace",
                  "stringReplaceFirst", "stringReplaceAll", "toNumber", "trim", "toUpperCase",
                  "toLowerCase", "toString", "toStringWithDecimal", "toStringFormat",

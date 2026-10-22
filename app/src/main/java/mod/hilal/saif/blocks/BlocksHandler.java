@@ -2877,6 +2877,7 @@ public class BlocksHandler {
         }
         logicEditorActivity.a("c", "if");
         logicEditorActivity.a("e", "ifElse");
+        logicEditorActivity.a("c", "elseIf");
         if (showBuiltIn()) {
             logicEditorActivity.a("b", "instanceOfOperator");
             logicEditorActivity.a("b", "isEmpty");
@@ -2908,6 +2909,7 @@ public class BlocksHandler {
         logicEditorActivity.a("b", "<");
         logicEditorActivity.a("b", "=");
         logicEditorActivity.a("b", ">");
+        logicEditorActivity.a("b", "isNotEqual");
         logicEditorActivity.a("b", "&&");
         logicEditorActivity.a("b", "||");
         logicEditorActivity.a("b", "not");
@@ -2919,6 +2921,13 @@ public class BlocksHandler {
         logicEditorActivity.a("d", "random");
         logicEditorActivity.a("d", "stringLength");
         logicEditorActivity.a("s", "stringJoin");
+        logicEditorActivity.a("s", "stringJoinNumber");
+        logicEditorActivity.a("s", "numberJoinString");
+        logicEditorActivity.a("s", "stringJoinBoolean");
+        logicEditorActivity.a("s", "booleanJoinString");
+        logicEditorActivity.a("s", "numberJoinBoolean");
+        logicEditorActivity.a("s", "booleanJoinNumber");
+        logicEditorActivity.a("s", "booleanJoinBoolean");
         logicEditorActivity.a("d", "stringIndex");
         logicEditorActivity.a("d", "stringLastIndex");
         logicEditorActivity.a("s", "stringSub");
@@ -2950,6 +2959,7 @@ public class BlocksHandler {
         logicEditorActivity.a("s", "mapToStr");
         logicEditorActivity.a(" ", "strToListMap");
         logicEditorActivity.a("s", "listMapToStr");
+        logicEditorActivity.a(" ", "comment");
         if (showBuiltIn()) {
             logicEditorActivity.a(" ", "GsonStringToListString");
             logicEditorActivity.a(" ", "GsonStringToListNumber");

@@ -28,10 +28,20 @@ public class ExtraBlocks {
     }
 
     public static void extraBlocks(ArrayList<HashMap<String, Object>> arrayList) {
+        arrayList.add(addBlock("comment", " ", "", "// %s", "#5cb722", "comment %s.inputOnly"));
+        arrayList.add(addBlock("isNotEqual", "b", "", "%1$s != %2$s", "#e1a92a", "%s != %s"));
+        arrayList.add(addBlock("stringJoinNumber", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%s + %d"));
+        arrayList.add(addBlock("numberJoinString", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%d + %s"));
+        arrayList.add(addBlock("stringJoinBoolean", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%s + %b"));
+        arrayList.add(addBlock("booleanJoinString", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%b + %s"));
+        arrayList.add(addBlock("numberJoinBoolean", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%d + %b"));
+        arrayList.add(addBlock("booleanJoinNumber", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%b + %d"));
+        arrayList.add(addBlock("booleanJoinBoolean", "s", "", "String.valueOf(%1$s) + String.valueOf(%2$s)", "#5cb722", "%b + %b"));
         arrayList.add(addBlock("caseStrAnd", " ", "", "case %s:", "#e1a92a", "case %s and"));
         arrayList.add(addBlock("caseNumAnd", " ", "", "case ((int)%s):", "#e1a92a", "case %d and"));
         arrayList.add(addBlock("continue", "f", "", "continue;", "#e1a92a", "continue"));
         arrayList.add(addBlock("isEmpty", "b", "", "%s.isEmpty()", "#e1a92a", "%s isEmpty"));
+        arrayList.add(addBlock("elseIf", "c", "", "else if (%1$s) {\r\n%2$s\r\n}", "#ff9800", "else if %b then"));
         arrayList.add(addBlock("fileutilcopydir", " ", "", "FileUtil.copyDir(%1$s, %2$s);", "#a1887f", "copy dir path %s to path %s"));
         arrayList.add(addBlock("instanceOfOperator", "b", "", "%1$s instanceof %2$s", "#e1a92a", "%s instanceOf %s"));
         arrayList.add(addBlock("checkViewVisibility", "b", "", "%s.getVisibility() == View.%s", "#4a6cd4", "visibility of %m.view equals %m.visible"));

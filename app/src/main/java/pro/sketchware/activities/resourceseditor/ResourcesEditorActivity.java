@@ -38,6 +38,7 @@ import pro.sketchware.R;
 import pro.sketchware.activities.resourceseditor.components.adapters.EditorsAdapter;
 import pro.sketchware.activities.resourceseditor.components.fragments.ArraysEditor;
 import pro.sketchware.activities.resourceseditor.components.fragments.ColorsEditor;
+import pro.sketchware.activities.resourceseditor.components.fragments.DimensionsEditor;
 import pro.sketchware.activities.resourceseditor.components.fragments.StringsEditor;
 import pro.sketchware.activities.resourceseditor.components.fragments.StylesEditor;
 import pro.sketchware.activities.resourceseditor.components.fragments.ThemesEditor;
@@ -62,11 +63,13 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
     public String stylesFilePath;
     public String themesFilePath;
     public String arrayFilePath;
+    public String dimensionFilePath;
     public StringsEditor stringsEditor;
     public ColorsEditor colorsEditor;
     public StylesEditor stylesEditor;
     public ThemesEditor themesEditor;
     public ArraysEditor arraysEditor;
+    public DimensionsEditor dimensionsEditor;
     private ResourcesEditorsActivityBinding binding;
     private MaterialAlertDialogBuilder builder;
     private int currentTabPosition = 0;
@@ -77,7 +80,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
-                .replace("'", "\\'")
+                .replace("'", "&apos;")
                 .replace("\n", "&#10;")
                 .replace("\r", "&#13;");
     }
@@ -102,7 +105,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         binding = ResourcesEditorsActivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.topAppBar);
-        binding.viewPager.setOffscreenPageLimit(4);
+        binding.viewPager.setOffscreenPageLimit(5);
     }
 
     private void initializeManagers() {
@@ -118,6 +121,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         stylesEditor = new StylesEditor();
         themesEditor = new ThemesEditor();
         arraysEditor = new ArraysEditor();
+        dimensionsEditor = new DimensionsEditor();
     }
 
     private void initializeBackgroundTask(String variant) {
@@ -128,6 +132,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         stylesFilePath = baseDir + "styles.xml";
         themesFilePath = baseDir + "themes.xml";
         arrayFilePath = baseDir + "arrays.xml";
+        dimensionFilePath = baseDir + "dimens.xml";
 
         setupViewPager();
         startBackgroundTask();
@@ -144,6 +149,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                 case 2 -> stylesEditor.showAddStyleDialog();
                 case 3 -> themesEditor.showAddThemeDialog();
                 case 4 -> arraysEditor.showAddArrayDialog();
+                case 5 -> dimensionsEditor.showAddDimensionDialog();
             }
         });
     }
@@ -163,6 +169,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         stylesEditor.updateStylesList(stylesFilePath, 0, false);
         themesEditor.updateThemesList(themesFilePath, 0, false);
         arraysEditor.updateArraysList(arrayFilePath, 0, false);
+        dimensionsEditor.updateDimensionsList(dimensionFilePath, false);
     }
 
     public void checkForInvalidResources() {
@@ -185,6 +192,10 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
 
         if (arraysEditor.arraysEditorManager.isDataLoadingFailed) {
             showLoadFailedDialog("arrays.xml", arrayFilePath);
+            return;
+        }
+        if (dimensionsEditor.isDataLoadingFailed) {
+            showLoadFailedDialog("dimens.xml", dimensionFilePath);
         }
     }
 
@@ -269,6 +280,9 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         if (arraysEditor.hasUnsavedChanges) {
             unsavedFiles.add("arrays.xml");
         }
+        if (dimensionsEditor.hasUnsavedChanges) {
+            unsavedFiles.add("dimens.xml");
+        }
         return unsavedFiles;
     }
 
@@ -295,6 +309,9 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
 
             if (currentItem == 4 || arraysEditor.arraysEditorManager.isDataLoadingFailed) {
                 arraysEditor.updateArraysList(arrayFilePath, 0, false);
+            }
+            if (currentItem == 5 || dimensionsEditor.isDataLoadingFailed) {
+                dimensionsEditor.updateDimensionsList(dimensionFilePath, false);
             }
             checkForInvalidResources();
         }
@@ -325,6 +342,8 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                         themesEditor.adapter.filter(newText);
                     } else if (currentItem == 4) {
                         arraysEditor.adapter.filter(newText);
+                    } else if (currentItem == 5) {
+                        dimensionsEditor.filter(newText);
                     }
                     return false;
                 }
@@ -380,6 +399,11 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                     arraysEditor.saveArraysFile();
                     goToCodeEditor("arrays.xml", arrayFilePath);
                 }
+                case 5 -> {
+                    dimensionsEditor.hasUnsavedChanges = true;
+                    dimensionsEditor.saveDimensionsFile();
+                    goToCodeEditor("dimens.xml", dimensionFilePath);
+                }
             }
         }
         return super.onOptionsItemSelected(item);
@@ -397,6 +421,7 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
         stylesEditor.saveStylesFile();
         themesEditor.saveThemesFile();
         arraysEditor.saveArraysFile();
+        dimensionsEditor.saveDimensionsFile();
         updateProjectMetadata();
         SketchwareUtil.toast("Save completed");
     }
@@ -424,24 +449,16 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
     private void setupViewPager() {
         EditorsAdapter adapter = new EditorsAdapter(this);
         binding.viewPager.setAdapter(adapter);
-        binding.viewPager.setCurrentItem(currentTabPosition, false);
+        binding.viewPager.setCurrentItem(Math.min(currentTabPosition, 5), false);
 
         new TabLayoutMediator(binding.tabLayout, binding.viewPager, (tab, position) -> {
             switch (position) {
-                case 0:
-                    tab.setText("strings" + variant + ".xml");
-                    break;
-                case 1:
-                    tab.setText("colors" + variant + ".xml");
-                    break;
-                case 2:
-                    tab.setText("styles" + variant + ".xml");
-                    break;
-                case 3:
-                    tab.setText("themes" + variant + ".xml");
-                    break;
-                case 4:
-                    tab.setText("arrays" + variant + ".xml");
+                case 0 -> tab.setText("strings" + variant + ".xml");
+                case 1 -> tab.setText("colors" + variant + ".xml");
+                case 2 -> tab.setText("styles" + variant + ".xml");
+                case 3 -> tab.setText("themes" + variant + ".xml");
+                case 4 -> tab.setText("arrays" + variant + ".xml");
+                case 5 -> tab.setText("dimens" + variant + ".xml");
             }
         }).attach();
         UI.animateLayoutChanges(binding.viewPager);
@@ -579,7 +596,8 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                 "colors.xml",
                 "styles.xml",
                 "themes.xml",
-                "arrays.xml"
+                "arrays.xml",
+                "dimens.xml"
         ));
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice, resourcesFileNames);
@@ -606,6 +624,8 @@ public class ResourcesEditorActivity extends BaseAppCompatActivity {
                                 themesEditor.updateThemesList(themesFilePath.replace(variant, ""), updateMode, true);
                         case 4 ->
                                 arraysEditor.updateArraysList(arrayFilePath.replace(variant, ""), updateMode, true);
+                        case 5 ->
+                                dimensionsEditor.updateDimensionsList(dimensionFilePath.replace(variant, ""), updateMode, true);
                     }
                 }
             }
