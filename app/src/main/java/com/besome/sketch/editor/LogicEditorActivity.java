@@ -432,7 +432,28 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         dialog.setTitle(R.string.logic_editor_title_remove_variable);
         View a2 = wB.a(this, R.layout.property_popup_selector_single);
         ViewGroup viewGroup = a2.findViewById(R.id.rg_content);
-        for (Pair<Integer, String> next : jC.a(scId).k(M.getJavaName())) {
+        ArrayList<Pair<Integer, String>> variables = new ArrayList<>(jC.a(scId).k(M.getJavaName()));
+        int[] numericVariableTypes = {
+                ExtraMenuBean.VARIABLE_TYPE_FLOAT,
+                ExtraMenuBean.VARIABLE_TYPE_INT_NUM
+        };
+        for (int variableType : numericVariableTypes) {
+            for (String variableName : jC.a(scId).e(M.getJavaName(), variableType)) {
+                boolean alreadyListed = false;
+                for (Pair<Integer, String> variable : variables) {
+                    if (variable != null && variable.first != null
+                            && variable.first == variableType
+                            && variableName.equals(variable.second)) {
+                        alreadyListed = true;
+                        break;
+                    }
+                }
+                if (!alreadyListed) {
+                    variables.add(new Pair<>(variableType, variableName));
+                }
+            }
+        }
+        for (Pair<Integer, String> next : variables) {
             RadioButton e = e(next.second);
             e.setTag(next.first);
             viewGroup.addView(e);
