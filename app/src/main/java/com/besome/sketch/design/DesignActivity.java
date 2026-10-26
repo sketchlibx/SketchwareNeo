@@ -126,6 +126,7 @@ import mod.jbk.diagnostic.MissingFileException;
 import mod.jbk.util.LogUtil;
 import mod.khaled.logcat.LogReaderActivity;
 import mod.sketchlibx.search.GlobalSearchDialog;
+import mod.sketchlibx.project.git.GitWorkspace;
 import mod.sketchlibx.terminal.TerminalBuildBridge;
 import mod.sketchlibx.terminal.TerminalFragment;
 import mod.sketchlibx.terminal.TerminalSessionManager;
@@ -698,11 +699,7 @@ private void checkAndInitGit() {
                     .setMessage("This project does not have a Git repository yet. It will be created safely in a permanent workspace away from junk files:\n" + gitWorkspacePath)
                     .setPositiveButton("Initialize", (dialog, which) -> {
                         try {
-                            gitWorkspace.mkdirs();
-                            Git.init().setDirectory(gitWorkspace).setInitialBranch("main").call();
-                            
-                            File gitignore = new File(gitWorkspace, ".gitignore");
-                            FileUtil.writeFile(gitignore.getAbsolutePath(), "bin/\nbuild/\n*.apk\n*.dex\n.gradle/\nlocal.properties\n");
+                            GitWorkspace.initialize(gitWorkspace);
 
                             SketchwareUtil.toast("Git Repository Initialized Safely!");
                             openGitClient();

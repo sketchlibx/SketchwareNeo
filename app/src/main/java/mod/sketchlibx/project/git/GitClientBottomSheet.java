@@ -609,55 +609,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void regenerateSketchwareSource() throws Exception {
-        jC.a(sc_id).j();
-        jC.b(sc_id).m();
-        jC.c(sc_id).l();
-        jC.d(sc_id).x();
-
-        hC hCVar = new hC(sc_id);
-        kC kCVar = new kC(sc_id);
-        eC eCVar = new eC(sc_id);
-        iC iCVar = new iC(sc_id);
-
-        hCVar.i(); kCVar.s(); eCVar.g(); eCVar.e(); iCVar.i();
-
-        HashMap<String, Object> projectInfo = lC.b(sc_id);
-        yq project_metadata = new yq(requireContext(), wq.d(sc_id), projectInfo);
-        project_metadata.a(requireContext(), wq.e(xq.a(sc_id) ? "600" : sc_id));
-
-        ProjectBuilder builder = new ProjectBuilder(null, requireContext(), project_metadata);
-        project_metadata.a(iCVar, hCVar, eCVar, yq.ExportType.ANDROID_STUDIO);
-        builder.buildBuiltInLibraryInformation();
-        project_metadata.b(hCVar, eCVar, iCVar, builder.getBuiltInLibraryManager());
-        project_metadata.a();
-        project_metadata.f();
-
-        File appDir = new File(repoDir, "app/src/main");
-        FileUtil.makeDir(appDir.getAbsolutePath());
-
-        File javaSrc = new File(project_metadata.javaFilesPath);
-        if (javaSrc.exists() && javaSrc.isDirectory()) FileUtil.copyDirectory(javaSrc, new File(appDir, "java"));
-
-        File resSrc = new File(project_metadata.resDirectoryPath);
-        if (resSrc.exists() && resSrc.isDirectory()) FileUtil.copyDirectory(resSrc, new File(appDir, "res"));
-
-        File assetsSrc = new File(project_metadata.assetsPath);
-        if (assetsSrc.exists() && assetsSrc.isDirectory()) FileUtil.copyDirectory(assetsSrc, new File(appDir, "assets"));
-
-        File manifestSrc = new File(project_metadata.projectMyscPath, "AndroidManifest.xml");
-        if (manifestSrc.exists()) FileUtil.copyFile(manifestSrc.getAbsolutePath(), new File(appDir, "AndroidManifest.xml").getAbsolutePath());
-
-        File rootGradleSrc = new File(project_metadata.projectMyscPath, "build.gradle");
-        if (rootGradleSrc.exists()) FileUtil.copyFile(rootGradleSrc.getAbsolutePath(), new File(repoDir, "build.gradle").getAbsolutePath());
-
-        File settingsGradleSrc = new File(project_metadata.projectMyscPath, "settings.gradle");
-        if (settingsGradleSrc.exists()) FileUtil.copyFile(settingsGradleSrc.getAbsolutePath(), new File(repoDir, "settings.gradle").getAbsolutePath());
-
-        File gradlePropertiesSrc = new File(project_metadata.projectMyscPath, "gradle.properties");
-        if (gradlePropertiesSrc.exists()) FileUtil.copyFile(gradlePropertiesSrc.getAbsolutePath(), new File(repoDir, "gradle.properties").getAbsolutePath());
-
-        File appGradleSrc = new File(project_metadata.projectMyscPath, "app" + File.separator + "build.gradle");
-        if (appGradleSrc.exists()) FileUtil.copyFile(appGradleSrc.getAbsolutePath(), new File(repoDir, "app" + File.separator + "build.gradle").getAbsolutePath());
+        GitSourceExporter.regenerate(requireContext(), sc_id, repoDir);
     }
 
     private void commitAndPush(String rawMessage, boolean push) {
@@ -753,47 +705,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void verifyAndPush(String remoteName, String branch, ObjectId localHead) throws Exception {
-        if (localHead == null) throw new IllegalStateException("Nothing to commit. Working tree is clean.");
-        Iterable<PushResult> results = git.push()
-                .setRemote(remoteName)
-                .setCredentialsProvider(getCredentials())
-                .call();
-
-        boolean anySuccess = false;
-        StringBuilder failures = new StringBuilder();
-        for (PushResult pr : results) {
-            for (RemoteRefUpdate rru : pr.getRemoteUpdates()) {
-                RemoteRefUpdate.Status st = rru.getStatus();
-                if (st == RemoteRefUpdate.Status.OK || st == RemoteRefUpdate.Status.UP_TO_DATE) {
-                    anySuccess = true;
-                } else {
-                    failures.append(describePushFailure(st, rru)).append(' ');
-                }
-            }
-        }
-        if (!anySuccess) throw new IllegalStateException(failures.length() > 0 ? failures.toString().trim() : "Push rejected by remote.");
-
-        Collection<Ref> remoteRefs = git.lsRemote().setRemote(remoteName).setCredentialsProvider(getCredentials()).call();
-        String fullRef = "refs/heads/" + branch;
-        boolean verified = false;
-        for (Ref r : remoteRefs) {
-            ObjectId remoteId = r.getObjectId();
-            if (remoteId != null && fullRef.equals(r.getName()) && remoteId.equals(localHead)) { verified = true; break; }
-        }
-        if (!verified) throw new IllegalStateException("Push reported success but the remote branch does not match local HEAD yet. Please verify manually.");
-    }
-
-    private String describePushFailure(RemoteRefUpdate.Status status, RemoteRefUpdate rru) {
-        switch (status) {
-            case REJECTED_NONFASTFORWARD: return "Remote has new commits. Pull or fetch before pushing.";
-            case REJECTED_NODELETE: return "The server does not allow deleting that ref.";
-            case REJECTED_REMOTE_CHANGED: return "Remote ref changed unexpectedly. Try again.";
-            case REJECTED_OTHER_REASON: return "Push rejected by remote" + (rru.getMessage() != null ? ": " + rru.getMessage() : ".");
-            case NON_EXISTING: return "Local branch does not exist.";
-            case NOT_ATTEMPTED: return "Push was not attempted.";
-            case AWAITING_REPORT: return "No confirmation received from the server.";
-            default: return "Push failed (" + status + ").";
-        }
+        GitRemoteOperations.verifyAndPush(git, getCredentials(), remoteName, branch, localHead, null);
     }
 
     private void doFetch(boolean showToast) {
@@ -810,16 +722,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private String describePullResult(PullResult result) {
-        MergeResult mr = result.getMergeResult();
-        if (mr != null) {
-            MergeResult.MergeStatus status = mr.getMergeStatus();
-            if (status == MergeResult.MergeStatus.CONFLICTING) return "Merge conflict detected. Resolve conflicts in the Changes tab.";
-            if (status == MergeResult.MergeStatus.ALREADY_UP_TO_DATE) return "Already up to date.";
-            if (status == MergeResult.MergeStatus.FAST_FORWARD) return "Fast-forwarded to the latest changes.";
-            if (status == MergeResult.MergeStatus.MERGED) return "Merged remote changes.";
-            return "Pull complete (" + status + ").";
-        }
-        return "Pull complete.";
+        return GitRemoteOperations.describePullResult(result);
     }
 
     private void doPull() {

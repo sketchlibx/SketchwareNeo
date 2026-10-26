@@ -224,6 +224,64 @@ public class Hx {
         return sb.toString();
     }
 
+    public String generateGoogleBillingPurchaseUpdatedMethod() {
+        ArrayList<Event> billingComponents = new ArrayList<>();
+        for (Event componentEvent : componentEvents) {
+            if (componentEvent.isGoogleBilling()) billingComponents.add(componentEvent);
+        }
+        if (billingComponents.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("@Override").append(Jx.EOL);
+        sb.append("public void onPurchasesUpdated(BillingResult _billingResult, List<Purchase> _purchases) {").append(Jx.EOL);
+        sb.append("final int _billingResponseCode = _billingResult == null ? -1 : _billingResult.getResponseCode();").append(Jx.EOL);
+        sb.append("final String _billingDebugMessage = _sketchwareBillingSafeDebugMessage(_billingResult == null ? \"Unknown Billing result\" : _billingResult.getDebugMessage());").append(Jx.EOL);
+        sb.append("final ArrayList<Purchase> _billingUpdatedPurchases = _purchases == null ? new ArrayList<>() : new ArrayList<>(_purchases);").append(Jx.EOL);
+
+        for (Event componentEvent : billingComponents) {
+            String id = componentEvent.id;
+            sb.append("{").append(Jx.EOL);
+            sb.append("final int _responseCode = _billingResponseCode;").append(Jx.EOL);
+            sb.append("final String _debugMessage = _billingDebugMessage;").append(Jx.EOL);
+            sb.append("final ArrayList<Purchase> _queriedPurchases = _billingUpdatedPurchases;").append(Jx.EOL);
+            sb.append("_").append(id).append("_last_response_code = _responseCode;").append(Jx.EOL);
+            sb.append("_").append(id).append("_last_debug_message = _debugMessage;").append(Jx.EOL);
+            sb.append("if (_responseCode == BillingClient.BillingResponseCode.OK) {").append(Jx.EOL);
+            sb.append("for (Purchase _billingIncomingPurchase : _queriedPurchases) {").append(Jx.EOL);
+            sb.append("if (_billingIncomingPurchase == null) continue;").append(Jx.EOL);
+            sb.append("boolean _billingPurchaseFound = false;").append(Jx.EOL);
+            sb.append("String _billingIncomingToken = _billingIncomingPurchase.getPurchaseToken();").append(Jx.EOL);
+            sb.append("for (int _billingIndex = 0; _billingIndex < _").append(id).append("_purchases.size(); _billingIndex++) {").append(Jx.EOL);
+            sb.append("Purchase _billingExistingPurchase = _").append(id).append("_purchases.get(_billingIndex);").append(Jx.EOL);
+            sb.append("if (_billingExistingPurchase != null && _billingIncomingToken != null && _billingIncomingToken.equals(_billingExistingPurchase.getPurchaseToken())) { _").append(id).append("_purchases.set(_billingIndex, _billingIncomingPurchase); _billingPurchaseFound = true; break; }").append(Jx.EOL);
+            sb.append("}").append(Jx.EOL);
+            sb.append("if (!_billingPurchaseFound) _").append(id).append("_purchases.add(_billingIncomingPurchase);").append(Jx.EOL);
+            sb.append("if (_billingIncomingPurchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {").append(Jx.EOL);
+            sb.append("if (_billingIncomingPurchase.isAcknowledged()) {").append(Jx.EOL);
+            sb.append("if (_billingIncomingPurchase.getProducts() != null) for (String _billingOwnedId : _billingIncomingPurchase.getProducts()) if (!_").append(id).append("_owned_product_ids.contains(_billingOwnedId)) _").append(id).append("_owned_product_ids.add(_billingOwnedId);").append(Jx.EOL);
+            sb.append("} else if (_billingIncomingToken != null && !_billingIncomingToken.trim().isEmpty() && !_").append(id).append("_acknowledging_tokens.contains(_billingIncomingToken) && ").append(id).append(" != null && ").append(id).append(".isReady()) {").append(Jx.EOL);
+            sb.append("_").append(id).append("_acknowledging_tokens.add(_billingIncomingToken);").append(Jx.EOL);
+            sb.append(id).append(".acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(_billingIncomingToken).build(), _billingAckResult -> {").append(Jx.EOL);
+            sb.append("_").append(id).append("_acknowledging_tokens.remove(_billingIncomingToken);").append(Jx.EOL);
+            sb.append("_").append(id).append("_last_response_code = _billingAckResult == null ? -1 : _billingAckResult.getResponseCode();").append(Jx.EOL);
+            sb.append("_").append(id).append("_last_debug_message = _sketchwareBillingSafeDebugMessage(_billingAckResult == null ? \"Unknown Billing result\" : _billingAckResult.getDebugMessage());").append(Jx.EOL);
+            sb.append("if (_billingAckResult != null && _billingAckResult.getResponseCode() == BillingClient.BillingResponseCode.OK && _billingIncomingPurchase.getProducts() != null) for (String _billingOwnedId : _billingIncomingPurchase.getProducts()) if (!_").append(id).append("_owned_product_ids.contains(_billingOwnedId)) _").append(id).append("_owned_product_ids.add(_billingOwnedId);").append(Jx.EOL);
+            sb.append("});").append(Jx.EOL).append("}").append(Jx.EOL).append("}").append(Jx.EOL).append("}").append(Jx.EOL);
+            sb.append("}").append(Jx.EOL);
+            sb.append("final int _purchaseCount = _queriedPurchases.size();").append(Jx.EOL);
+            sb.append("final Purchase _firstPurchase = _queriedPurchases.isEmpty() ? null : _queriedPurchases.get(0);").append(Jx.EOL);
+            sb.append("final String _productId = _firstPurchase == null || _firstPurchase.getProducts() == null || _firstPurchase.getProducts().isEmpty() ? \"\" : _firstPurchase.getProducts().get(0);").append(Jx.EOL);
+            sb.append("final int _purchaseState = _firstPurchase == null ? 0 : _firstPurchase.getPurchaseState();").append(Jx.EOL);
+            sb.append("final boolean _isAcknowledged = _firstPurchase != null && _firstPurchase.isAcknowledged();").append(Jx.EOL);
+            String eventLogic = componentEvent.getEventLogic("onPurchasesUpdated");
+            if (eventLogic.isEmpty()) eventLogic = componentEvent.getEventLogic("onGoogleBillingPurchasesUpdated");
+            if (!eventLogic.isEmpty()) sb.append(eventLogic).append(Jx.EOL);
+            sb.append("}").append(Jx.EOL);
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
     private void addDrawerEvents(String targetId, String eventName, String eventLogic) {
         for (Event next : drawerViewEvents) {
             if (next.id.equals(isViewBindingEnabled ? "binding.drawer." + ViewBindingBuilder.generateParameterFromId(targetId) : "_drawer_" + targetId)) {
@@ -348,11 +406,13 @@ public class Hx {
     private static class Event {
         private final Hx hx;
         private final String id;
+        private final Gx classInfo;
         private final ArrayList<ComponentEvents> listeners = new ArrayList<>();
 
         private Event(Hx hx, String id, Gx classInfo, boolean isViewBindingEnabled) {
             this.hx = hx;
             this.id = id;
+            this.classInfo = classInfo;
 
             String[] listeners = oq.getListenersForClass(classInfo);
             if (listeners.length > 0) {
@@ -383,6 +443,20 @@ public class Hx {
                     default:
                 }
             }
+        }
+
+        private boolean isGoogleBilling() {
+            return classInfo != null && classInfo.a("GoogleBilling");
+        }
+
+        private String getEventLogic(String eventName) {
+            for (ComponentEvents listener : listeners) {
+                if (!"googleBillingPurchaseListener".equals(listener.listenerName)) continue;
+                for (ActivityEvent activityEvent : listener.activityEvents) {
+                    if (activityEvent.name.equals(eventName)) return activityEvent.logic;
+                }
+            }
+            return "";
         }
 
         private String generateEvent() {

@@ -2376,4 +2376,8 @@ Please try again later"</string>
     <string name="property_collapsing_title_collapse_mode">Title collapse mode</string>
     <string name="property_collapsing_collapse_mode">Collapse mode</string>
     <string name="property_collapsing_parallax_multiplier">Parallax multiplier</string>
+    <string name="design_library_title_google_billing">Google Billing</string>
+    <string name="design_library_description_google_billing">Use Google Play In app purchase</string>
+    <string name="design_library_message_google_billing">Requirements: Google Play Billing Library requires minSdk 23. Product IDs must match Play Console.\nDebug blocks show only a sanitized response code/message; purchase tokens are not exposed in blocks or event parameters.</string>
+    <string name="component_description_google_billing">Google Play Billing component for product queries, purchase flows, and purchase management.</string>
 </resources>

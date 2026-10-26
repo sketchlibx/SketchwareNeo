@@ -466,6 +466,9 @@ public class Ix {
             writePermission(a, "android.permission.ACCESS_ADSERVICES_TOPICS");
             writePermission(a, "android.permission.ACCESS_ADSERVICES_ATTRIBUTION");
         }
+        if (c.isGoogleBillingEnabled) {
+            writePermission(a, "com.android.vending.BILLING");
+        }
         if (builtInLibraryManager.containsLibrary(BuiltInLibraries.ANDROIDX_WORK_RUNTIME)) {
             writePermission(a, "android.permission.WAKE_LOCK");
             writePermission(a, "android.permission.ACCESS_NETWORK_STATE");
@@ -483,7 +486,7 @@ public class Ix {
         
         AndroidManifestInjector.getP(a, c.sc_id);
 
-        if (c.isAdMobEnabled || c.isUnityAdsEnabled || c.isTextToSpeechUsed || c.isSpeechToTextUsed) {
+        if (c.isAdMobEnabled || c.isUnityAdsEnabled || c.isGoogleBillingEnabled || c.isTextToSpeechUsed || c.isSpeechToTextUsed) {
             XmlBuilder queries = new XmlBuilder("queries");
             if (c.isAdMobEnabled) {
                 XmlBuilder forBrowserContent = new XmlBuilder("intent");
@@ -520,6 +523,19 @@ public class Ix {
                 action.addAttribute("android", "name", "android.speech.RecognitionService");
                 intent.addChildNode(action);
                 queries.addChildNode(intent);
+            }
+            if (c.isGoogleBillingEnabled) {
+                XmlBuilder billingServiceIntent = new XmlBuilder("intent");
+                XmlBuilder billingServiceAction = new XmlBuilder("action");
+                billingServiceAction.addAttribute("android", "name", "com.android.vending.billing.InAppBillingService.BIND");
+                billingServiceIntent.addChildNode(billingServiceAction);
+                queries.addChildNode(billingServiceIntent);
+
+                XmlBuilder billingTestCompanionIntent = new XmlBuilder("intent");
+                XmlBuilder billingTestCompanionAction = new XmlBuilder("action");
+                billingTestCompanionAction.addAttribute("android", "name", "com.google.android.apps.play.billingtestcompanion.BillingOverrideService.BIND");
+                billingTestCompanionIntent.addChildNode(billingTestCompanionAction);
+                queries.addChildNode(billingTestCompanionIntent);
             }
             if (c.isUnityAdsEnabled) {
                 XmlBuilder referralIntent = new XmlBuilder("intent");
@@ -666,6 +682,9 @@ public class Ix {
             testingActivity.addAttribute("android", "exported", "false");
             applicationTag.addChildNode(testingActivity);
         }
+        if (c.isGoogleBillingEnabled) {
+            writeGoogleBillingManifest(applicationTag);
+        }
         if (c.isUnityAdsEnabled) {
             XmlBuilder unityActivity = new XmlBuilder("activity");
             unityActivity.addAttribute("android", "name", "com.unity3d.ads.adplayer.FullScreenWebViewDisplay");
@@ -688,7 +707,7 @@ public class Ix {
         if (builtInLibraryManager.containsLibrary(BuiltInLibraries.ANDROIDX_WORK_RUNTIME)) {
             writeAndroidxWorkRuntimeTags(applicationTag);
         }
-        if (c.isFirebaseEnabled || c.isAdMobEnabled || c.isMapUsed || c.isUnityAdsEnabled) {
+        if (c.isFirebaseEnabled || c.isAdMobEnabled || c.isMapUsed || c.isUnityAdsEnabled || c.isGoogleBillingEnabled) {
             writeGMSVersion(applicationTag);
         }
         if (c.isFirebaseEnabled) {
@@ -732,6 +751,27 @@ public class Ix {
         a.addChildNode(applicationTag);
         
         return AndroidManifestInjector.mHolder(a.toCode(), c.sc_id).replaceAll("\\$\\{applicationId\\}", packageName);
+    }
+
+
+    private void writeGoogleBillingManifest(XmlBuilder applicationTag) {
+        XmlBuilder billingVersion = new XmlBuilder("meta-data");
+        billingVersion.addAttribute("android", "name", "com.google.android.play.billingclient.version");
+        billingVersion.addAttribute("android", "value", "9.1.0");
+        applicationTag.addChildNode(billingVersion);
+
+        String[] billingActivities = {
+                "com.android.billingclient.api.ProxyBillingActivity",
+                "com.android.billingclient.api.ProxyBillingActivityV2"
+        };
+        for (String activityName : billingActivities) {
+            XmlBuilder billingActivity = new XmlBuilder("activity");
+            billingActivity.addAttribute("android", "name", activityName);
+            billingActivity.addAttribute("android", "configChanges", "keyboard|keyboardHidden|screenLayout|screenSize|orientation");
+            billingActivity.addAttribute("android", "exported", "false");
+            billingActivity.addAttribute("android", "theme", "@android:style/Theme.Translucent.NoTitleBar");
+            applicationTag.addChildNode(billingActivity);
+        }
     }
 
     private void writeJava(XmlBuilder applicationTag, String activityName, ArrayList<HashMap<String, Object>> activityAttrs) {

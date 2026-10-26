@@ -45,6 +45,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
     private final int REQUEST_CODE_MATERIAL3_ACTIVITY = 242;
     private final int REQUEST_CODE_CUSTOM_ITEM_LIBRARY_ACTIVITY = 243;
     private final int REQUEST_CODE_NATIVE_TOOLS_ACTIVITY = 244;
+    private final int REQUEST_CODE_GOOGLE_BILLING_ACTIVITY = 245;
 
     private String sc_id;
     private LinearLayout libraryItemLayout;
@@ -52,6 +53,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
     private ProjectLibraryBean firebaseLibraryBean;
     private ProjectLibraryBean compatLibraryBean;
     private ProjectLibraryBean admobLibraryBean;
+    private ProjectLibraryBean googleBillingLibraryBean;
     private ProjectLibraryBean googleMapLibraryBean;
     private ProjectLibraryBean nativeToolsLibraryBean;
 
@@ -59,6 +61,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
     private String originalCompatUseYn = "N";
     private String originalAdmobUseYn = "N";
     private boolean admobSettingsChanged = false;
+    private boolean originalGoogleBillingEnabled = false;
     private String originalGoogleMapUseYn = "N";
 
     private final List<LibraryItemView> libraryItems = new ArrayList<>();
@@ -152,6 +155,25 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
         startActivityForResult(intent, REQUEST_CODE_ADMOB_ACTIVITY);
     }
 
+    private void toGoogleBillingActivity() {
+        Intent intent = new Intent(this, ManageGoogleBillingActivity.class);
+        intent.putExtra("sc_id", sc_id);
+        intent.putExtra("admob", admobLibraryBean);
+        startActivityForResult(intent, REQUEST_CODE_GOOGLE_BILLING_ACTIVITY);
+    }
+
+    private void refreshGoogleBillingRow() {
+        boolean enabled = admobLibraryBean != null && admobLibraryBean.isGoogleBillingEnabled();
+        googleBillingLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_BILLING);
+        googleBillingLibraryBean.useYn = enabled ? ProjectLibraryBean.LIB_USE_Y : ProjectLibraryBean.LIB_USE_N;
+        for (LibraryItemView itemView : libraryItems) {
+            Object tag = itemView.getTag();
+            if (tag instanceof Integer && ((Integer) tag) == ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_BILLING) {
+                itemView.setData(googleBillingLibraryBean);
+            }
+        }
+    }
+
     private void toFirebaseActivity(ProjectLibraryBean libraryBean) {
         Intent intent = new Intent(getApplicationContext(), ManageFirebaseActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -233,6 +255,13 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
                 case REQUEST_CODE_ADMOB_ACTIVITY:
                     initializeLibrary(data.getParcelableExtra("admob"));
                     admobSettingsChanged = true;
+                    refreshGoogleBillingRow();
+                    break;
+
+                case REQUEST_CODE_GOOGLE_BILLING_ACTIVITY:
+                    initializeLibrary(data.getParcelableExtra("admob"));
+                    admobSettingsChanged = true;
+                    refreshGoogleBillingRow();
                     break;
 
                 case REQUEST_CODE_GOOGLE_MAPS_ACTIVITY:
@@ -283,6 +312,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
                 || !originalFirebaseUseYn.equals(firebaseLibraryBean.useYn)
                 || !originalAdmobUseYn.equals(admobLibraryBean.useYn)
                 || admobSettingsChanged
+                || originalGoogleBillingEnabled != (admobLibraryBean != null && admobLibraryBean.isGoogleBillingEnabled())
                 || !originalGoogleMapUseYn.equals(googleMapLibraryBean.useYn);
     }
 
@@ -304,6 +334,10 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
 
                     case ProjectLibraryBean.PROJECT_LIB_TYPE_ADMOB:
                         toAdmobActivity(admobLibraryBean);
+                        break;
+
+                    case ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_BILLING:
+                        toGoogleBillingActivity();
                         break;
 
                     case ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_MAP:
@@ -403,6 +437,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
                     originalFirebaseUseYn = firebaseLibraryBean.useYn;
                     admobLibraryBean = finalAdmob;
                     originalAdmobUseYn = admobLibraryBean.useYn;
+                    originalGoogleBillingEnabled = admobLibraryBean.isGoogleBillingEnabled();
                     googleMapLibraryBean = finalGoogleMap;
                     originalGoogleMapUseYn = googleMapLibraryBean.useYn;
                     nativeToolsLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS);
@@ -420,6 +455,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
             admobLibraryBean = savedInstanceState.getParcelable("admob");
             originalAdmobUseYn = savedInstanceState.getString("originalAdmobUseYn");
             admobSettingsChanged = savedInstanceState.getBoolean("admobSettingsChanged", false);
+            originalGoogleBillingEnabled = savedInstanceState.getBoolean("originalGoogleBillingEnabled", admobLibraryBean != null && admobLibraryBean.isGoogleBillingEnabled());
             googleMapLibraryBean = savedInstanceState.getParcelable("google_map");
             originalGoogleMapUseYn = savedInstanceState.getString("originalGoogleMapUseYn");
             nativeToolsLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_NATIVE_TOOLS);
@@ -440,6 +476,9 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
         addLibraryItem(nativeToolsLibraryBean, basicCategory);
         addLibraryItem(firebaseLibraryBean, basicCategory);
         addLibraryItem(admobLibraryBean, basicCategory);
+        googleBillingLibraryBean = new ProjectLibraryBean(ProjectLibraryBean.PROJECT_LIB_TYPE_GOOGLE_BILLING);
+        googleBillingLibraryBean.useYn = admobLibraryBean != null && admobLibraryBean.isGoogleBillingEnabled() ? ProjectLibraryBean.LIB_USE_Y : ProjectLibraryBean.LIB_USE_N;
+        addLibraryItem(googleBillingLibraryBean, basicCategory);
         addLibraryItem(googleMapLibraryBean, basicCategory, false);
 
         LibraryCategoryView externalCategory = addCategoryItem("External libraries");
@@ -465,6 +504,7 @@ public class ManageLibraryActivity extends BaseAppCompatActivity implements View
         outState.putParcelable("compat", compatLibraryBean);
         outState.putParcelable("admob", admobLibraryBean);
         outState.putParcelable("google_map", googleMapLibraryBean);
+        outState.putBoolean("originalGoogleBillingEnabled", originalGoogleBillingEnabled);
         outState.putString("originalFirebaseUseYn", originalFirebaseUseYn);
         outState.putString("originalCompatUseYn", originalCompatUseYn);
         outState.putString("originalAdmobUseYn", originalAdmobUseYn);

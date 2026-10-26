@@ -344,6 +344,11 @@ public class ManageEvent {
             case "onCompleteRegister" -> R.drawable.ic_mtrl_user_register_complete;
             case "onUpdatePasswordComplete" -> R.drawable.ic_mtrl_password;
             case "onUserEarnedReward" -> R.drawable.ic_mtrl_payment;
+            case "onBillingSetupFinished" -> R.drawable.ic_mtrl_billing_ready;
+            case "onBillingServiceDisconnected" -> R.drawable.ic_mtrl_billing_disconnected;
+            case "onProductDetailsResponse" -> R.drawable.ic_mtrl_billing_products;
+            case "onQueryPurchasesResponse" -> R.drawable.ic_mtrl_billing_purchases;
+            case "onPurchasesUpdated" -> R.drawable.ic_mtrl_billing_purchase_updated;
             case "onUnityAdsInitialized" -> R.drawable.ic_mtrl_unity_ads_initialized;
             case "onUnityAdsFailedToInitialize" -> R.drawable.ic_mtrl_unity_ads_failed_to_initialize;
             case "onUnityAdsAdLoaded" -> R.drawable.ic_mtrl_unity_ads_ad_loaded;
@@ -398,6 +403,7 @@ public class ManageEvent {
                  "onCodeSent", "onTimeChanged", "onUpdatePasswordComplete",
                  "onAdDismissedFullScreenContent", "onAdFailedToShowFullScreenContent",
                  "onAdShowedFullScreenContent", "onUserEarnedReward",
+                 "onBillingSetupFinished", "onBillingServiceDisconnected", "onProductDetailsResponse", "onQueryPurchasesResponse", "onPurchasesUpdated",
                  "onUnityAdsInitialized", "onUnityAdsFailedToInitialize",
                  "onUnityAdsAdLoaded", "onUnityAdsFailedToLoad",
                  "onUnityAdsShowComplete", "onUnityAdsShowFailure",
@@ -632,6 +638,65 @@ public class ManageEvent {
                     "final String _errorMessage = _param1.getMessage();\r\n" +
                     eventLogic + "\r\n" +
                     "}";
+            case "onBillingSetupFinished" -> "@Override\r\n" +
+                    "public void onBillingSetupFinished(BillingResult _billingResult) {\r\n" +
+                    "final int _responseCode = _billingResult == null ? -1 : _billingResult.getResponseCode();\r\n" +
+                    "final String _debugMessage = _sketchwareBillingSafeDebugMessage(_billingResult == null ? \"Unknown Billing result\" : _billingResult.getDebugMessage());\r\n" +
+                    "final boolean _isConnected = _billingResult != null && _billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK;\r\n" +
+                    "_" + targetId + "_is_connecting = false;\r\n" +
+                    "_" + targetId + "_is_connected = _isConnected;\r\n" +
+                    "_" + targetId + "_last_response_code = _responseCode;\r\n" +
+                    "_" + targetId + "_last_debug_message = _debugMessage;\r\n" +
+                    eventLogic + "\r\n" +
+                    "}";
+            case "onBillingServiceDisconnected" -> "@Override\r\n" +
+                    "public void onBillingServiceDisconnected() {\r\n" +
+                    "final int _responseCode = BillingClient.BillingResponseCode.SERVICE_DISCONNECTED;\r\n" +
+                    "final String _debugMessage = _sketchwareBillingSafeDebugMessage(\"Billing service disconnected.\");\r\n" +
+                    "_" + targetId + "_is_connecting = false;\r\n" +
+                    "_" + targetId + "_is_connected = false;\r\n" +
+                    "_" + targetId + "_last_response_code = _responseCode;\r\n" +
+                    "_" + targetId + "_last_debug_message = _debugMessage;\r\n" +
+                    eventLogic + "\r\n" +
+                    "}";
+            case "onProductDetailsResponse" -> "@Override\r\n" +
+                    "public void onProductDetailsResponse(BillingResult _billingResult, QueryProductDetailsResult _queryResult) {\r\n" +
+                    "final int _responseCode = _billingResult == null ? -1 : _billingResult.getResponseCode();\r\n" +
+                    "final String _debugMessage = _sketchwareBillingSafeDebugMessage(_billingResult == null ? \"Unknown Billing result\" : _billingResult.getDebugMessage());\r\n" +
+                    "final ArrayList<ProductDetails> _queriedProductDetails = _queryResult == null || _queryResult.getProductDetailsList() == null ? new ArrayList<>() : new ArrayList<>(_queryResult.getProductDetailsList());\r\n" +
+                    "_" + targetId + "_last_response_code = _responseCode;\r\n" +
+                    "_" + targetId + "_last_debug_message = _debugMessage;\r\n" +
+                    "if (_responseCode == BillingClient.BillingResponseCode.OK) {\r\n" +
+                    billingMergeProductDetails(targetId, "_queriedProductDetails") + "\r\n" +
+                    "if (!_queriedProductDetails.isEmpty()) _" + targetId + "_selected_product_details = _queriedProductDetails.get(0);\r\n" +
+                    "}\r\n" +
+                    "final ProductDetails _firstProduct = _queriedProductDetails.isEmpty() ? null : _queriedProductDetails.get(0);\r\n" +
+                    "final String _productId = _firstProduct == null || _firstProduct.getProductId() == null ? \"\" : _firstProduct.getProductId();\r\n" +
+                    "final String _productName = _firstProduct == null || _firstProduct.getName() == null ? \"\" : _firstProduct.getName();\r\n" +
+                    "final String _formattedPrice = " + billingProductPriceExpression("_firstProduct") + ";\r\n" +
+                    "final String _productType = _firstProduct == null || _firstProduct.getProductType() == null ? \"\" : _firstProduct.getProductType();\r\n" +
+                    "final int _productCount = _queriedProductDetails.size();\r\n" +
+                    eventLogic + "\r\n" +
+                    "}";
+            case "onQueryPurchasesResponse" -> "@Override\r\n" +
+                    "public void onQueryPurchasesResponse(BillingResult _billingResult, List<Purchase> _purchases) {\r\n" +
+                    "final int _responseCode = _billingResult == null ? -1 : _billingResult.getResponseCode();\r\n" +
+                    "final String _debugMessage = _sketchwareBillingSafeDebugMessage(_billingResult == null ? \"Unknown Billing result\" : _billingResult.getDebugMessage());\r\n" +
+                    "final ArrayList<Purchase> _queriedPurchases = _purchases == null ? new ArrayList<>() : new ArrayList<>(_purchases);\r\n" +
+                    "_" + targetId + "_last_response_code = _responseCode;\r\n" +
+                    "_" + targetId + "_last_debug_message = _debugMessage;\r\n" +
+                    "if (_responseCode == BillingClient.BillingResponseCode.OK) {\r\n" +
+                    billingMergePurchases(targetId, "_queriedPurchases") + "\r\n" +
+                    billingProcessPurchases(targetId, "_queriedPurchases") + "\r\n" +
+                    "}\r\n" +
+                    "final int _purchaseCount = _queriedPurchases.size();\r\n" +
+                    "final Purchase _firstPurchase = _queriedPurchases.isEmpty() ? null : _queriedPurchases.get(0);\r\n" +
+                    "final String _productId = _firstPurchase == null || _firstPurchase.getProducts() == null || _firstPurchase.getProducts().isEmpty() ? \"\" : _firstPurchase.getProducts().get(0);\r\n" +
+                    "final int _purchaseState = _firstPurchase == null ? 0 : _firstPurchase.getPurchaseState();\r\n" +
+                    "final boolean _isAcknowledged = _firstPurchase != null && _firstPurchase.isAcknowledged();\r\n" +
+                    eventLogic + "\r\n" +
+                    "}";
+            case "onPurchasesUpdated" -> "";
             case "onUnityAdsInitialized" -> "@Override\r\npublic void onInitializationComplete() {\r\n" + eventLogic + "\r\n}";
             case "onUnityAdsFailedToInitialize" -> "@Override\r\npublic void onInitializationFailed(UnityAds.UnityAdsInitializationError _error, String _message) {\r\nfinal String _errorCode = _error == null ? \"\" : _error.name();\r\nfinal String _errorMessage = _message == null ? \"\" : _message;\r\nandroid.util.Log.e(\"UnityAds\", \"Initialization failed [\" + _errorCode + \"] \" + _errorMessage);\r\n" + eventLogic + "\r\n}";
             case "onUnityAdsAdLoaded" -> "@Override\r\npublic void onUnityAdsAdLoaded(String _placementId) {\r\nfinal String _unityPlacementId = _placementId;\r\n" + eventLogic + "\r\n}";
@@ -861,6 +926,13 @@ public class ManageEvent {
                     "_" + targetId + "_rewarded_ad_load_callback = new RewardedAdLoadCallback() {\r\n" +
                             listenerLogic + "\r\n" +
                             "};";
+            case "googleBillingStateListener" ->
+                    "_" + targetId + "_state_listener = new BillingClientStateListener() {\r\n" + listenerLogic + "\r\n};";
+            case "googleBillingProductDetailsListener" ->
+                    "_" + targetId + "_product_details_listener = new ProductDetailsResponseListener() {\r\n" + listenerLogic + "\r\n};";
+            case "googleBillingPurchasesResponseListener" ->
+                    "_" + targetId + "_query_purchases_listener = new PurchasesResponseListener() {\r\n" + listenerLogic + "\r\n};";
+            case "googleBillingPurchaseListener" -> "";
             case "unityAdsInitializationListener" ->
                     "_" + targetId + "_initialization_listener = new IUnityAdsInitializationListener() {\r\n" + listenerLogic + "\r\n};";
             case "unityAdsLoadListener" ->
@@ -878,6 +950,49 @@ public class ManageEvent {
                             "}\r\n};";
             default -> EventsHandler.getListenerCode(listenerName, targetId, listenerLogic);
         };
+    }
+
+    private static String billingMergeProductDetails(String targetId, String incomingList) {
+        return "for (ProductDetails _billingProduct : " + incomingList + ") {\r\n" +
+                "if (_billingProduct != null) { boolean _billingFound = false;\r\n" +
+                "for (int _billingIndex = 0; _billingIndex < _" + targetId + "_product_details.size(); _billingIndex++) {\r\n" +
+                "ProductDetails _billingExisting = _" + targetId + "_product_details.get(_billingIndex);\r\n" +
+                "if (_billingExisting != null && _billingExisting.getProductId().equals(_billingProduct.getProductId())) { _" + targetId + "_product_details.set(_billingIndex, _billingProduct); _billingFound = true; break; }\r\n" +
+                "} if (!_billingFound) _" + targetId + "_product_details.add(_billingProduct); }\r\n" +
+                "}\r\n";
+    }
+
+    private static String billingMergePurchases(String targetId, String incomingList) {
+        return "for (Purchase _billingPurchase : " + incomingList + ") {\r\n" +
+                "if (_billingPurchase != null) { boolean _billingFound = false;\r\n" +
+                "for (int _billingIndex = 0; _billingIndex < _" + targetId + "_purchases.size(); _billingIndex++) {\r\n" +
+                "Purchase _billingExisting = _" + targetId + "_purchases.get(_billingIndex);\r\n" +
+                "if (_billingExisting != null && _billingExisting.getPurchaseToken() != null && _billingExisting.getPurchaseToken().equals(_billingPurchase.getPurchaseToken())) { _" + targetId + "_purchases.set(_billingIndex, _billingPurchase); _billingFound = true; break; }\r\n" +
+                "} if (!_billingFound) _" + targetId + "_purchases.add(_billingPurchase); }\r\n" +
+                "}\r\n";
+    }
+
+    private static String billingProcessPurchases(String targetId, String incomingList) {
+        return "for (Purchase _billingPurchase : " + incomingList + ") {\r\n" +
+                "if (_billingPurchase != null && _billingPurchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {\r\n" +
+                "if (_billingPurchase.isAcknowledged()) { if (_billingPurchase.getProducts() != null) for (String _billingOwnedId : _billingPurchase.getProducts()) if (!_" + targetId + "_owned_product_ids.contains(_billingOwnedId)) _" + targetId + "_owned_product_ids.add(_billingOwnedId); }\r\n" +
+                "else { String _billingAckToken = _billingPurchase.getPurchaseToken(); if (_billingAckToken != null && !_billingAckToken.isEmpty() && !_" + targetId + "_acknowledging_tokens.contains(_billingAckToken) && " + targetId + " != null && " + targetId + ".isReady()) {\r\n" +
+                "_" + targetId + "_acknowledging_tokens.add(_billingAckToken); " + targetId + ".acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(_billingAckToken).build(), _billingAckResult -> {\r\n" +
+                "_" + targetId + "_acknowledging_tokens.remove(_billingAckToken); _" + targetId + "_last_response_code = _billingAckResult == null ? -1 : _billingAckResult.getResponseCode();\r\n" +
+                "_" + targetId + "_last_debug_message = _sketchwareBillingSafeDebugMessage(_billingAckResult == null ? \"Unknown Billing result\" : _billingAckResult.getDebugMessage());\r\n" +
+                "if (_billingAckResult != null && _billingAckResult.getResponseCode() == BillingClient.BillingResponseCode.OK && _billingPurchase.getProducts() != null) for (String _billingOwnedId : _billingPurchase.getProducts()) if (!_" + targetId + "_owned_product_ids.contains(_billingOwnedId)) _" + targetId + "_owned_product_ids.add(_billingOwnedId);\r\n" +
+                "}); } } } }\r\n";
+    }
+
+    private static String billingProductPriceExpression(String productVariable) {
+        return "(" + productVariable + " == null ? \"\" : (BillingClient.ProductType.INAPP.equals(" + productVariable + ".getProductType()) ? " +
+                "(" + productVariable + ".getOneTimePurchaseOfferDetails() == null ? \"\" : " + productVariable + ".getOneTimePurchaseOfferDetails().getFormattedPrice()) : " +
+                "(" + productVariable + ".getSubscriptionOfferDetails() == null || " + productVariable + ".getSubscriptionOfferDetails().isEmpty() || " +
+                productVariable + ".getSubscriptionOfferDetails().get(0).getPricingPhases() == null || " +
+                productVariable + ".getSubscriptionOfferDetails().get(0).getPricingPhases().getPricingPhaseList() == null || " +
+                productVariable + ".getSubscriptionOfferDetails().get(0).getPricingPhases().getPricingPhaseList().isEmpty() ? \"\" : " +
+                productVariable + ".getSubscriptionOfferDetails().get(0).getPricingPhases().getPricingPhaseList().get(" +
+                productVariable + ".getSubscriptionOfferDetails().get(0).getPricingPhases().getPricingPhaseList().size() - 1).getFormattedPrice())))";
     }
 
     public static String h(String eventName) {
@@ -915,7 +1030,11 @@ public class ManageEvent {
             case "onScrollChanged" -> "%d.scrollState";
             case "onBannerAdFailedToLoad", "onRewardAdFailedToLoad", "onInterstitialAdFailedToLoad",
                  "onAdFailedToShowFullScreenContent" -> "%d.errorCode %d.errorMessage";
-            case "onUnityAdsInitialized" -> "";
+            case "onBillingSetupFinished" -> "%d.responseCode %s.debugMessage %b.isConnected";
+            case "onBillingServiceDisconnected" -> "%d.responseCode %s.debugMessage";
+            case "onProductDetailsResponse" -> "%d.responseCode %s.debugMessage %s.productId %s.productName %s.formattedPrice %s.productType %d.productCount";
+            case "onQueryPurchasesResponse", "onPurchasesUpdated" -> "%d.responseCode %s.debugMessage %d.purchaseCount %s.productId %d.purchaseState %b.isAcknowledged";
+                        case "onUnityAdsInitialized" -> "";
             case "onUnityAdsFailedToInitialize", "onUnityAdsFailedToLoad", "onUnityAdsShowFailure", "onUnityBannerFailedToLoad" -> "%s.errorCode %s.errorMessage";
             case "onUnityAdsShowComplete" -> "%s.placementId %s.completionState";
             case "onUnityAdsAdLoaded", "onUnityAdsShowStart", "onUnityAdsShowClick" -> "%s.placementId";
@@ -931,6 +1050,13 @@ public class ManageEvent {
             list.add("onAdDismissedFullScreenContent");
             list.add("onAdFailedToShowFullScreenContent");
             list.add("onAdShowedFullScreenContent");
+        }
+        if (gx.a("GoogleBilling")) {
+            list.add("onBillingSetupFinished");
+            list.add("onBillingServiceDisconnected");
+            list.add("onProductDetailsResponse");
+            list.add("onQueryPurchasesResponse");
+            list.add("onPurchasesUpdated");
         }
         if (gx.a("UnityAds")) {
             list.add("onUnityAdsInitialized");
@@ -1040,6 +1166,10 @@ public class ManageEvent {
             case "onBannerAdOpened" -> targetId + ": onAdOpened";
             case "onBannerAdClicked" -> targetId + ": onAdClicked";
             case "onBannerAdClosed" -> targetId + ": onAdClosed";
+            case "onBillingSetupFinished" -> "When " + targetId + " " + eventName + " %d.responseCode %s.debugMessage %b.isConnected";
+            case "onBillingServiceDisconnected" -> "When " + targetId + " " + eventName + " %d.responseCode %s.debugMessage";
+            case "onProductDetailsResponse" -> "When " + targetId + " " + eventName + " %d.responseCode %s.debugMessage %s.productId %s.productName %s.formattedPrice %s.productType %d.productCount";
+            case "onQueryPurchasesResponse", "onPurchasesUpdated" -> "When " + targetId + " " + eventName + " %d.responseCode %s.debugMessage %d.purchaseCount %s.productId %d.purchaseState %b.isAcknowledged";
             case "onUnityAdsInitialized" -> targetId + ": " + eventName;
             case "onUnityAdsFailedToInitialize" -> targetId + ": " + eventName + " %s.errorCode %s.errorMessage";
             case "onUnityAdsFailedToLoad", "onUnityAdsShowFailure", "onUnityBannerFailedToLoad" -> targetId + ": " + eventName + " %s.errorCode %s.errorMessage";

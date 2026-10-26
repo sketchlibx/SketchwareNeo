@@ -97,6 +97,7 @@ public class mq {
             case ComponentBean.COMPONENT_TYPE_FIREBASE_AUTH_GOOGLE_LOGIN -> "GoogleSignInClient";
 
             case ComponentBean.COMPONENT_TYPE_UNITY_ADS -> "UnityAds";
+            case ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING -> "GoogleBilling";
             default -> ComponentsHandler.var(componentId);
         };
     }
@@ -208,6 +209,7 @@ public class mq {
             case "customViews" -> "CustomView";
             case "asynctask" -> "AsyncTask";
             case "activity" -> "Context";
+            case "googlebilling", "Google Billing", "GoogleBilling", "BillingClient", "billingclient" -> "GoogleBilling";
             case "otpview" -> "OTPView";
             case "lottie" -> "LottieAnimation";
             case "phoneauth" -> "FirebasePhoneAuth";
@@ -657,6 +659,27 @@ public class mq {
                 importList.add("com.google.firebase.auth.GoogleAuthProvider");
                 return importList;
 
+            case "GoogleBilling":
+                importList.add("com.android.billingclient.api.AcknowledgePurchaseParams");
+                importList.add("com.android.billingclient.api.BillingClient");
+                importList.add("com.android.billingclient.api.BillingClientStateListener");
+                importList.add("com.android.billingclient.api.BillingFlowParams");
+                importList.add("com.android.billingclient.api.BillingResult");
+                importList.add("com.android.billingclient.api.ConsumeParams");
+                importList.add("com.android.billingclient.api.PendingPurchasesParams");
+                importList.add("com.android.billingclient.api.ProductDetails");
+                importList.add("com.android.billingclient.api.ProductDetailsResponseListener");
+                importList.add("com.android.billingclient.api.Purchase");
+                importList.add("com.android.billingclient.api.PurchasesUpdatedListener");
+                importList.add("com.android.billingclient.api.QueryProductDetailsParams");
+                importList.add("com.android.billingclient.api.QueryProductDetailsResult");
+                importList.add("com.android.billingclient.api.QueryPurchasesParams");
+                importList.add("com.android.billingclient.api.PurchasesResponseListener");
+                importList.add("java.util.ArrayList");
+                importList.add("java.util.Collections");
+                importList.add("java.util.List");
+                return importList;
+
             case "UnityAds":
                 importList.add("com.unity3d.ads.UnityAds");
                 importList.add("com.unity3d.ads.IUnityAdsInitializationListener");
@@ -824,6 +847,7 @@ public class mq {
             case "Gyroscope" -> "SensorManager";
             case "Dialog" -> "AlertDialog.Builder";
             case "FirebaseDB" -> "DatabaseReference";
+            case "GoogleBilling" -> "BillingClient";
             case "FirebaseStorage" -> "StorageReference";
             case "Camera", "FilePicker" -> "Intent";
             case "SpeechToText" -> "SpeechRecognizer";

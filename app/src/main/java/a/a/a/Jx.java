@@ -145,6 +145,7 @@ public class Jx {
         boolean isDialogFragment = projectFileBean.fileName.contains("_dialog_fragment");
         boolean isBottomDialogFragment = projectFileBean.fileName.contains("_bottomdialog_fragment");
         boolean isFragment = projectFileBean.fileName.contains("_fragment");
+        boolean hasGoogleBillingComponent = hasGoogleBillingComponent();
 
         extraVariables();
         handleAppCompat();
@@ -165,6 +166,27 @@ public class Jx {
         }
 
         if (buildConfig.isFirebaseEnabled) addImport("com.google.firebase.FirebaseApp");
+
+        if (buildConfig.isGoogleBillingEnabled || hasGoogleBillingComponent) {
+            addImport("com.android.billingclient.api.AcknowledgePurchaseParams");
+            addImport("com.android.billingclient.api.BillingClient");
+            addImport("com.android.billingclient.api.BillingClientStateListener");
+            addImport("com.android.billingclient.api.BillingFlowParams");
+            addImport("com.android.billingclient.api.BillingResult");
+            addImport("com.android.billingclient.api.ConsumeParams");
+            addImport("com.android.billingclient.api.PendingPurchasesParams");
+            addImport("com.android.billingclient.api.ProductDetails");
+            addImport("com.android.billingclient.api.ProductDetailsResponseListener");
+            addImport("com.android.billingclient.api.Purchase");
+            addImport("com.android.billingclient.api.PurchasesUpdatedListener");
+            addImport("com.android.billingclient.api.QueryProductDetailsParams");
+            addImport("com.android.billingclient.api.QueryProductDetailsResult");
+            addImport("com.android.billingclient.api.QueryPurchasesParams");
+            addImport("com.android.billingclient.api.PurchasesResponseListener");
+            addImport("java.util.ArrayList");
+            addImport("java.util.Collections");
+            addImport("java.util.List");
+        }
 
         if (buildConfig.isUnityAdsEnabled) {
             addImport("com.unity3d.ads.UnityAds");
@@ -241,6 +263,9 @@ public class Jx {
                 sb.append("Activity");
             }
         }
+        if (hasGoogleBillingComponent) {
+            sb.append(" implements PurchasesUpdatedListener");
+        }
         sb.append(" {").append(EOL);
 
         boolean activityHasFields = false;
@@ -314,6 +339,26 @@ public class Jx {
         }
 
         if (activityHasFields) sb.append(EOL);
+
+        if (hasGoogleBillingComponent) {
+            sb.append("private ProductDetails _sketchwareBillingFindProductDetails(List<ProductDetails> _details, String _productId) {").append(EOL);
+            sb.append("if (_details == null || _productId == null || _productId.trim().isEmpty()) return null;").append(EOL);
+            sb.append("for (ProductDetails _item : _details) { if (_item != null && _productId.equals(_item.getProductId())) return _item; }").append(EOL);
+            sb.append("return null;").append(EOL).append("}").append(EOL).append(EOL);
+            sb.append("private String _sketchwareBillingProductPrice(List<ProductDetails> _details, String _productId) {").append(EOL);
+            sb.append("ProductDetails _item = _sketchwareBillingFindProductDetails(_details, _productId);").append(EOL);
+            sb.append("if (_item == null) return \"\";").append(EOL);
+            sb.append("if (BillingClient.ProductType.INAPP.equals(_item.getProductType())) { ProductDetails.OneTimePurchaseOfferDetails _offer = _item.getOneTimePurchaseOfferDetails(); return _offer == null ? \"\" : _offer.getFormattedPrice(); }").append(EOL);
+            sb.append("List<ProductDetails.SubscriptionOfferDetails> _offers = _item.getSubscriptionOfferDetails(); if (_offers == null || _offers.isEmpty() || _offers.get(0) == null || _offers.get(0).getPricingPhases() == null) return \"\";").append(EOL);
+            sb.append("List<ProductDetails.PricingPhase> _phases = _offers.get(0).getPricingPhases().getPricingPhaseList(); return _phases == null || _phases.isEmpty() ? \"\" : _phases.get(_phases.size() - 1).getFormattedPrice();").append(EOL);
+            sb.append("}").append(EOL).append(EOL);
+            sb.append("private String _sketchwareBillingSafeDebugMessage(String _message) {").append(EOL);
+            sb.append("if (_message == null) return \"\";").append(EOL);
+            sb.append("String _safe = _message.replace('\r', ' ').replace('\n', ' ').trim();").append(EOL);
+            sb.append("_safe = _safe.replaceAll(\"(?i)(purchase\\\\s*token|token|order\\\\s*id)\\\\s*[:=]\\\\s*[^\\\\s,;]+\", \"$1=[redacted]\");").append(EOL);
+            sb.append("return _safe.length() > 500 ? _safe.substring(0, 500) : _safe;").append(EOL);
+            sb.append("}").append(EOL).append(EOL);
+        }
 
         sb.append(EOL);
         String bindingName = ViewBindingBuilder.generateFileNameForLayout(projectFileBean.fileName);
@@ -479,6 +524,12 @@ public class Jx {
 
         sb.append(EOL);
         sb.append("}").append(EOL);
+        if (hasGoogleBillingComponent) {
+            String googleBillingPurchaseUpdatedMethod = eventManager.generateGoogleBillingPurchaseUpdatedMethod();
+            if (!googleBillingPurchaseUpdatedMethod.isEmpty()) {
+                sb.append(EOL).append(googleBillingPurchaseUpdatedMethod).append(EOL);
+            }
+        }
         sb.append(EOL);
         sb.append("private void initializeLogic() {").append(EOL);
         if (!onCreateEventCode.isEmpty()) {
@@ -568,6 +619,15 @@ public class Jx {
         if (!isFragment && !settings.getValue(ProjectSettings.SETTING_DISABLE_OLD_METHODS, BuildSettings.SETTING_GENERIC_VALUE_TRUE)
                 .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)) {
             sb.append(getDeprecatedMethodsCode());
+        }
+        if (buildConfig.isGoogleBillingEnabled) {
+            sb.append("private boolean _sketchwareHasBillingProduct(List<Purchase> _billingItems, String _billingProductId) {").append(EOL)
+                    .append("if (_billingItems == null || _billingProductId == null) return false;").append(EOL)
+                    .append("for (Purchase _billingItem : _billingItems) {").append(EOL)
+                    .append("if (_billingItem != null && _billingItem.getPurchaseState() == Purchase.PurchaseState.PURCHASED && _billingItem.getProducts() != null && _billingItem.getProducts().contains(_billingProductId)) return true;").append(EOL)
+                    .append("}").append(EOL)
+                    .append("return false;").append(EOL)
+                    .append("}").append(EOL);
         }
         sb.append("}").append(EOL);
         String code = sb.toString();
@@ -1080,6 +1140,9 @@ public class Jx {
                 case ComponentBean.COMPONENT_TYPE_UNITY_ADS:
                     fieldsWithStaticInitializers.add(Lx.getComponentFieldCode("UnityAds"));
                     break;
+                case ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING:
+                    fieldsWithStaticInitializers.add(Lx.getComponentFieldCode("GoogleBilling"));
+                    break;
             }
         }
         if (hasTimer) {
@@ -1097,6 +1160,17 @@ public class Jx {
         if (hasRewardedVideoAd) {
             fieldsWithStaticInitializers.add(Lx.getComponentFieldCode("RewardedVideoAd"));
         }
+    }
+
+    private boolean hasGoogleBillingComponent() {
+        ArrayList<ComponentBean> componentBeans = projectDataManager.e(projectFileBean.getJavaName());
+        if (componentBeans == null) return false;
+        for (ComponentBean componentBean : componentBeans) {
+            if (componentBean != null && componentBean.type == ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean requireImports(ViewBean viewBean) {

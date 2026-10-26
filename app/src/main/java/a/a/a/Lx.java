@@ -57,7 +57,7 @@ public class Lx {
                 .append(metadata.packageName)
                 .append("\"\r\n")
                 .append("minSdkVersion ")
-                .append(minSdkVersion)
+                .append(metadata.isGoogleBillingEnabled ? Math.max(minSdkVersion, 23) : minSdkVersion)
                 .append("\r\n")
                 .append("targetSdkVersion ")
                 .append(targetSdkVersion)
@@ -116,6 +116,10 @@ public class Lx {
 
         if (metadata.isUnityAdsEnabled) {
             content.append("implementation 'com.unity3d.ads:unity-ads:4.21.0'\r\n");
+        }
+
+        if (metadata.isGoogleBillingEnabled) {
+            content.append("implementation 'com.android.billingclient:billing:9.1.0'\r\n");
         }
 
         if (isLibraryNotExcluded(BuiltInLibraries.PLAY_SERVICES_MAPS, excludedLibraries) && metadata.isMapUsed) {
@@ -660,6 +664,21 @@ public class Lx {
                 case "InterstitialAd":
                     fieldDeclaration += "\r\nprivate InterstitialAdLoadCallback _" + typeInstanceName + "_interstitial_ad_load_callback;";
                     fieldDeclaration += "\r\nprivate FullScreenContentCallback _" + typeInstanceName + "_full_screen_content_callback;";
+                    break;
+
+                case "GoogleBilling":
+                    fieldDeclaration += "\r\nprivate BillingClientStateListener _" + typeInstanceName + "_state_listener;";
+                    fieldDeclaration += "\r\nprivate ProductDetailsResponseListener _" + typeInstanceName + "_product_details_listener;";
+                    fieldDeclaration += "\r\nprivate PurchasesResponseListener _" + typeInstanceName + "_query_purchases_listener;";
+                    fieldDeclaration += "\r\nprivate ArrayList<ProductDetails> _" + typeInstanceName + "_product_details = new ArrayList<>();";
+                    fieldDeclaration += "\r\nprivate ArrayList<Purchase> _" + typeInstanceName + "_purchases = new ArrayList<>();";
+                    fieldDeclaration += "\r\nprivate ArrayList<String> _" + typeInstanceName + "_owned_product_ids = new ArrayList<>();";
+                    fieldDeclaration += "\r\nprivate ArrayList<String> _" + typeInstanceName + "_acknowledging_tokens = new ArrayList<>();";
+                    fieldDeclaration += "\r\nprivate ProductDetails _" + typeInstanceName + "_selected_product_details;";
+                    fieldDeclaration += "\r\nprivate int _" + typeInstanceName + "_last_response_code = -1;";
+                    fieldDeclaration += "\r\nprivate String _" + typeInstanceName + "_last_debug_message = \"\";";
+                    fieldDeclaration += "\r\nprivate boolean _" + typeInstanceName + "_is_connecting = false;";
+                    fieldDeclaration += "\r\nprivate boolean _" + typeInstanceName + "_is_connected = false;";
                     break;
 
                 case "UnityAds":

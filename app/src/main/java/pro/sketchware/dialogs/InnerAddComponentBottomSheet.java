@@ -246,6 +246,15 @@ public class InnerAddComponentBottomSheet extends BottomSheetDialogFragment {
                 jC.a(scId).a(projectFileBean.getJavaName(), componentType, componentId);
                 break;
 
+            case ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING:
+                ProjectLibraryBean billingSettings = jC.c(scId).b();
+                if (billingSettings == null || !billingSettings.isGoogleBillingEnabled()) {
+                    bB.b(getContext(), "Enable Google Billing in Library Manager first.", bB.TOAST_WARNING).show();
+                    return false;
+                }
+                jC.a(scId).a(projectFileBean.getJavaName(), componentType, componentId);
+                break;
+
             case ComponentBean.COMPONENT_TYPE_UNITY_ADS:
                 ProjectLibraryBean adNetworkSettings = jC.c(scId).b();
                 if (adNetworkSettings == null || !adNetworkSettings.isUnityAdsEnabled()) {

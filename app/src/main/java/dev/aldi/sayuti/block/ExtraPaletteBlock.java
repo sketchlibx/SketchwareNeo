@@ -83,7 +83,6 @@ public class ExtraPaletteBlock {
             var eC = jC.a(sc_id);
             var view = eC.c(xmlName, logicEditor.id);
             if (view == null) {
-                // in case the View's in a Drawer
                 view = eC.c("_drawer_" + xmlName, logicEditor.id);
             }
             String customView = view.customView;
@@ -169,8 +168,6 @@ public class ExtraPaletteBlock {
             logicEditor.a(numberVariables.get(i), "d", "getVar").setTag(numberVariables.get(i));
         }
 
-        // NOTE: 5 and 6 are already the simple/typed custom-variable lists (see below),
-        // so the new Int type has to be 7, not 5.
         ArrayList<String> floatVariables = jC.a(sc_id).e(javaName, 4);
         ArrayList<String> intNumVariables = jC.a(sc_id).e(javaName, 7);
 
@@ -191,18 +188,12 @@ public class ExtraPaletteBlock {
         for (int i = 0; i < floatVariables.size(); i++) {
             if (i == 0) logicEditor.a("Float", getTitleBgColor());
 
-            // Use "d" (Number's) shape/type-char here, not "f": the block renderer has
-            // no shape mapping for "f" and was showing this as a broken stack-block
-            // instead of a value pill (see analysis). Codegen is unaffected either way —
-            // Fx's "getVar" case emits the raw variable name regardless of this char.
             logicEditor.a(floatVariables.get(i), "d", "getVar").setTag(floatVariables.get(i));
         }
 
         for (int i = 0; i < intNumVariables.size(); i++) {
             if (i == 0) logicEditor.a("Int", getTitleBgColor());
 
-            // Same fix as Float above: "i" has no shape mapping either (was rendering as
-            // plain text, not even a block). Use "d".
             logicEditor.a(intNumVariables.get(i), "d", "getVar").setTag(intNumVariables.get(i));
         }
 
@@ -226,13 +217,6 @@ public class ExtraPaletteBlock {
             String variableType = CustomVariableUtil.getVariableType(variable);
             String variableName = CustomVariableUtil.getVariableName(variable);
             if (variableType != null && variableName != null) {
-                // NOTE: float/Float/int/Integer render their getVar chip with the same
-                // "d" shape/type-char as double/long/short — "f"/"i" have no shape
-                // mapping in the block renderer (see analysis: they showed up as a
-                // broken stack-block / plain text instead of a value pill). Codegen
-                // still distinguishes them correctly elsewhere (Fx/mq/BlocksConverter
-                // key off the variable's declared Java type and its own set-block
-                // opcode, not off this palette-chip type-char).
                 String type = switch (variableType) {
                     case "boolean", "Boolean" -> "b";
                     case "String" -> "s";
@@ -1121,6 +1105,26 @@ public class ExtraPaletteBlock {
                     logicEditor.a(" ", "interstitialAdLoad");
                     logicEditor.a(" ", "interstitialAdShow");
                     logicEditor.a("b", "interstitialAdIsLoaded");
+                }
+                if (extraBlocks.isComponentUsed(ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING)) {
+                    logicEditor.a("Google Billing", getTitleBgColor());
+                    logicEditor.a(" ", "playBillingConnect");
+                    logicEditor.a("b", "playBillingIsConnected");
+                    logicEditor.a(" ", "playBillingQueryInApp");
+                    logicEditor.a(" ", "playBillingQuerySubscription");
+                    logicEditor.a("s", "playBillingGetProductName");
+                    logicEditor.a("s", "playBillingGetProductPrice");
+                    logicEditor.a(" ", "playBillingPurchaseProduct");
+                    logicEditor.a(" ", "playBillingRestorePurchases");
+                    logicEditor.a(" ", "playBillingQueryPurchasesType");
+                    logicEditor.a("b", "playBillingHasPurchased");
+                    logicEditor.a("d", "playBillingGetPurchaseCount");
+                    logicEditor.a(" ", "playBillingAcknowledgePurchase");
+                    logicEditor.a("d", "playBillingGetResponseCode");
+                    logicEditor.a("s", "playBillingGetDebugMessage");
+                    logicEditor.a(" ", "playBillingShowDebugToast");
+                    logicEditor.a(" ", "playBillingCopyDebugInfo");
+                    logicEditor.a(" ", "playBillingDisconnect");
                 }
                 if (extraBlocks.isComponentUsed(ComponentBean.COMPONENT_TYPE_UNITY_ADS)) {
                     logicEditor.a("Unity Ads", getTitleBgColor());

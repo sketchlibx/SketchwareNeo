@@ -61,14 +61,31 @@ public class Gx {
     }
 
     public boolean a(String classInfo) {
+        if (classInfo == null) return false;
+        if (isGoogleBillingType(classInfo) &&
+                (isGoogleBillingType(className) || containsGoogleBillingType(classPath))) {
+            return true;
+        }
         if (classInfo.equals("!") || classInfo.equals(className)) {
             return true;
-        } else {
-            for (String s : classPath) {
-                if (s.equals(classInfo)) return true;
-            }
-            return false;
         }
+        for (String s : classPath) {
+            if (s.equals(classInfo)) return true;
+        }
+        return false;
+    }
+
+    private static boolean isGoogleBillingType(String name) {
+        return "GoogleBilling".equals(name) || "BillingClient".equals(name) ||
+                "Component.GoogleBilling".equals(name);
+    }
+
+    private static boolean containsGoogleBillingType(String[] classPath) {
+        if (classPath == null) return false;
+        for (String item : classPath) {
+            if ("GoogleBilling".equals(item) || "BillingClient".equals(item)) return true;
+        }
+        return false;
     }
 
     public boolean b() {
@@ -378,6 +395,12 @@ public class Gx {
 
             case "UnityAds":
                 classInfos = "Component.UnityAds";
+                break;
+
+            case "GoogleBilling":
+            case "BillingClient":
+            case "Component.GoogleBilling":
+                classInfos = "Component.GoogleBilling";
                 break;
 
             case "PopupMenu":

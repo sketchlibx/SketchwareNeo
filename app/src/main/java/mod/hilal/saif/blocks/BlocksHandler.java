@@ -2705,6 +2705,103 @@ public class BlocksHandler {
         hashMap.put("spec", "%m.unityads destroy banner");
         arrayList.add(hashMap);
 
+
+        addGoogleBillingBlock(arrayList, "playBillingConnect", " ", "",
+                formatBillingCode(
+                        "{ if (%1$s == null) { " +
+                        "if (_%1$s_state_listener == null) _%1$s_state_listener = new BillingClientStateListener() { " +
+                        "@Override public void onBillingSetupFinished(BillingResult _result) { _%1$s_is_connecting = false; _%1$s_is_connected = _result != null && _result.getResponseCode() == BillingClient.BillingResponseCode.OK; _%1$s_last_response_code = _result == null ? -1 : _result.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_result == null ? \"Unknown Billing result\" : _result.getDebugMessage()); } " +
+                        "@Override public void onBillingServiceDisconnected() { _%1$s_is_connecting = false; _%1$s_is_connected = false; _%1$s_last_response_code = BillingClient.BillingResponseCode.SERVICE_DISCONNECTED; _%1$s_last_debug_message = \"Billing service disconnected.\"; } }; " +
+                        "if (_%1$s_product_details_listener == null) _%1$s_product_details_listener = (_result, _query) -> { _%1$s_last_response_code = _result == null ? -1 : _result.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_result == null ? \"Unknown Billing result\" : _result.getDebugMessage()); ArrayList<ProductDetails> _details = _query == null || _query.getProductDetailsList() == null ? new ArrayList<>() : new ArrayList<>(_query.getProductDetailsList()); if (_result != null && _result.getResponseCode() == BillingClient.BillingResponseCode.OK) { " +
+                        billingMergeProductDetailsCode("_details") +
+                        "if (!_details.isEmpty()) _%1$s_selected_product_details = _details.get(0); else _%1$s_last_debug_message = \"No product details returned. Check the product ID and Play Console status.\"; } }; " +
+                        "if (_%1$s_query_purchases_listener == null) _%1$s_query_purchases_listener = (_result, _items) -> { _%1$s_last_response_code = _result == null ? -1 : _result.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_result == null ? \"Unknown Billing result\" : _result.getDebugMessage()); if (_result != null && _result.getResponseCode() == BillingClient.BillingResponseCode.OK) { " +
+                        billingMergePurchasesCode("_items", true) + " } " +
+                        "}; " +
+                        "%1$s = BillingClient.newBuilder(%2$s.this.getApplicationContext()).setListener(this).enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()).enableAutoServiceReconnection().build(); " +
+                        "} if (%1$s != null && !%1$s.isReady() && !_%1$s_is_connecting) { _%1$s_is_connecting = true; %1$s.startConnection(_%1$s_state_listener); } }"
+                ), "%m.googlebilling connect to Play Billing in %m.activity");
+
+        addGoogleBillingBlock(arrayList, "playBillingIsConnected", "b", "boolean",
+                formatBillingCode("%1$s != null && %1$s.isReady()"),
+                "%m.googlebilling is connected");
+
+        addGoogleBillingBlock(arrayList, "playBillingQueryInApp", " ", "",
+                billingQueryProductCode("inapp"),
+                "%m.googlebilling query in-app product %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingQuerySubscription", " ", "",
+                billingQueryProductCode("subs"),
+                "%m.googlebilling query subscription %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingGetProductName", "s", "String",
+                formatBillingCode("(_sketchwareBillingFindProductDetails(_%1$s_product_details, String.valueOf(%2$s).trim()) == null ? \"\" : _sketchwareBillingFindProductDetails(_%1$s_product_details, String.valueOf(%2$s).trim()).getName())"),
+                "%m.googlebilling product name for %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingGetProductPrice", "s", "String",
+                formatBillingCode("_sketchwareBillingProductPrice(_%1$s_product_details, String.valueOf(%2$s).trim())"),
+                "%m.googlebilling formatted price for %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingPurchaseProduct", " ", "",
+                formatBillingCode(
+                        "{ String _billingProductId = String.valueOf(%2$s).trim(); ProductDetails _billingProduct = _sketchwareBillingFindProductDetails(_%1$s_product_details, _billingProductId); " +
+                        "if (%1$s == null || !%1$s.isReady()) { _%1$s_last_response_code = BillingClient.BillingResponseCode.SERVICE_DISCONNECTED; _%1$s_last_debug_message = \"Billing is not connected. Connect first.\"; } " +
+                        "else if (_billingProduct == null) { _%1$s_last_response_code = BillingClient.BillingResponseCode.ITEM_UNAVAILABLE; _%1$s_last_debug_message = \"Product was not found. Query it before purchasing.\"; } " +
+                        "else { BillingFlowParams.ProductDetailsParams.Builder _billingItem = BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(_billingProduct); " +
+                        "if (BillingClient.ProductType.SUBS.equals(_billingProduct.getProductType())) { List<ProductDetails.SubscriptionOfferDetails> _offers = _billingProduct.getSubscriptionOfferDetails(); " +
+                        "if (_offers == null || _offers.isEmpty() || _offers.get(0) == null || _offers.get(0).getOfferToken() == null || _offers.get(0).getOfferToken().trim().isEmpty()) { _%1$s_last_response_code = BillingClient.BillingResponseCode.ITEM_UNAVAILABLE; _%1$s_last_debug_message = \"No subscription offer is available.\"; } " +
+                        "else { _billingItem.setOfferToken(_offers.get(0).getOfferToken()); BillingResult _launch = %1$s.launchBillingFlow(%3$s.this, BillingFlowParams.newBuilder().setProductDetailsParamsList(Collections.singletonList(_billingItem.build())).build()); _%1$s_last_response_code = _launch == null ? -1 : _launch.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_launch == null ? \"Unknown Billing result\" : _launch.getDebugMessage()); } } " +
+                        "else { BillingResult _launch = %1$s.launchBillingFlow(%3$s.this, BillingFlowParams.newBuilder().setProductDetailsParamsList(Collections.singletonList(_billingItem.build())).build()); _%1$s_last_response_code = _launch == null ? -1 : _launch.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_launch == null ? \"Unknown Billing result\" : _launch.getDebugMessage()); } } }"
+                ), "%m.googlebilling purchase product %s.productId in %m.activity");
+
+        addGoogleBillingBlock(arrayList, "playBillingRestorePurchases", " ", "",
+                "{ " + billingQueryPurchasesCode("inapp") + " " + billingQueryPurchasesCode("subs") + " }",
+                "%m.googlebilling restore purchases");
+
+        addGoogleBillingBlock(arrayList, "playBillingQueryPurchasesType", " ", "",
+                billingQueryPurchasesCode(null),
+                "%m.googlebilling query purchases type %s.productType");
+
+        addGoogleBillingBlock(arrayList, "playBillingHasPurchased", "b", "boolean",
+                formatBillingCode("_%1$s_owned_product_ids != null && _%1$s_owned_product_ids.contains(String.valueOf(%2$s).trim())"),
+                "%m.googlebilling owns product %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingGetPurchaseCount", "d", "double",
+                formatBillingCode("((double) (_%1$s_purchases == null ? 0 : _%1$s_purchases.size()))"),
+                "%m.googlebilling purchase count");
+
+        addGoogleBillingBlock(arrayList, "playBillingAcknowledgePurchase", " ", "",
+                formatBillingCode(
+                        "{ String _billingProductId = String.valueOf(%2$s).trim(); Purchase _billingToAcknowledge = null; " +
+                        "for (Purchase _purchase : _%1$s_purchases) { if (_purchase != null && _purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED && ! _purchase.isAcknowledged() && _purchase.getProducts() != null && _purchase.getProducts().contains(_billingProductId)) { _billingToAcknowledge = _purchase; break; } } " +
+                        "if (%1$s == null || !%1$s.isReady()) { _%1$s_last_response_code = BillingClient.BillingResponseCode.SERVICE_DISCONNECTED; _%1$s_last_debug_message = \"Billing is not connected.\"; } " +
+                        "else if (_billingToAcknowledge == null) { _%1$s_last_response_code = BillingClient.BillingResponseCode.ITEM_UNAVAILABLE; _%1$s_last_debug_message = \"No unacknowledged purchased item was found for this product. Query purchases first.\"; } " +
+                        "else { final Purchase _purchaseToAcknowledge = _billingToAcknowledge; final String _internalToken = _purchaseToAcknowledge.getPurchaseToken(); " +
+                        "if (_internalToken == null || _internalToken.trim().isEmpty()) { _%1$s_last_response_code = BillingClient.BillingResponseCode.DEVELOPER_ERROR; _%1$s_last_debug_message = \"Purchase token is unavailable.\"; } " +
+                        "else if (!_%1$s_acknowledging_tokens.contains(_internalToken)) { _%1$s_acknowledging_tokens.add(_internalToken); %1$s.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(_internalToken).build(), _ackResult -> { _%1$s_acknowledging_tokens.remove(_internalToken); _%1$s_last_response_code = _ackResult == null ? -1 : _ackResult.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_ackResult == null ? \"Unknown Billing result\" : _ackResult.getDebugMessage()); if (_ackResult != null && _ackResult.getResponseCode() == BillingClient.BillingResponseCode.OK && _purchaseToAcknowledge.getProducts() != null) { for (String _ownedId : _purchaseToAcknowledge.getProducts()) if (!_%1$s_owned_product_ids.contains(_ownedId)) _%1$s_owned_product_ids.add(_ownedId); } }); } } }"
+                ), "%m.googlebilling acknowledge purchase for %s.productId");
+
+        addGoogleBillingBlock(arrayList, "playBillingGetResponseCode", "d", "double",
+                formatBillingCode("((double) _%1$s_last_response_code)"),
+                "%m.googlebilling last response code");
+
+        addGoogleBillingBlock(arrayList, "playBillingGetDebugMessage", "s", "String",
+                formatBillingCode("_sketchwareBillingSafeDebugMessage(_%1$s_last_debug_message)"),
+                "%m.googlebilling last debug message");
+
+        addGoogleBillingBlock(arrayList, "playBillingShowDebugToast", " ", "",
+                formatBillingCode("SketchwareUtil.showMessage(%2$s.this, \"Billing code: \" + _%1$s_last_response_code + \"\\n\" + _sketchwareBillingSafeDebugMessage(_%1$s_last_debug_message))"),
+                "%m.googlebilling show safe debug message in %m.activity");
+
+        addGoogleBillingBlock(arrayList, "playBillingCopyDebugInfo", " ", "",
+                formatBillingCode(
+                        "{ String _safeBillingDebug = \"Google Play Billing\\nResponse code: \" + _%1$s_last_response_code + \"\\nMessage: \" + _sketchwareBillingSafeDebugMessage(_%1$s_last_debug_message); try { android.content.ClipboardManager _clipboard = (android.content.ClipboardManager) %2$s.this.getSystemService(android.content.Context.CLIPBOARD_SERVICE); if (_clipboard != null) { _clipboard.setPrimaryClip(android.content.ClipData.newPlainText(\"Billing debug\", _safeBillingDebug)); SketchwareUtil.showMessage(%2$s.this, \"Billing debug info copied.\"); } else { SketchwareUtil.showMessage(%2$s.this, \"Clipboard unavailable.\"); } } catch (RuntimeException _copyError) { SketchwareUtil.showMessage(%2$s.this, \"Could not copy Billing debug info.\"); } }"
+                ), "%m.googlebilling copy safe debug info in %m.activity");
+
+        addGoogleBillingBlock(arrayList, "playBillingDisconnect", " ", "",
+                formatBillingCode("{ if (%1$s != null) { %1$s.endConnection(); %1$s = null; } _%1$s_is_connecting = false; _%1$s_is_connected = false; _%1$s_product_details.clear(); _%1$s_purchases.clear(); _%1$s_owned_product_ids.clear(); _%1$s_acknowledging_tokens.clear(); _%1$s_selected_product_details = null; }"),
+                "%m.googlebilling disconnect from Play Billing");
+
         hashMap = new HashMap<>();
         hashMap.put("name", "getResString");
         hashMap.put("type", "s");
@@ -2713,6 +2810,179 @@ public class BlocksHandler {
         hashMap.put("palette", "-1");
         hashMap.put("spec", "get String from %m.ResString");
         arrayList.add(hashMap);
+    }
+
+    private static void addGoogleBillingBlock(
+            ArrayList<HashMap<String, Object>> blocks,
+            String name,
+            String type,
+            String typeName,
+            String code,
+            String spec) {
+        HashMap<String, Object> block = new HashMap<>();
+        block.put("name", name);
+        block.put("type", type);
+        block.put("typeName", typeName);
+        block.put("code", code);
+        block.put("color", "#2AA4E2");
+        block.put("palette", "-1");
+        block.put("spec", spec);
+        blocks.add(block);
+    }
+
+    private static String billingQueryProductCode(String fixedProductType) {
+        String typeValue = "\"" + fixedProductType + "\"";
+        return formatBillingCode(
+                "{ String _productId = String.valueOf(%2$s).trim(); " +
+                "if (%1$s != null && %1$s.isReady() && !_productId.isEmpty()) { " +
+                "QueryProductDetailsParams _params = QueryProductDetailsParams.newBuilder().setProductList(Collections.singletonList(QueryProductDetailsParams.Product.newBuilder().setProductId(_productId).setProductType(" + typeValue + ").build())).build(); " +
+                "if (_%1$s_product_details_listener == null) _%1$s_product_details_listener = (_result, _query) -> { _%1$s_last_response_code = _result == null ? -1 : _result.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_result == null ? \"Unknown Billing result\" : _result.getDebugMessage()); ArrayList<ProductDetails> _details = _query == null || _query.getProductDetailsList() == null ? new ArrayList<>() : new ArrayList<>(_query.getProductDetailsList()); if (_result != null && _result.getResponseCode() == BillingClient.BillingResponseCode.OK) { " +
+                billingMergeProductDetailsCode("_details") +
+                "if (!_details.isEmpty()) _%1$s_selected_product_details = _details.get(0); else _%1$s_last_debug_message = \"No product details returned. Check the product ID, type, and Play Console status.\"; } }; " +
+                "%1$s.queryProductDetailsAsync(_params, _%1$s_product_details_listener); " +
+                "} else { _%1$s_last_response_code = %1$s == null || !%1$s.isReady() ? BillingClient.BillingResponseCode.SERVICE_DISCONNECTED : BillingClient.BillingResponseCode.DEVELOPER_ERROR; _%1$s_last_debug_message = \"Connect to Play Billing and provide a product ID first.\"; } }"
+        );
+    }
+
+    private static String billingQueryPurchasesCode(String fixedProductType) {
+        String typeValue = fixedProductType == null
+                ? "String.valueOf(%2$s).trim().toLowerCase(java.util.Locale.US)"
+                : "\"" + fixedProductType + "\"";
+        return formatBillingCode(
+                "{ String _productType = " + typeValue + "; " +
+                "if (%1$s != null && %1$s.isReady() && (\"inapp\".equals(_productType) || \"subs\".equals(_productType))) { " +
+                "if (_%1$s_query_purchases_listener == null) _%1$s_query_purchases_listener = (_result, _items) -> { _%1$s_last_response_code = _result == null ? -1 : _result.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_result == null ? \"Unknown Billing result\" : _result.getDebugMessage()); if (_result != null && _result.getResponseCode() == BillingClient.BillingResponseCode.OK) { " +
+                billingMergePurchasesCode("_items", true) + " } " +
+                "}; %1$s.queryPurchasesAsync(QueryPurchasesParams.newBuilder().setProductType(_productType).build(), _%1$s_query_purchases_listener); " +
+                "} else { _%1$s_last_response_code = %1$s == null || !%1$s.isReady() ? BillingClient.BillingResponseCode.SERVICE_DISCONNECTED : BillingClient.BillingResponseCode.DEVELOPER_ERROR; _%1$s_last_debug_message = \"Connect to Play Billing and use product type inapp or subs.\"; } }"
+        );
+    }
+
+    private static String billingMergeProductDetailsCode(String incomingList) {
+        return "if (" + incomingList + " != null) { for (ProductDetails _newDetails : " + incomingList + ") { if (_newDetails != null) { boolean _foundDetails = false; " +
+                "for (int _i = 0; _i < _%1$s_product_details.size(); _i++) { ProductDetails _oldDetails = _%1$s_product_details.get(_i); " +
+                "if (_oldDetails != null && _oldDetails.getProductId().equals(_newDetails.getProductId()) && _oldDetails.getProductType().equals(_newDetails.getProductType())) { _%1$s_product_details.set(_i, _newDetails); _foundDetails = true; break; } } " +
+                "if (!_foundDetails) _%1$s_product_details.add(_newDetails); } } } ";
+    }
+
+    private static String billingMergePurchasesCode(String incomingList, boolean acknowledgePurchasedItems) {
+        String code = "if (" + incomingList + " != null) { for (Purchase _incomingPurchase : " + incomingList + ") { if (_incomingPurchase != null) { boolean _foundPurchase = false; " +
+                "for (int _i = 0; _i < _%1$s_purchases.size(); _i++) { Purchase _oldPurchase = _%1$s_purchases.get(_i); " +
+                "if (_oldPurchase != null && _oldPurchase.getPurchaseToken() != null && _oldPurchase.getPurchaseToken().equals(_incomingPurchase.getPurchaseToken())) { _%1$s_purchases.set(_i, _incomingPurchase); _foundPurchase = true; break; } } " +
+                "if (!_foundPurchase) _%1$s_purchases.add(_incomingPurchase); ";
+        if (acknowledgePurchasedItems) {
+            code += "if (_incomingPurchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) { " +
+                    "if (_incomingPurchase.isAcknowledged()) { if (_incomingPurchase.getProducts() != null) for (String _ownedId : _incomingPurchase.getProducts()) if (!_ %1$s_owned_product_ids.contains(_ownedId)) _%1$s_owned_product_ids.add(_ownedId); } " +
+                    "else { String _internalToken = _incomingPurchase.getPurchaseToken(); if (_internalToken != null && !_internalToken.trim().isEmpty() && !_%1$s_acknowledging_tokens.contains(_internalToken) && %1$s != null && %1$s.isReady()) { " +
+                    "_%1$s_acknowledging_tokens.add(_internalToken); %1$s.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(_internalToken).build(), _ackResult -> { _%1$s_acknowledging_tokens.remove(_internalToken); _%1$s_last_response_code = _ackResult == null ? -1 : _ackResult.getResponseCode(); _%1$s_last_debug_message = _sketchwareBillingSafeDebugMessage(_ackResult == null ? \"Unknown Billing result\" : _ackResult.getDebugMessage()); if (_ackResult != null && _ackResult.getResponseCode() == BillingClient.BillingResponseCode.OK && _incomingPurchase.getProducts() != null) for (String _ownedId : _incomingPurchase.getProducts()) if (!_%1$s_owned_product_ids.contains(_ownedId)) _%1$s_owned_product_ids.add(_ownedId); }); } } } ";
+        } else {
+            code += "if (_incomingPurchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED && _incomingPurchase.isAcknowledged() && _incomingPurchase.getProducts() != null) for (String _ownedId : _incomingPurchase.getProducts()) if (!_ %1$s_owned_product_ids.contains(_ownedId)) _%1$s_owned_product_ids.add(_ownedId); ";
+        }
+        code = code.replace("!_ %1$s_owned_product_ids", "!_%1$s_owned_product_ids");
+        return code + "} } } ";
+    }
+
+    private static String formatBillingCode(String code) {
+        if (code == null || code.isEmpty()) {
+            return code;
+        }
+
+        StringBuilder formatted = new StringBuilder(code.length() + 128);
+        boolean inString = false;
+        boolean escaped = false;
+        int parentheses = 0;
+        int braces = 0;
+
+        for (int i = 0; i < code.length(); i++) {
+            char current = code.charAt(i);
+
+            if (inString) {
+                formatted.append(current);
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (current == '"') {
+                inString = true;
+                formatted.append(current);
+                continue;
+            }
+
+            if (current == '(') {
+                parentheses++;
+                formatted.append(current);
+                continue;
+            }
+            if (current == ')') {
+                parentheses = Math.max(0, parentheses - 1);
+                formatted.append(current);
+                continue;
+            }
+
+            if (current == '{') {
+                formatted.append(current);
+                braces++;
+                appendBillingIndent(formatted, braces);
+                while (i + 1 < code.length() && Character.isWhitespace(code.charAt(i + 1))) {
+                    i++;
+                }
+                continue;
+            }
+
+            if (current == '}') {
+                trimBillingWhitespace(formatted);
+                braces = Math.max(0, braces - 1);
+                appendBillingIndent(formatted, braces);
+                formatted.append(current);
+                int next = i + 1;
+                while (next < code.length() && Character.isWhitespace(code.charAt(next))) {
+                    next++;
+                }
+                if (next < code.length() && code.charAt(next) == ')') {
+                    i = next - 1;
+                } else {
+                    appendBillingIndent(formatted, braces);
+                }
+                while (i + 1 < code.length() && Character.isWhitespace(code.charAt(i + 1))) {
+                    i++;
+                }
+                continue;
+            }
+
+            formatted.append(current);
+            if (current == ';') {
+                appendBillingIndent(formatted, braces);
+                while (i + 1 < code.length() && Character.isWhitespace(code.charAt(i + 1))) {
+                    i++;
+                }
+            }
+        }
+
+        return formatted.toString().trim();
+    }
+
+    private static void appendBillingIndent(StringBuilder builder, int depth) {
+        builder.append('\n');
+        for (int i = 0; i < depth; i++) {
+            builder.append("    ");
+        }
+    }
+
+    private static void trimBillingWhitespace(StringBuilder builder) {
+        while (builder.length() > 0) {
+            char last = builder.charAt(builder.length() - 1);
+            if (last == ' ' || last == '\t' || last == '\r' || last == '\n') {
+                builder.setLength(builder.length() - 1);
+            } else {
+                break;
+            }
+        }
     }
 
     private static boolean showAll() {

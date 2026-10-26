@@ -41,8 +41,8 @@ public final class TerminalCommandServer {
     private static final Pattern REQUEST_ID = Pattern.compile("[0-9A-Za-z_-]{1,64}");
     private static final Set<String> KNOWN_KEYS = Set.of(
             TerminalCommands.KEY_COMMAND, TerminalCommands.KEY_SC_ID, TerminalCommands.KEY_CONFIRMED,
-            TerminalCommands.KEY_DRY_RUN, TerminalCommands.KEY_URL);
-    private static final int MAX_REQUEST_BYTES = 4096;
+            TerminalCommands.KEY_DRY_RUN, TerminalCommands.KEY_URL, TerminalCommands.KEY_ARGC);
+    private static final int MAX_REQUEST_BYTES = 40 * 1024;
     private static final long STALE_MILLIS = 60L * 60L * 1000L;
     private static final long PURGE_INTERVAL_MILLIS = 60L * 1000L;
 
@@ -147,10 +147,15 @@ public final class TerminalCommandServer {
             int separator = line.indexOf('=');
             if (separator <= 0) return null;
             String key = line.substring(0, separator);
-            if (!KNOWN_KEYS.contains(key) || values.containsKey(key)) return null;
+            if (!isKnownKey(key) || values.containsKey(key)) return null;
             values.put(key, line.substring(separator + 1));
         }
         return values.containsKey(TerminalCommands.KEY_COMMAND) ? new Request(id, values) : null;
+    }
+
+    private static boolean isKnownKey(String key) {
+        if (KNOWN_KEYS.contains(key)) return true;
+        return key.matches(Pattern.quote(TerminalCommands.ARG_KEY_PREFIX) + "[0-9]{1,2}");
     }
 
     private static byte[] readLimited(File file) {

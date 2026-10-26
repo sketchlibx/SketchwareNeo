@@ -4,6 +4,8 @@ import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
@@ -22,19 +24,31 @@ public final class TerminalCommandHandler implements TerminalCommandServer.Dispa
         }
     }
 
+    public interface GitBridge {
+        int run(String scId, List<String> args, boolean confirmed, TerminalGitCommands.Output out, TerminalGitCommands.Cancellation cancel);
+
+        List<String> info(String scId);
+    }
+
     private final File storageRoot;
     private final Predicate<String> sessionExists;
     private final Executor worker;
     private final Executor mainThread;
     private final NdkInstaller ndkInstaller;
+    private final GitBridge gitBridge;
+    private final Executor gitWorker;
+    private final Map<String, AtomicBoolean> activeGit = new ConcurrentHashMap<>();
     private final AtomicBoolean ndkInstallRunning = new AtomicBoolean(false);
 
-    public TerminalCommandHandler(File storageRoot, Predicate<String> sessionExists, Executor worker, Executor mainThread, NdkInstaller ndkInstaller) {
+    public TerminalCommandHandler(File storageRoot, Predicate<String> sessionExists, Executor worker, Executor mainThread, NdkInstaller ndkInstaller,
+                                  GitBridge gitBridge, Executor gitWorker) {
         this.storageRoot = storageRoot;
         this.sessionExists = sessionExists;
         this.worker = worker;
         this.mainThread = mainThread;
         this.ndkInstaller = ndkInstaller;
+        this.gitBridge = gitBridge;
+        this.gitWorker = gitWorker;
     }
 
     @Override
@@ -62,7 +76,68 @@ public final class TerminalCommandHandler implements TerminalCommandServer.Dispa
                 String url = request.get(TerminalCommands.KEY_URL);
                 worker.execute(() -> installNdk(reply, url));
             }
+            case TerminalCommands.COMMAND_GIT -> runGit(request, reply, scId);
+            case TerminalCommands.COMMAND_CANCEL_GIT -> {
+                AtomicBoolean flag = activeGit.get(scId);
+                if (flag != null) flag.set(true);
+                reply.finish(TerminalCleanup.CODE_OK, "Cancel requested.");
+            }
+            case TerminalCommands.COMMAND_GIT_INFO -> gitWorker.execute(() -> {
+                try {
+                    reply.lines(gitBridge.info(scId));
+                    reply.finish(TerminalCleanup.CODE_OK);
+                } catch (Throwable t) {
+                    reply.finish(TerminalCleanup.CODE_FAILED, "Could not read the Git client state: " + t.getMessage());
+                }
+            });
             default -> reply.finish(TerminalCleanup.CODE_INVALID, "Unknown command: " + command);
+        }
+    }
+
+    static List<String> parseArgs(TerminalCommandServer.Request request) {
+        String count = request.get(TerminalCommands.KEY_ARGC);
+        if (count == null || !count.matches("[0-9]{1,2}")) return null;
+        int argc = Integer.parseInt(count);
+        if (argc > TerminalCommands.MAX_ARGS) return null;
+        List<String> args = new ArrayList<>();
+        for (int i = 0; i < argc; i++) {
+            String value = request.get(TerminalCommands.ARG_KEY_PREFIX + i);
+            if (value == null || value.length() > TerminalCommands.MAX_ARG_LENGTH || value.indexOf('\0') >= 0) return null;
+            args.add(value);
+        }
+        return args;
+    }
+
+    private void runGit(TerminalCommandServer.Request request, TerminalReply reply, String scId) {
+        List<String> args = parseArgs(request);
+        if (args == null) {
+            reply.finish(TerminalCleanup.CODE_INVALID, "Malformed git arguments.");
+            return;
+        }
+        if (!args.isEmpty() && args.get(0).equals("sync") && TerminalBuildBridge.isBuildRunning(scId)) {
+            reply.finish(TerminalCommands.EXIT_BUSY, "A build is running. Wait for it to finish or cancel it first.");
+            return;
+        }
+        AtomicBoolean cancel = new AtomicBoolean(false);
+        if (activeGit.putIfAbsent(scId, cancel) != null) {
+            reply.finish(TerminalCommands.EXIT_BUSY, "Another git command is still running for this project.");
+            return;
+        }
+        boolean confirmed = request.getBoolean(TerminalCommands.KEY_CONFIRMED);
+        try {
+            gitWorker.execute(() -> {
+                try {
+                    int code = gitBridge.run(scId, args, confirmed, reply::line, cancel::get);
+                    reply.finish(code);
+                } catch (Throwable t) {
+                    reply.finish(TerminalCleanup.CODE_FAILED, "Unexpected git error: " + t.getMessage());
+                } finally {
+                    activeGit.remove(scId, cancel);
+                }
+            });
+        } catch (RuntimeException e) {
+            activeGit.remove(scId, cancel);
+            reply.finish(TerminalCleanup.CODE_FAILED, "The git command could not be started.");
         }
     }
 

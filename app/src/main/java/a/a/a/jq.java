@@ -151,6 +151,7 @@ public class jq {
 
     /** Whether Unity Ads is enabled for the current generated project. */
     public boolean isUnityAdsEnabled = false;
+    public boolean isGoogleBillingEnabled = false;
     public String unityGameId = "";
     public boolean unityTestMode = true;
 

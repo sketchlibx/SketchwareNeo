@@ -907,6 +907,9 @@ public class ProjectBuilder {
         if (yq.N.isUnityAdsEnabled) {
             builtInLibraryManager.addLibrary(BuiltInLibraries.UNITY_ADS);
         }
+        if (yq.N.isGoogleBillingEnabled) {
+            builtInLibraryManager.addLibrary(BuiltInLibraries.BILLING);
+        }
         if (yq.N.isGsonUsed) {
             builtInLibraryManager.addLibrary(BuiltInLibraries.GSON);
         }

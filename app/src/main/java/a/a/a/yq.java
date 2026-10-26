@@ -192,7 +192,11 @@ public class yq {
     }
 
     public void generateGradleFiles() {
-        String defaultAppGradle = Lx.getBuildGradleString(VAR_DEFAULT_TARGET_SDK_VERSION, VAR_DEFAULT_MIN_SDK_VERSION, projectSettings.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(VAR_DEFAULT_TARGET_SDK_VERSION)), N, projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE));
+        int minimumSdkVersion = projectSettings.getMinSdkVersion();
+        if (N.isGoogleBillingEnabled) {
+            minimumSdkVersion = Math.max(minimumSdkVersion, 23);
+        }
+        String defaultAppGradle = Lx.getBuildGradleString(VAR_DEFAULT_TARGET_SDK_VERSION, minimumSdkVersion, projectSettings.getValue(ProjectSettings.SETTING_TARGET_SDK_VERSION, String.valueOf(VAR_DEFAULT_TARGET_SDK_VERSION)), N, projectSettings.getValue(ProjectSettings.SETTING_ENABLE_VIEWBINDING, ProjectSettings.SETTING_GENERIC_VALUE_FALSE).equals(ProjectSettings.SETTING_GENERIC_VALUE_TRUE));
         String defaultProjGradle = Lx.c("8.12.0", "4.4.3");
         String defaultSettingsGradle = Lx.a();
 
@@ -448,7 +452,8 @@ public class yq {
         }
         N.isAdMobEnabled = adMob.isAdMobEnabled();
         N.isUnityAdsEnabled = adMob.isUnityAdsEnabled();
-        if (N.isAdMobEnabled || N.isUnityAdsEnabled) {
+        N.isGoogleBillingEnabled = adMob.isGoogleBillingEnabled();
+        if (N.isAdMobEnabled || N.isUnityAdsEnabled || N.isGoogleBillingEnabled) {
             N.addPermission(jq.PERMISSION_INTERNET);
             N.addPermission(jq.PERMISSION_ACCESS_NETWORK_STATE);
         }
@@ -533,6 +538,11 @@ public class yq {
                             N.x.isFCMUsed = true;
                     case ComponentBean.COMPONENT_TYPE_FIREBASE_AUTH_GOOGLE_LOGIN ->
                             N.x.isFBGoogleUsed = true;
+                    case ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING -> {
+                        N.isGoogleBillingEnabled = true;
+                        N.addPermission(activity.getActivityName(), jq.PERMISSION_INTERNET);
+                        N.addPermission(activity.getActivityName(), jq.PERMISSION_ACCESS_NETWORK_STATE);
+                    }
                     case ComponentBean.COMPONENT_TYPE_UNITY_ADS -> {
                         if (!N.isUnityAdsEnabled) {
                             N.isUnityAdsEnabled = true;

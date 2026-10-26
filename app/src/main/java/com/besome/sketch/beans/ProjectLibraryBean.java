@@ -37,6 +37,7 @@ public class ProjectLibraryBean implements Parcelable {
     public static final int PROJECT_LIB_TYPE_EXCLUDE_BUILTIN_LIBRARIES = 6;
     public static final int PROJECT_LIB_TYPE_MATERIAL3 = 7;
     public static final int PROJECT_LIB_TYPE_NATIVE_TOOLS = 8;
+    public static final int PROJECT_LIB_TYPE_GOOGLE_BILLING = 9;
 
     @Expose
     public String appId;
@@ -101,6 +102,7 @@ public class ProjectLibraryBean implements Parcelable {
             case 4 -> R.drawable.ic_mtrl_box;
             case 5 -> R.drawable.ic_mtrl_settings_input;
             case 8 -> R.drawable.ic_mtrl_cpp;
+            case 9 -> R.drawable.ic_mtrl_billing;
             default -> 0;
         };
     }
@@ -114,6 +116,7 @@ public class ProjectLibraryBean implements Parcelable {
             case 4 -> R.string.text_subtitle_menu_local_library;
             case 5 -> R.string.design_drawer_menu_nativelibs_subtitle;
             case 8 -> R.string.design_library_description_native_tools;
+            case 9 -> R.string.design_library_description_google_billing;
             default -> 0;
         };
     }
@@ -127,6 +130,7 @@ public class ProjectLibraryBean implements Parcelable {
             case 4 -> R.string.text_title_menu_local_library;
             case 5 -> R.string.design_drawer_menu_nativelibs;
             case 8 -> R.string.design_library_title_native_tools;
+            case 9 -> R.string.design_library_title_google_billing;
             default -> 0;
         };
     }
@@ -163,6 +167,7 @@ public class ProjectLibraryBean implements Parcelable {
     public static final String CONFIG_UNITY_GAME_ID = "unity_game_id";
     public static final String CONFIG_UNITY_TEST_MODE = "unity_test_mode";
     public static final String CONFIG_UNITY_PLACEMENTS = "unity_placements";
+    public static final String CONFIG_GOOGLE_BILLING_ENABLED = "google_billing_enabled";
 
     public boolean isEnabled() {
         return useYn != null && !useYn.isEmpty() && useYn.equals(LIB_USE_Y);
@@ -178,6 +183,10 @@ public class ProjectLibraryBean implements Parcelable {
 
     public boolean isUnityAdsEnabled() {
         return configurations != null && asBoolean(configurations.get(CONFIG_UNITY_ENABLED), false);
+    }
+
+    public boolean isGoogleBillingEnabled() {
+        return configurations != null && asBoolean(configurations.get(CONFIG_GOOGLE_BILLING_ENABLED), false);
     }
 
     public String getConfigurationString(String key, String fallback) {

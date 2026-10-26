@@ -73,6 +73,11 @@ public class oq {
                     R.drawable.ic_mtrl_load_failed;
             case "onAdDismissedFullScreenContent", "onBannerAdClosed" ->
                     R.drawable.ic_mtrl_preview_off;
+            case "onBillingSetupFinished" -> R.drawable.ic_mtrl_billing_ready;
+            case "onBillingServiceDisconnected" -> R.drawable.ic_mtrl_billing_disconnected;
+            case "onProductDetailsResponse" -> R.drawable.ic_mtrl_billing_products;
+            case "onQueryPurchasesResponse" -> R.drawable.ic_mtrl_billing_purchases;
+            case "onPurchasesUpdated" -> R.drawable.ic_mtrl_billing_purchase_updated;
             case "onUploadProgress" -> R.drawable.ic_mtrl_uploading;
             case "onDownloadProgress" -> R.drawable.ic_mtrl_downloading;
             case "onUploadSuccess" -> R.drawable.ic_mtrl_uploaded;
@@ -311,6 +316,12 @@ public class oq {
             eventList.add("fullScreenContentCallback");
         }
 
+        if (classInfo.a("GoogleBilling")) {
+            eventList.add("googleBillingStateListener");
+            eventList.add("googleBillingProductDetailsListener");
+            eventList.add("googleBillingPurchasesResponseListener");
+            eventList.add("googleBillingPurchaseListener");
+        }
         if (classInfo.a("UnityAds")) {
             eventList.add("unityAdsInitializationListener");
             eventList.add("unityAdsLoadListener");
@@ -402,6 +413,13 @@ public class oq {
                 eventList.add("onInterstitialAdLoaded");
                 eventList.add("onInterstitialAdFailedToLoad");
             }
+            case "googleBillingStateListener" -> {
+                eventList.add("onBillingSetupFinished");
+                eventList.add("onBillingServiceDisconnected");
+            }
+            case "googleBillingProductDetailsListener" -> eventList.add("onProductDetailsResponse");
+            case "googleBillingPurchasesResponseListener" -> eventList.add("onQueryPurchasesResponse");
+            case "googleBillingPurchaseListener" -> eventList.add("onPurchasesUpdated");
             case "unityAdsInitializationListener" -> {
                 eventList.add("onUnityAdsInitialized");
                 eventList.add("onUnityAdsFailedToInitialize");

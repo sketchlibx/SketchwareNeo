@@ -2,6 +2,7 @@ package mod.sketchlibx.terminal;
 
 import java.util.List;
 
+/** Defines the commands available in the terminal. */
 public final class TerminalCommands {
 
     public static final String KEY_COMMAND = "command";
@@ -9,6 +10,10 @@ public final class TerminalCommands {
     public static final String KEY_CONFIRMED = "confirmed";
     public static final String KEY_DRY_RUN = "dry_run";
     public static final String KEY_URL = "url";
+    public static final String KEY_ARGC = "argc";
+    public static final String ARG_KEY_PREFIX = "arg";
+    public static final int MAX_ARGS = 32;
+    public static final int MAX_ARG_LENGTH = 1000;
 
     public static final String COMMAND_STATUS = "status";
     public static final String COMMAND_BUILD = "build";
@@ -16,6 +21,9 @@ public final class TerminalCommands {
     public static final String COMMAND_CLEAN_CACHE = "clean-cache";
     public static final String COMMAND_CLEAN_GRADLE_BACKUPS = "clean-gradle-backups";
     public static final String COMMAND_NDK_INSTALL = "ndk-install";
+    public static final String COMMAND_GIT = "git";
+    public static final String COMMAND_CANCEL_GIT = "cancel-git";
+    public static final String COMMAND_GIT_INFO = "git-info";
 
     public static final int EXIT_NOT_AVAILABLE = 4;
     public static final int EXIT_BUSY = 5;
@@ -58,6 +66,15 @@ public final class TerminalCommands {
             "ndk_install <url>",
             "    Download and install an NDK/CMake archive from an http(s) URL. Progress and the",
             "    final result are printed here; Ctrl+C stops waiting but the install continues.",
+            "",
+            "git <command>   (also: sw_git <command>)",
+            "    Git through the built-in Git client (JGit) on this project's Git workspace",
+            "    (.sketchware/data/<project id>/git_workspace), using the author, username and token",
+            "    from Git Client > Settings. Supported: status, init, add, commit, log, branch,",
+            "    remote, pull, push and sync. Run 'git help' for the exact syntax. Other git",
+            "    commands are not supported. Ctrl+C cancels pull and push. Android has no git",
+            "    program; if one is in PATH, 'git' runs that instead and sw_git still uses the",
+            "    built-in client.",
             "",
             "gradlew <tasks>",
             "    Run ./gradlew from the current directory, or system Gradle if installed.",

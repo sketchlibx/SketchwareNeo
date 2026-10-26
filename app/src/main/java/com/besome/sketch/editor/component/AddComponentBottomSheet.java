@@ -92,6 +92,9 @@ public class AddComponentBottomSheet extends BottomSheetDialogFragment {
             if (networkSettings != null && networkSettings.isUnityAdsEnabled()) {
                 componentList.add(new ComponentBean(ComponentBean.COMPONENT_TYPE_UNITY_ADS));
             }
+            if (networkSettings != null && networkSettings.isGoogleBillingEnabled()) {
+                componentList.add(new ComponentBean(ComponentBean.COMPONENT_TYPE_GOOGLE_BILLING));
+            }
         } catch (RuntimeException ignored) {
 
         }

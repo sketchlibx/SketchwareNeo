@@ -137,6 +137,18 @@ public class BuiltInLibraries {
     public static String OTPVIEW = "OTPView-0.1.0";
     public static String PATTERN_LOCK_VIEW = "pattern-lock-view";
     public static String UNITY_ADS = "unity-ads-4.21.0";
+    public static String BILLING = "billing-9.1.0";
+    public static String TRANSPORT_API = "transport-api-3.0.0";
+    public static String TRANSPORT_BACKEND_CCT = "transport-backend-cct-3.1.8";
+    public static String TRANSPORT_RUNTIME = "transport-runtime-3.1.8";
+    public static String FIREBASE_ENCODERS = "firebase-encoders-17.0.0";
+    public static String FIREBASE_ENCODERS_JSON = "firebase-encoders-json-18.0.0";
+    public static String FIREBASE_ENCODERS_PROTO = "firebase-encoders-proto-16.0.0";
+    public static String JAVAX_INJECT = "javax.inject-1";
+    public static String PLAY_SERVICES_BASE_BILLING = "play-services-base-18.5.0";
+    public static String PLAY_SERVICES_BASEMENT_BILLING = "play-services-basement-18.9.0";
+    public static String PLAY_SERVICES_LOCATION_BILLING = "play-services-location-19.0.0";
+    public static String PLAY_SERVICES_TASKS_BILLING = "play-services-tasks-18.2.0";
     public static String ANDROIDX_DATASTORE_CORE = "datastore-core-1.0.0";
     public static String ANDROIDX_WEBKIT = "webkit-1.6.1";
     public static String ANDROIDX_WORK_RUNTIME_KTX = "work-runtime-ktx-2.7.0";
@@ -466,6 +478,38 @@ public class BuiltInLibraries {
                     JETBRAINS_KOTLINX_COROUTINES_ANDROID, JETBRAINS_KOTLINX_COROUTINES_CORE_JVM,
                     OKHTTP_ANDROID, OKIO_JVM, OMSDK_ANDROID, PLAY_SERVICES_APPSET, PLAY_SERVICES_CRONET,
                     PLAY_SERVICES_TASKS, PROTOBUF_JAVALITE, PROTOBUF_KOTLIN_LITE)),
+
+            new BuiltInLibrary(BILLING, List.of(ANDROIDX_ACTIVITY, ANDROIDX_CORE, TRANSPORT_API,
+                    TRANSPORT_BACKEND_CCT, TRANSPORT_RUNTIME, PLAY_SERVICES_BASE_BILLING,
+                    PLAY_SERVICES_BASEMENT_BILLING, PLAY_SERVICES_LOCATION_BILLING,
+                    PLAY_SERVICES_TASKS_BILLING, FIREBASE_ENCODERS, FIREBASE_ENCODERS_JSON,
+                    FIREBASE_ENCODERS_PROTO, JAVAX_INJECT), "com.android.billingclient"),
+
+            new BuiltInLibrary(TRANSPORT_API, List.of(JAVAX_INJECT)),
+
+            new BuiltInLibrary(TRANSPORT_BACKEND_CCT, List.of(TRANSPORT_API, TRANSPORT_RUNTIME,
+                    FIREBASE_ENCODERS, FIREBASE_ENCODERS_JSON, FIREBASE_ENCODERS_PROTO)),
+
+            new BuiltInLibrary(TRANSPORT_RUNTIME, List.of(TRANSPORT_API, FIREBASE_ENCODERS,
+                    FIREBASE_ENCODERS_JSON, FIREBASE_ENCODERS_PROTO, JAVAX_INJECT)),
+
+            new BuiltInLibrary(FIREBASE_ENCODERS),
+
+            new BuiltInLibrary(FIREBASE_ENCODERS_JSON, List.of(FIREBASE_ENCODERS)),
+
+            new BuiltInLibrary(FIREBASE_ENCODERS_PROTO, List.of(FIREBASE_ENCODERS)),
+
+            new BuiltInLibrary(JAVAX_INJECT),
+
+            new BuiltInLibrary(PLAY_SERVICES_BASE_BILLING, List.of(PLAY_SERVICES_BASEMENT_BILLING,
+                    PLAY_SERVICES_TASKS_BILLING)),
+
+            new BuiltInLibrary(PLAY_SERVICES_BASEMENT_BILLING),
+
+            new BuiltInLibrary(PLAY_SERVICES_LOCATION_BILLING, List.of(PLAY_SERVICES_BASE_BILLING,
+                    PLAY_SERVICES_BASEMENT_BILLING, PLAY_SERVICES_TASKS_BILLING)),
+
+            new BuiltInLibrary(PLAY_SERVICES_TASKS_BILLING, List.of(PLAY_SERVICES_BASEMENT_BILLING)),
 
             new BuiltInLibrary(ANDROIDX_DATASTORE_CORE, List.of(JETBRAINS_KOTLIN_STDLIB, JETBRAINS_KOTLINX_COROUTINES_CORE_JVM)),
 
