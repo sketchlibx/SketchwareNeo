@@ -50,9 +50,11 @@ public final class MultiBlockGenTask {
             "given - never invent a different kind name for the same handle). A listener_wrapper's spec has " +
             "ONLY its own real parameters (typically just \"%m.<kind> setListener\"-style) - the substack " +
             "placeholder is implicit and must NOT appear in spec. A callback's spec is its bare name only. " +
-            "\"code\" placeholders are %s/%b/%d in the SAME left-to-right order as they appear in spec " +
-            "(use %1$s, %2$s, ... numbered form), PLUS exactly one extra trailing numbered placeholder for " +
-            "a listener_wrapper's or callback's own substack (the next number after its real params). " +
+            "\"code\" placeholders must ALWAYS use %1$s, %2$s, ... numbered %s substitutions, in the SAME " +
+            "left-to-right order as spec sockets; even boolean/number sockets use %s because these are " +
+            "Java source snippets passed as Strings, not runtime values. NEVER use %b or %d in code. " +
+            "PLUS exactly one extra trailing numbered placeholder for a listener_wrapper's or callback's " +
+            "own substack (the next number after its real params). " +
             "\"color\": reuse one consistent hex color across this whole SDK's blocks unless there's a " +
             "good reason to vary it slightly for a sub-group. " +
             "\"imports\": newline-separated fully-qualified Java imports this block's code needs, empty " +
@@ -64,13 +66,35 @@ public final class MultiBlockGenTask {
 
     private MultiBlockGenTask() {}
 
-    public static void generateChunk(Context context, String planJson, String chunkBlocksJson, String existingNames, AiResponseCallback callback) {
-        String prompt = "Overall plan (context only, do not re-generate blocks from this list unless they also " +
-                "appear below):\n" + planJson +
-                "\n\nGenerate the FULL block JSON now for exactly these planned blocks:\n" + chunkBlocksJson +
-                (existingNames != null && !existingNames.isEmpty()
-                        ? "\n\nThese names already exist elsewhere and must not be reused: " + existingNames
-                        : "");
-        AiManager.sendPrompt(context, SYSTEM_PROMPT, prompt, callback);
+    public static void generateChunk(Context context, String planJson, String chunkBlocksJson,
+                                     String existingNames, AiResponseCallback callback) {
+        generateChunk(context, planJson, chunkBlocksJson, existingNames, null, callback);
     }
+
+    /** A compact one-shot repair hint is used when the model returns incomplete/invalid JSON. */
+    public static void generateChunk(Context context, String planJson, String chunkBlocksJson,
+                                     String existingNames, String repairHint, AiResponseCallback callback) {
+        String objectKind = "";
+        try {
+            org.json.JSONObject plan = new org.json.JSONObject(planJson == null ? "{}" : planJson.trim());
+            if (!plan.isNull("objectKind")) objectKind = plan.optString("objectKind", "");
+        } catch (Exception ignored) {
+            // This context is optional; the exact chunk always contains the required role metadata.
+        }
+        StringBuilder prompt = new StringBuilder(512 + chunkBlocksJson.length());
+        prompt.append("Generate full JSON definitions only for these planned blocks. Do not output prose.\n")
+                .append("Object handle type: ").append(objectKind.isEmpty() ? "none" : objectKind).append("\n")
+                .append("Required block entries: ").append(chunkBlocksJson);
+        if (existingNames != null && !existingNames.trim().isEmpty()) {
+            String names = existingNames.trim();
+            if (names.length() > 1800) names = names.substring(Math.max(0, names.length() - 1800));
+            prompt.append("\nAlready-used names (never reuse): ").append(names);
+        }
+        if (repairHint != null && !repairHint.trim().isEmpty()) {
+            prompt.append("\nCorrection required: ").append(repairHint.trim())
+                    .append(" Return every requested block, all schema fields, and valid JSON only.");
+        }
+        AiManager.sendPrompt(context, SYSTEM_PROMPT, prompt.toString(), AiManager.Feature.BLOCKS, callback);
+    }
+
 }

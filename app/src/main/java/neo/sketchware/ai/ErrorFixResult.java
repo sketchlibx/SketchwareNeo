@@ -7,6 +7,9 @@ public class ErrorFixResult {
     public String summary;
     public String explanation;
     public String filePath;
+    /** Canonical project-data root captured when the patches were analyzed. */
+    public String projectRootPath;
+    public String projectId;
     public List<Patch> patches = new ArrayList<>();
     public boolean needsManualEvent;
     public String manualEventHint;
@@ -16,6 +19,8 @@ public class ErrorFixResult {
     public boolean patchable;
 
     public static class Patch {
+        /** Absolute path resolved by the host from the AI-provided project-relative path. */
+        public String filePath;
         public String originalSnippet;
         public String fixedSnippet;
         public boolean applicable;

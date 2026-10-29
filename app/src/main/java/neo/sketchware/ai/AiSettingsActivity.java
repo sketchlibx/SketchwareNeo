@@ -144,7 +144,16 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                             LocalModelManager.importModel(getApplicationContext(), uri, displayName);
                             runOnUiThread(() -> {
                                 if (localModelsBinding != null) renderLocalList();
-                                Toast.makeText(AiSettingsActivity.this, "GGUF model imported into private storage", Toast.LENGTH_LONG).show();
+                                new MaterialAlertDialogBuilder(AiSettingsActivity.this)
+                                    .setTitle("GGUF imported")
+                                    .setMessage("The GGUF file is stored in Sketchware Neo's private storage, but importing it does not run the model by itself. Start an inference server/runtime that supports this GGUF and exposes an Ollama or OpenAI-compatible API, then connect using the exact model ID shown by that server. Use 127.0.0.1 only when the server runs on this same device; for a computer on the same network, enter its reachable LAN IP and ensure the server accepts LAN connections.")
+                                    .setPositiveButton("Configure local server", (dialog, which) -> {
+                                        Intent intent = new Intent(AiSettingsActivity.this, AiModelEditActivity.class);
+                                        intent.putExtra(AiModelEditActivity.EXTRA_PROVIDER_ID, "local");
+                                        editorLauncher.launch(intent);
+                                    })
+                                    .setNegativeButton("Later", null)
+                                    .show();
                             });
                         } catch (Exception e) {
                             String message = e.getMessage() == null ? "Model import failed" : e.getMessage();
@@ -333,6 +342,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             TextView status = card.findViewById(R.id.textStatus);
             card.findViewById(R.id.textActiveBadge).setVisibility(View.GONE);
             card.findViewById(R.id.iconStatus).setVisibility(View.GONE);
+            AiProviderVisuals.bind(card.findViewById(R.id.imageProviderIcon), "local");
 
             name.setText(f.getName());
             boolean validGguf = LocalModelManager.isValidGguf(f);
@@ -391,6 +401,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             chatAdapter.notifyDataSetChanged();
             updateInputState();
         });
+        chatBinding.buttonHistory.setOnClickListener(v -> showChatHistoryPicker());
 
         if (explicitConfigId != null) {
             chatConfigId = explicitConfigId;
@@ -410,7 +421,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         if (config != null) {
             AiProvider p = AiProviderRegistry.get(config.providerId);
             chatBinding.textChatAgentName.setText(config.displayName + " (" + (p != null && p.isLocal() ? "LOCAL" : "CLOUD") + ")");
-            chatBinding.imgChatAgentIcon.setImageResource(R.drawable.ic_mtrl_ai);
+            AiProviderVisuals.bind(chatBinding.imgChatAgentIcon, config.providerId);
         } else {
             chatBinding.textChatAgentName.setText("No Agent Selected");
         }
@@ -543,7 +554,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 remaining -= n;
             }
             String text = new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-            if (remaining == 0) text += "\n[Attachment truncated at 96 KB.]";
+            if (remaining == 0) text += "\n[Attachment truncated at 32 KB to keep AI requests responsive.]";
             return text;
         } catch (Exception e) {
             return "[Could not read attachment: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()) + "]";
@@ -555,18 +566,25 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         int placeholderIndex = currentChatMessages.size() - 1;
         int currentUserIndex = currentChatMessages.size() - 2;
         int end = Math.min(currentUserIndex - 1, placeholderIndex - 2);
-        int start = Math.max(0, end - 9);
+        int start = Math.max(0, end - 5); // at most the three most recent user/assistant turns
         boolean hasHistory = false;
+        int historyChars = 0;
         for (int i = start; i <= end; i++) {
             ChatMessage message = currentChatMessages.get(i);
             if (message == null || message.isError || message.isStreaming || message.content == null || message.content.trim().isEmpty()) continue;
+            String content = message.content.trim();
+            if (content.length() > 1800) content = content.substring(0, 1100) + "\n[earlier content omitted]\n" + content.substring(content.length() - 550);
+            if (historyChars + content.length() > 6500) continue;
             prompt.append("You".equals(message.role) ? "User: " : "Assistant: ")
-                    .append(message.content).append("\n\n");
+                    .append(content).append("\n\n");
+            historyChars += content.length();
             hasHistory = true;
         }
-        if (hasHistory) prompt.insert(0, "Recent conversation history (oldest first):\n");
-        prompt.append("Current user message:\n").append(currentPrompt);
-        return prompt.toString();
+        if (hasHistory) prompt.insert(0, "Recent conversation excerpts (oldest first; omit if irrelevant):\n");
+        String current = currentPrompt == null ? "" : currentPrompt.trim();
+        if (current.length() > 30000) current = current.substring(0, 20000) + "\n[request middle shortened]\n" + current.substring(current.length() - 9000);
+        prompt.append("Current user message:\n").append(current);
+        return AiPromptOptimizer.optimizeUser(prompt.toString());
     }
 
     private void updateInputState() {
@@ -629,8 +647,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         final AiModelConfig requestConfig = selectedConfig;
         String promptWithContext = buildConversationPrompt(userPrompt);
         AtomicBoolean terminalDelivered = new AtomicBoolean(false);
-        AiManager.sendPrompt(this, requestConfig, "You are the Sketchware Neo AI assistant. Answer using Markdown formatting. " +
-                "Use the supplied conversation history for continuity, but treat the latest user message as the current request.", promptWithContext, new AiResponseCallback() {
+        AiManager.sendPrompt(this, requestConfig, "You are Sketchware Neo's coding assistant. Answer in concise Markdown. Prefer correct Android Java/XML and Sketchware Neo conventions. For code requests, give usable code and state essential assumptions only.", promptWithContext, AiManager.Feature.CHAT, new AiResponseCallback() {
             @Override public void onStart(String id) { /* Provider may add progress/streaming in the future. */ }
 
             @Override
@@ -744,6 +761,54 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 chatBinding.recyclerChat.smoothScrollToPosition(chatAdapter.getItemCount() - 1);
             }
         }
+    }
+
+    /** Shows saved conversations grouped by configured agent. History stays on-device. */
+    private void showChatHistoryPicker() {
+        if (!getSharedPreferences("ai_prefs", MODE_PRIVATE).getBoolean("remember_chat", true)) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Chat history is off")
+                    .setMessage("Enable ‘Remember chat history on this device’ in AI Settings to save and reopen conversations.")
+                    .setPositiveButton("Open AI Settings", (dialog, which) -> showAiPreferences())
+                    .setNegativeButton("Close", null)
+                    .show();
+            return;
+        }
+
+        SharedPreferences history = getSharedPreferences("ai_chat_history", MODE_PRIVATE);
+        List<AiModelConfig> savedConfigs = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        Gson gson = new Gson();
+        java.lang.reflect.Type listType = new TypeToken<ArrayList<ChatMessage>>() {}.getType();
+        for (AiModelConfig config : AiManager.getConfigs(this)) {
+            String json = history.getString("chat_" + config.id, null);
+            if (json == null || json.trim().isEmpty()) continue;
+            try {
+                List<ChatMessage> messages = gson.fromJson(json, listType);
+                if (messages == null || messages.isEmpty()) continue;
+                savedConfigs.add(config);
+                labels.add(config.displayName + " · " + messages.size() + (messages.size() == 1 ? " message" : " messages"));
+            } catch (RuntimeException ignored) {
+                history.edit().remove("chat_" + config.id).apply();
+            }
+        }
+
+        if (savedConfigs.isEmpty()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("No saved chats")
+                    .setMessage("Send a message with an AI agent first. Saved conversations appear here while chat history is enabled.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Recent conversations")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    if (which >= 0 && which < savedConfigs.size()) showChat(savedConfigs.get(which).id);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void saveChatHistory() {
@@ -935,15 +1000,16 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
             AiModelConfig c = configs.get(position);
             AiProvider p = AiProviderRegistry.get(c.providerId);
 
-            holder.textName.setText(c.displayName);
-            holder.textProvider.setText((p != null ? p.getProviderName() : "Unknown") + " • " + c.modelName);
+            holder.textName.setText(c.displayName == null || c.displayName.trim().isEmpty() ? "Unnamed AI agent" : c.displayName);
+            holder.textProvider.setText((p != null ? p.getProviderName() : "Unknown provider") + " • " + (c.modelName == null ? "Model not set" : c.modelName));
+            AiProviderVisuals.bind(holder.imageProviderIcon, c.providerId);
 
             boolean isActive = c.id.equals(activeId);
             holder.textBadge.setVisibility(isActive ? View.VISIBLE : View.GONE);
             holder.cardRoot.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(AiSettingsActivity.this, isActive ? R.attr.colorPrimary : R.attr.colorOutlineVariant)));
             holder.cardRoot.setStrokeWidth(isActive ? SketchwareUtil.dpToPx(2) : SketchwareUtil.dpToPx(1));
 
-            holder.textStatus.setText((p != null && p.isLocal() ? "LOCAL SERVER" : "CLOUD PROVIDER") + " • configured");
+            holder.textStatus.setText(AiProviderVisuals.statusLabel(c));
             holder.cardRoot.setOnClickListener(v -> activity.showChat(c.id));
 
             holder.buttonMore.setOnClickListener(v -> {
@@ -983,6 +1049,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
         class AgentVH extends RecyclerView.ViewHolder {
             MaterialCardView cardRoot;
             TextView textName, textProvider, textBadge, textStatus;
+            android.widget.ImageView imageProviderIcon;
             ImageButton buttonMore;
             AgentVH(View v) {
                 super(v);
@@ -991,6 +1058,7 @@ public class AiSettingsActivity extends BaseAppCompatActivity {
                 textProvider = v.findViewById(R.id.textModelProvider);
                 textBadge = v.findViewById(R.id.textActiveBadge);
                 textStatus = v.findViewById(R.id.textStatus);
+                imageProviderIcon = v.findViewById(R.id.imageProviderIcon);
                 buttonMore = v.findViewById(R.id.buttonMore);
             }
         }

@@ -32,6 +32,7 @@ import com.besome.sketch.design.DesignActivity;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.besome.sketch.projects.MyProjectSettingActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -49,9 +50,12 @@ import java.util.concurrent.TimeUnit;
 import a.a.a.wq;
 import a.a.a.lC;
 import mod.hey.studios.project.ProjectTracker;
+import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.R;
 
-/** Material 3 workspace for durable, multi-agent tasks and safe project hand-off. */
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 public class AgentWorkspaceActivity extends BaseAppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refreshRunnable = new Runnable() {
@@ -75,6 +79,15 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
     private final Map<String, String> agentIdByLabel = new HashMap<>();
     private ActivityResultLauncher<Intent> createProjectLauncher;
     private String pendingProjectRunId;
+    private String pendingProjectBrief;
+    private JSONObject pendingGeneratedProject;
+    private androidx.appcompat.app.AlertDialog projectProgressDialog;
+    private LinearProgressIndicator projectProgressBar;
+    private TextView projectProgressTitle;
+    private TextView projectProgressDetail;
+    private final TextView[] projectStageLabels = new TextView[6];
+    private boolean aiProjectGenerationRunning;
+    private boolean aiProjectApplyRunning;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -102,21 +115,30 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
         createProjectLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             Intent data = result.getData();
             if (result.getResultCode() != RESULT_OK || data == null || !data.getBooleanExtra("is_new", false)) {
+                closeProjectProgressDialog();
                 pendingProjectRunId = null;
+                pendingProjectBrief = null;
+                pendingGeneratedProject = null;
                 return;
             }
             String scId = data.getStringExtra("sc_id");
             if (TextUtils.isEmpty(scId)) {
                 Toast.makeText(this, "Project was saved, but its identifier was not returned.", Toast.LENGTH_LONG).show();
                 pendingProjectRunId = null;
+                pendingGeneratedProject = null;
                 return;
             }
+            if (pendingGeneratedProject != null) {
+                applyPendingGeneratedProject(scId, pendingGeneratedProject, pendingProjectRunId);
+                return;
+            }
+
             AgentRun run = TextUtils.isEmpty(pendingProjectRunId) ? null : AgentRunStore.get(this, pendingProjectRunId);
             if (run != null) {
                 run.createdProjectId = scId;
                 try {
                     writeProjectBlueprint(scId, run);
-                    run.record("Project created", "Project created with the native Sketchware wizard and agent blueprint attached.");
+                    run.record("Project created", "A native Sketchware project was created; agent notes are attached as a blueprint.");
                     Toast.makeText(this, "Project created and agent blueprint attached.", Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
                     run.record("Project created", "Project was created, but blueprint saving failed: " + safeMessage(e));
@@ -124,13 +146,7 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
                 }
                 try { AgentRunStore.save(this, run); } catch (Exception ignored) { }
             }
-            ProjectTracker.setScId(scId);
-            Intent open = new Intent(this, DesignActivity.class);
-            open.putExtra("sc_id", scId);
-            open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            startActivity(open);
-            pendingProjectRunId = null;
-            finish();
+            openProjectInEditor(scId, false);
         });
 
         findViewById(R.id.buttonCreateProject).setOnClickListener(v -> openProjectWizard(null));
@@ -139,6 +155,8 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
             finish();
         });
         findViewById(R.id.buttonRunTask).setOnClickListener(v -> enqueueTask());
+        findViewById(R.id.buttonGenerateProject).setOnClickListener(v -> startAiProjectGeneration(
+                editTask.getText() == null ? "" : editTask.getText().toString().trim(), null));
         findViewById(R.id.buttonSaveContext).setOnClickListener(v -> saveReusableContext(true));
         editReusableContext.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -211,6 +229,8 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
 
         boolean haveAgent = !configs.isEmpty();
         findViewById(R.id.buttonRunTask).setEnabled(haveAgent);
+        View generateProjectButton = findViewById(R.id.buttonGenerateProject);
+        if (generateProjectButton != null) generateProjectButton.setEnabled(haveAgent && !aiProjectGenerationRunning && !aiProjectApplyRunning);
         if (!haveAgent) {
             textTaskHint.setText("First configure an AI agent and test its connection. Use “Configure AI agents” above.");
         } else {
@@ -350,8 +370,8 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
         TextView content = new TextView(this);
         content.setText(details);
         content.setTextIsSelectable(true);
-        content.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
-        content.setTextColor(com.google.android.material.color.MaterialColors.getColor(content, com.google.android.material.R.attr.colorOnSurface));
+        content.setTextAppearance(R.style.TextAppearance_Material3_BodyMedium);
+        content.setTextColor(ThemeUtils.getColor(content, R.attr.colorOnSurface));
         int padding = (int) (20 * getResources().getDisplayMetrics().density);
         content.setPadding(padding, padding, padding, padding);
         ScrollView scroll = new ScrollView(this);
@@ -366,7 +386,7 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
                     Toast.makeText(this, "Result copied", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Close", null)
-                .setPositiveButton("Create project from run", (d, w) -> openProjectWizard(run.id))
+                .setPositiveButton("Build project from run", (d, w) -> startAiProjectGeneration(buildProjectBriefFromRun(run), run.id))
                 .show();
     }
 
@@ -382,7 +402,9 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
     private void openProjectWizard(String runId) {
         pendingProjectRunId = runId;
         AgentRun run = TextUtils.isEmpty(runId) ? null : AgentRunStore.get(this, runId);
-        String seed = run == null ? "Generated Project" : run.title;
+        String seed = pendingGeneratedProject != null
+                ? pendingGeneratedProject.optString("appName", "Generated Project")
+                : run == null ? "Generated Project" : run.title;
         String projectName = safeProjectName(seed);
         String slug = projectName.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "").trim();
         if (slug.isEmpty() || !Character.isLetter(slug.charAt(0))) slug = "app" + slug;
@@ -398,6 +420,219 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
         createProjectLauncher.launch(intent);
     }
 
+    private void startAiProjectGeneration(String brief, String runId) {
+        if (aiProjectGenerationRunning || aiProjectApplyRunning) return;
+        String prompt = brief == null ? "" : brief.trim();
+        if (prompt.isEmpty()) {
+            editTask.setError("Describe the app you want to build first");
+            editTask.requestFocus();
+            return;
+        }
+        if (prompt.length() > 24000) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Project brief is too long")
+                    .setMessage("Use 24,000 characters or fewer so the generated project can be validated safely.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        if (AiManager.getConfigs(this).isEmpty()) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Configure an AI agent")
+                    .setMessage("Add and test at least one AI agent before asking it to implement a project.")
+                    .setPositiveButton("Configure", (d, w) -> {
+                        startActivity(new Intent(this, AiSettingsActivity.class));
+                        finish();
+                    }).setNegativeButton("Cancel", null).show();
+            return;
+        }
+
+        pendingProjectRunId = runId;
+        pendingProjectBrief = prompt;
+        pendingGeneratedProject = null;
+        aiProjectGenerationRunning = true;
+        View generateButton = findViewById(R.id.buttonGenerateProject);
+        if (generateButton != null) generateButton.setEnabled(false);
+        showProjectProgressDialog();
+        updateProjectProgress(1, "Understanding your request", "AI is analyzing the requirements and planning the app structure.", true);
+
+        AiModelConfig selectedBuilder = null;
+        String selectedBuilderId = selectedAgentId(builderDropdown);
+        for (AiModelConfig config : AiManager.getConfigs(this)) {
+            if (config.id != null && config.id.equals(selectedBuilderId)) { selectedBuilder = config; break; }
+        }
+        if (selectedBuilder == null) selectedBuilder = AiManager.getActiveConfig(this);
+        AiProjectGenerator.generate(this, selectedBuilder, prompt, new AiResponseCallback() {
+            @Override public void onSuccess(String responseText) {
+                runOnUiThread(() -> {
+                    aiProjectGenerationRunning = false;
+                    View button = findViewById(R.id.buttonGenerateProject);
+                    if (button != null) button.setEnabled(true);
+                    try {
+                        pendingGeneratedProject = new JSONObject(responseText);
+                        updateProjectProgress(3, "Layouts and logic are ready", "The generated specification passed initial structural checks. Choose the project details to continue.", false);
+                        closeProjectProgressDialog();
+                        openProjectWizard(pendingProjectRunId);
+                    } catch (Exception exception) {
+                        pendingGeneratedProject = null;
+                        pendingProjectRunId = null;
+                        closeProjectProgressDialog();
+                        new MaterialAlertDialogBuilder(AgentWorkspaceActivity.this)
+                                .setTitle("Could not prepare the generated project")
+                                .setMessage(safeMessage(exception))
+                                .setPositiveButton("OK", null).show();
+                    }
+                });
+            }
+
+            @Override public void onFailure(String errorMessage) {
+                runOnUiThread(() -> {
+                    aiProjectGenerationRunning = false;
+                    View button = findViewById(R.id.buttonGenerateProject);
+                    if (button != null) button.setEnabled(true);
+                    closeProjectProgressDialog();
+                    pendingProjectRunId = null;
+                    pendingProjectBrief = null;
+                    new MaterialAlertDialogBuilder(AgentWorkspaceActivity.this)
+                            .setTitle("Project generation failed")
+                            .setMessage(TextUtils.isEmpty(errorMessage) ? "The AI did not return a valid project specification." : errorMessage)
+                            .setPositiveButton("OK", null).show();
+                });
+            }
+        });
+    }
+
+    private String buildProjectBriefFromRun(AgentRun run) {
+        if (run == null) return editTask.getText() == null ? "" : editTask.getText().toString();
+        StringBuilder brief = new StringBuilder();
+        brief.append("Build a working Android application from this saved AI-agent task. Implement the best coherent MVP; do not return only a plan.\n\n")
+                .append("Original request:\n").append(run.prompt == null ? "" : run.prompt).append("\n\n");
+        if (!TextUtils.isEmpty(run.planOutput)) brief.append("Plan:\n").append(run.planOutput).append("\n\n");
+        if (!TextUtils.isEmpty(run.draftOutput)) brief.append("Builder implementation proposal:\n").append(run.draftOutput).append("\n\n");
+        if (!TextUtils.isEmpty(run.reviewOutput)) brief.append("Reviewer notes and final requirements:\n").append(run.reviewOutput).append("\n\n");
+        else if (!TextUtils.isEmpty(run.finalOutput)) brief.append("Final output:\n").append(run.finalOutput).append("\n\n");
+        String result = brief.toString().trim();
+        if (result.length() > 23000) result = result.substring(0, 23000);
+        return result;
+    }
+
+    private void showProjectProgressDialog() {
+        closeProjectProgressDialog();
+        View content = LayoutInflater.from(this).inflate(R.layout.dialog_ai_project_progress, null, false);
+        projectProgressTitle = content.findViewById(R.id.textAiProjectProgressTitle);
+        projectProgressDetail = content.findViewById(R.id.textAiProjectProgressDetail);
+        projectProgressBar = content.findViewById(R.id.progressAiProjectGeneration);
+        projectStageLabels[0] = content.findViewById(R.id.textAiProjectStage1);
+        projectStageLabels[1] = content.findViewById(R.id.textAiProjectStage2);
+        projectStageLabels[2] = content.findViewById(R.id.textAiProjectStage3);
+        projectStageLabels[3] = content.findViewById(R.id.textAiProjectStage4);
+        projectStageLabels[4] = content.findViewById(R.id.textAiProjectStage5);
+        projectStageLabels[5] = content.findViewById(R.id.textAiProjectStage6);
+        projectProgressDialog = new MaterialAlertDialogBuilder(this)
+                .setView(content)
+                .setCancelable(false)
+                .create();
+        projectProgressDialog.show();
+    }
+
+    private void updateProjectProgress(int stage, String title, String detail, boolean indeterminate) {
+        if (projectProgressDialog == null || !projectProgressDialog.isShowing()) return;
+        if (projectProgressTitle != null) projectProgressTitle.setText(title == null ? "Working on your project" : title);
+        if (projectProgressDetail != null) projectProgressDetail.setText(detail == null ? "" : detail);
+        if (projectProgressBar != null) {
+            projectProgressBar.setIndeterminate(indeterminate);
+            if (!indeterminate) projectProgressBar.setProgressCompat(Math.min(100, Math.max(0, stage * 16)), true);
+        }
+        String[] labels = {
+                "Understanding request", "Planning screens and flows", "Generating layouts and logic",
+                "Packaging native screen data", "Applying files and resources", "Preparing build verification"
+        };
+        int currentColor = ThemeUtils.getColor(this, R.attr.colorPrimary);
+        int normalColor = ThemeUtils.getColor(this, R.attr.colorOnSurfaceVariant);
+        for (int i = 0; i < projectStageLabels.length; i++) {
+            TextView label = projectStageLabels[i];
+            if (label == null) continue;
+            String prefix = i + 1 < stage ? "✓  " : i + 1 == stage ? "●  " : "○  ";
+            label.setText(prefix + labels[i]);
+            label.setTextColor(i + 1 <= stage ? currentColor : normalColor);
+            label.setTypeface(null, i + 1 == stage ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+    }
+
+    private void closeProjectProgressDialog() {
+        if (projectProgressDialog != null) {
+            try { projectProgressDialog.dismiss(); } catch (Exception ignored) { }
+        }
+        projectProgressDialog = null;
+        projectProgressBar = null;
+        projectProgressTitle = null;
+        projectProgressDetail = null;
+        for (int i = 0; i < projectStageLabels.length; i++) projectStageLabels[i] = null;
+    }
+
+    private void applyPendingGeneratedProject(String scId, JSONObject specification, String runId) {
+        if (aiProjectApplyRunning) return;
+        aiProjectApplyRunning = true;
+        showProjectProgressDialog();
+        updateProjectProgress(3, "Packaging native screen data", "Validating layouts and converting them into Sketchware Neo's screen format.", false);
+        Thread worker = new Thread(() -> {
+            AiProjectApplier.Result result = AiProjectApplier.apply(getApplicationContext(), scId, specification,
+                    (stage, title, detail) -> runOnUiThread(() -> updateProjectProgress(stage, title, detail, false)));
+            runOnUiThread(() -> {
+                aiProjectApplyRunning = false;
+                closeProjectProgressDialog();
+                AgentRun run = TextUtils.isEmpty(runId) ? null : AgentRunStore.get(this, runId);
+                if (!result.success) {
+                    if (run != null) {
+                        run.errorMessage = result.message;
+                        run.record("Implementation failed", result.message);
+                        try { AgentRunStore.save(this, run); } catch (Exception ignored) { }
+                    }
+                    pendingGeneratedProject = null;
+                    pendingProjectBrief = null;
+                    pendingProjectRunId = null;
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Project implementation needs attention")
+                            .setMessage(result.message + "\n\nThe native importer validates changes before adding screens. Open the project to inspect any files already saved.")
+                            .setNegativeButton("Close", null)
+                            .setPositiveButton("Open project", (d, w) -> openProjectInEditor(scId, false))
+                            .show();
+                    return;
+                }
+
+                if (run != null) {
+                    run.createdProjectId = scId;
+                    run.record("Native implementation applied", result.message);
+                    try {
+                        writeProjectBlueprint(scId, run);
+                        AgentRunStore.save(this, run);
+                    } catch (Exception exception) {
+                        run.record("Blueprint note", "The app screens were created, but saving the agent note failed: " + safeMessage(exception));
+                        try { AgentRunStore.save(this, run); } catch (Exception ignored) { }
+                    }
+                }
+                Toast.makeText(this, "Project implementation saved. Starting the build check…", Toast.LENGTH_LONG).show();
+                pendingGeneratedProject = null;
+                pendingProjectBrief = null;
+                pendingProjectRunId = null;
+                openProjectInEditor(scId, true);
+            });
+        }, "neo-ai-project-apply");
+        worker.start();
+    }
+
+    private void openProjectInEditor(String scId, boolean autoBuild) {
+        ProjectTracker.setScId(scId);
+        Intent open = new Intent(this, DesignActivity.class);
+        open.putExtra("sc_id", scId);
+        if (autoBuild) open.putExtra("auto_build", true);
+        open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(open);
+        pendingGeneratedProject = null;
+        pendingProjectBrief = null;
+        pendingProjectRunId = null;
+        finish();
+    }
+
     private void writeProjectBlueprint(String scId, AgentRun run) throws Exception {
         // Store outside the app's compiled /files resources so the blueprint cannot affect builds.
         File aiFolder = new File(wq.b(scId), "ai");
@@ -410,8 +645,25 @@ public class AgentWorkspaceActivity extends BaseAppCompatActivity {
         if (temp.exists() && !temp.delete()) throw new IllegalStateException("Cannot clear temporary blueprint");
         StringBuilder out = new StringBuilder();
         out.append("# AI Agent Project Blueprint\n\n")
-                .append("Generated by Sketchware Neo AI Agent Workspace. This file is a planning hand-off; it does not automatically create layouts or blocks.\n\n")
+                .append("Generated by Sketchware Neo AI Agent Workspace. This file preserves the project brief and agent notes.\n\n")
                 .append("## Original task\n\n").append(run.prompt == null ? "" : run.prompt).append("\n\n");
+        if (pendingGeneratedProject != null) {
+            out.append("## Native implementation\n\n")
+                    .append(pendingGeneratedProject.optString("summary", "AI-generated native screen implementation."))
+                    .append("\n\n");
+            JSONArray generatedScreens = pendingGeneratedProject.optJSONArray("screens");
+            if (generatedScreens != null) {
+                out.append("Screens: ");
+                for (int i = 0; i < generatedScreens.length(); i++) {
+                    JSONObject screen = generatedScreens.optJSONObject(i);
+                    if (screen != null) {
+                        if (i > 0) out.append(", ");
+                        out.append(screen.optString("name", "screen_" + (i + 1)));
+                    }
+                }
+                out.append("\n\n");
+            }
+        }
         if (!TextUtils.isEmpty(run.planOutput)) out.append("## Plan\n\n").append(run.planOutput).append("\n\n");
         if (!TextUtils.isEmpty(run.finalOutput)) out.append("## Final deliverable\n\n").append(run.finalOutput).append("\n\n");
         else if (!TextUtils.isEmpty(run.draftOutput)) out.append("## Builder draft\n\n").append(run.draftOutput).append("\n\n");

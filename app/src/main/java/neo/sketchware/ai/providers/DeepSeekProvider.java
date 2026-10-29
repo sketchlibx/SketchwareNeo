@@ -40,6 +40,9 @@ public class DeepSeekProvider implements AiProvider {
     public void sendRequest(AiModelConfig config, String systemPrompt, String userPrompt, AiResponseCallback callback) {
         EXECUTOR.execute(() -> {
             try {
+                if (config == null) throw new IllegalArgumentException("No DeepSeek agent selected.");
+                if (config.apiKey == null || config.apiKey.trim().isEmpty()) throw new IllegalArgumentException("DeepSeek API key is missing. Edit the agent and add an API key.");
+                if (config.modelName == null || config.modelName.trim().isEmpty()) throw new IllegalArgumentException("DeepSeek model ID is empty. Enter a model ID supported by your API account.");
                 JSONObject systemMessage = new JSONObject();
                 systemMessage.put("role", "system");
                 systemMessage.put("content", systemPrompt);
@@ -55,7 +58,9 @@ public class DeepSeekProvider implements AiProvider {
                 JSONObject body = new JSONObject();
                 body.put("model", config.modelName);
                 body.put("messages", messages);
-                body.put("temperature", config.temperature);
+                body.put("temperature", Math.max(0.0, Math.min(2.0, config.temperature)));
+                if (config.maxTokens > 0) body.put("max_tokens", Math.max(128, Math.min(config.maxTokens, 32768)));
+                if (config.topP > 0.0 && config.topP <= 1.0) body.put("top_p", config.topP);
                 body.put("stream", false);
 
                 Map<String, String> headers = new HashMap<>();
@@ -63,15 +68,9 @@ public class DeepSeekProvider implements AiProvider {
 
                 String response = AiHttpUtil.post("https://api.deepseek.com/chat/completions", headers, body.toString());
 
-                JSONObject json = new JSONObject(response);
-                String content = json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content");
-
-                postSuccess(callback, content);
+                postSuccess(callback, AiHttpUtil.extractChatCompletionText(response, "DeepSeek"));
             } catch (Exception e) {
-                postFailure(callback, e.getMessage() != null ? e.getMessage() : "DeepSeek request failed");
+                postFailure(callback, AiHttpUtil.humanizeError(e, "DeepSeek"));
             }
         });
     }

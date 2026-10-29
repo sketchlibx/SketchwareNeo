@@ -27,6 +27,8 @@ import neo.sketchware.ai.ErrorFixResult;
 import neo.sketchware.ai.ErrorFixTask;
 import pro.sketchware.databinding.CompileLogBinding;
 import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.utility.ThemeUtils;
+import pro.sketchware.R;
 
 public class CompileLogActivity extends BaseAppCompatActivity {
 
@@ -187,6 +189,9 @@ public class CompileLogActivity extends BaseAppCompatActivity {
         if (result.needsManualEvent && result.manualEventHint != null && !result.manualEventHint.isEmpty()) {
             message.append("\n\nThis needs a new event to be created manually:\n").append(result.manualEventHint);
         }
+        if (!result.patchable && result.patches != null && !result.patches.isEmpty()) {
+            message.append("\n\nSome proposed edits could not be matched safely against the current files. You can inspect the exact suggestions, but Auto Fix will remain disabled until the analysis can be verified.");
+        }
 
         MaterialAlertDialogBuilder dialogBuilder = new MaterialAlertDialogBuilder(this)
                 .setTitle("AI analysis")
@@ -202,7 +207,7 @@ public class CompileLogActivity extends BaseAppCompatActivity {
                     createViewEvent(result.filePath, result.createViewEventTargetId, result.createViewEventName));
         }
 
-        if (result.patchable && !result.patches.isEmpty()) {
+        if (result.patches != null && !result.patches.isEmpty()) {
             dialogBuilder.setPositiveButton("Review Changes", (dialog, which) -> showReviewChangesDialog(result));
         }
 
@@ -297,12 +302,12 @@ public class CompileLogActivity extends BaseAppCompatActivity {
         root.setPadding(dp20, dp20, dp20, dp8);
         scrollView.addView(root);
 
-        int colorOnSurface = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface);
-        int colorOnSurfaceVariant = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant);
-        int colorOutlineVariant = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant);
-        int colorSurfaceVariant = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant);
-        int colorErrorContainer = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorErrorContainer);
-        int colorPrimaryContainer = pro.sketchware.utility.ThemeUtils.getColor(this, com.google.android.material.R.attr.colorPrimaryContainer);
+        int colorOnSurface = ThemeUtils.getColor(this, R.attr.colorOnSurface);
+        int colorOnSurfaceVariant = ThemeUtils.getColor(this, R.attr.colorOnSurfaceVariant);
+        int colorOutlineVariant = ThemeUtils.getColor(this, R.attr.colorOutlineVariant);
+        int colorSurfaceVariant = ThemeUtils.getColor(this, R.attr.colorSurfaceVariant);
+        int colorErrorContainer = ThemeUtils.getColor(this, R.attr.colorErrorContainer);
+        int colorPrimaryContainer = ThemeUtils.getColor(this, R.attr.colorPrimaryContainer);
 
         TextView title = new TextView(this);
         title.setText(result.patches.size() == 1 ? "1 change to review" : result.patches.size() + " changes to review");
@@ -310,6 +315,17 @@ public class CompileLogActivity extends BaseAppCompatActivity {
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setTextColor(colorOnSurface);
         root.addView(title);
+
+        if (!result.patchable) {
+            TextView warning = new TextView(this);
+            warning.setText("Auto Fix is disabled because at least one patch could not be verified against the current project files. Re-run analysis against the latest build log.");
+            warning.setTextSize(13);
+            warning.setTextColor(ThemeUtils.getColor(this, R.attr.colorError));
+            LinearLayout.LayoutParams warningParams = new LinearLayout.LayoutParams(-1, -2);
+            warningParams.setMargins(0, dp8, 0, dp8);
+            warning.setLayoutParams(warningParams);
+            root.addView(warning);
+        }
 
         LinearLayout.LayoutParams spacer = new LinearLayout.LayoutParams(-1, dp12);
         root.addView(new android.view.View(this), spacer);
@@ -320,7 +336,8 @@ public class CompileLogActivity extends BaseAppCompatActivity {
             boolean isAddition = patch.originalSnippet == null || patch.originalSnippet.isEmpty();
             boolean isRemoval = patch.fixedSnippet == null || patch.fixedSnippet.isEmpty();
             String kind = isAddition ? "Addition" : isRemoval ? "Removal" : "Edit";
-            changeLabel.setText("Change " + index + " · " + kind);
+            String relativePath = relativeProjectPath(result.projectRootPath, patch.filePath);
+            changeLabel.setText("Change " + index + " · " + kind + "\n" + relativePath);
             changeLabel.setTextSize(13);
             changeLabel.setTypeface(null, android.graphics.Typeface.BOLD);
             changeLabel.setTextColor(colorOnSurfaceVariant);
@@ -343,18 +360,44 @@ public class CompileLogActivity extends BaseAppCompatActivity {
             index++;
         }
 
-        new MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder reviewDialog = new MaterialAlertDialogBuilder(this)
                 .setView(scrollView)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Apply All Changes", (dialog, which) -> {
-                    boolean applied = ErrorFixTask.applyFix(result);
-                    if (applied) {
-                        SketchwareUtil.toast("Changes applied. Rebuild the project to check.");
-                    } else {
-                        SketchwareUtil.toast("Could not apply the changes. The file may have changed since analysis - try Analyze with AI again.");
-                    }
-                })
-                .show();
+                .setNegativeButton("Cancel", null);
+        if (result.patchable) {
+            reviewDialog.setPositiveButton("Auto Fix, Save & Build", (dialog, which) -> {
+                boolean applied = ErrorFixTask.applyFix(result);
+                if (applied) {
+                    SketchwareUtil.toast("Fixes saved. Starting a fresh build check…");
+                    android.content.Intent buildIntent = new android.content.Intent(CompileLogActivity.this, com.besome.sketch.design.DesignActivity.class);
+                    buildIntent.putExtra("sc_id", scId);
+                    buildIntent.putExtra("auto_build", true);
+                    buildIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    startActivity(buildIntent);
+                } else {
+                    new MaterialAlertDialogBuilder(CompileLogActivity.this)
+                            .setTitle("Auto Fix could not be applied")
+                            .setMessage("The source files may have changed since analysis, or one of the proposed paths/snippets failed validation. No partial set of edits was kept. Analyze the latest build log again and review the new patch.")
+                            .setPositiveButton("OK", null).show();
+                }
+            });
+        } else {
+            reviewDialog.setPositiveButton("Close", null);
+        }
+        reviewDialog.show();
+    }
+
+    private static String relativeProjectPath(String projectRoot, String targetPath) {
+        if (targetPath == null || targetPath.isEmpty()) return "Unknown project file";
+        try {
+            if (projectRoot != null && !projectRoot.isEmpty()) {
+                java.nio.file.Path root = new java.io.File(projectRoot).getCanonicalFile().toPath();
+                java.nio.file.Path target = new java.io.File(targetPath).getCanonicalFile().toPath();
+                if (target.startsWith(root)) return root.relativize(target).toString().replace(java.io.File.separatorChar, '/');
+            }
+            return new java.io.File(targetPath).getName();
+        } catch (Exception ignored) {
+            return new java.io.File(targetPath).getName();
+        }
     }
 
     private static View buildCodeBlock(android.content.Context context, String label, String code, int accentColor, int textColor, int borderColor, int dp8) {

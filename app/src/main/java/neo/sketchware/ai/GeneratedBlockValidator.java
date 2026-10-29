@@ -19,8 +19,12 @@ public final class GeneratedBlockValidator {
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
     private static final Pattern BARE_PERCENT_M = Pattern.compile("%m(?!\\.[A-Za-z]+)");
-    private static final Pattern ANY_PERCENT_PARAM = Pattern.compile("%(?:s(?:\\.inputOnly)?|b|d|m\\.[A-Za-z]+)");
+    private static final Pattern ANY_PERCENT_PARAM = Pattern.compile("%(?:s(?:\\.inputOnly)?|b|d|f|i|m\\.[A-Za-z]+)");
+    private static final Pattern SPEC_SOCKET_PLACEHOLDER = Pattern.compile("%(?:s(?:\\.inputOnly)?|b|d|f|i|m\\.[A-Za-z]+)");
     private static final Pattern NUMBERED_CODE_PLACEHOLDER = Pattern.compile("%(\\d+)\\$s");
+    private static final Pattern NUMBERED_FORMAT_PLACEHOLDER = Pattern.compile("%(\\d+)\\$([sbd])");
+    private static final Pattern ANY_CODE_FORMAT_PLACEHOLDER = Pattern.compile("%(?:[0-9]+\\$)?([sbd])");
+    private static final Pattern UNNUMBERED_CODE_PLACEHOLDER = Pattern.compile("%(?:s|b|d)(?![A-Za-z0-9_])");
     // kq.a() in a.a.a returns this exact color for any opcode it does not recognize as a
     // reserved built-in name; anything else means the name collides with a real built-in block.
     private static final int KQ_UNRECOGNIZED_COLOR = 0xff8a55d7;
@@ -75,23 +79,53 @@ public final class GeneratedBlockValidator {
         java.util.regex.Matcher pm = ANY_PERCENT_PARAM.matcher(spec);
         while (pm.find()) specParamCount++;
 
+        java.util.Set<Integer> numberedPlaceholders = new java.util.HashSet<>();
         int maxCodePlaceholder = 0;
         java.util.regex.Matcher cm = NUMBERED_CODE_PLACEHOLDER.matcher(code);
-        while (cm.find()) maxCodePlaceholder = Math.max(maxCodePlaceholder, Integer.parseInt(cm.group(1)));
+        while (cm.find()) {
+            int index = Integer.parseInt(cm.group(1));
+            numberedPlaceholders.add(index);
+            maxCodePlaceholder = Math.max(maxCodePlaceholder, index);
+        }
 
-        if (planEntry == null) return Result.ok(); // no role context (e.g. ad-hoc single block) - schema-only checks above are enough
+        if (planEntry == null) {
+            // String.format receives source-code strings, not the runtime values of the sockets.
+            // Therefore every expression socket, including typed %m and %b/%d sockets, maps to %s.
+            java.util.List<String> expected = new java.util.ArrayList<>();
+            java.util.List<String> actual = new java.util.ArrayList<>();
+            java.util.regex.Matcher expectedMatcher = SPEC_SOCKET_PLACEHOLDER.matcher(spec);
+            while (expectedMatcher.find()) expected.add("%s");
+            if ("c".equals(type)) expected.add("%s");
+            if ("e".equals(type)) { expected.add("%s"); expected.add("%s"); }
+            java.util.regex.Matcher actualMatcher = ANY_CODE_FORMAT_PLACEHOLDER.matcher(code);
+            while (actualMatcher.find()) {
+                String formatter = actualMatcher.group(1);
+                if (!"s".equals(formatter)) {
+                    return Result.fail("use %s for every code placeholder; %b/%d format the text instead of inserting a Java expression");
+                }
+                actual.add("%s");
+            }
+            if (!expected.equals(actual)) {
+                return Result.fail("code must use one %s placeholder per spec socket (typed %m sockets included)" +
+                        ("c".equals(type) ? " and one for its inner stack" : "e".equals(type) ? " and two for its inner stacks" : "") +
+                        "; expected " + expected.size() + " placeholders, found " + actual.size());
+            }
+            if ("v".equals(type) && b.optString("typeName", "").trim().isEmpty()) {
+                return Result.fail("value block is missing typeName");
+            }
+            return Result.ok();
+        }
 
+        int expectedNumberedPlaceholders;
         switch (planEntry.role) {
             case "listener_wrapper":
                 if (!"c".equals(type)) return Result.fail("planned as listener_wrapper but type is \"" + type + "\" (must be \"c\")");
-                if (maxCodePlaceholder != specParamCount + 1) {
-                    return Result.fail("listener_wrapper's code must have exactly one placeholder beyond its spec params (for the nested callbacks), found " + maxCodePlaceholder + " vs spec params " + specParamCount);
-                }
+                expectedNumberedPlaceholders = specParamCount + 1;
                 break;
             case "callback":
                 if (!"c".equals(type)) return Result.fail("planned as callback but type is \"" + type + "\" (must be \"c\")");
                 if (specParamCount != 0) return Result.fail("a callback's spec must be a bare name with no %-placeholders");
-                if (maxCodePlaceholder != 1) return Result.fail("a callback's code must contain exactly one %1$s for its own substack");
+                expectedNumberedPlaceholders = 1;
                 if (planEntry.exposesValueName != null && !code.contains(planEntry.exposesValueName)) {
                     return Result.fail("planned to expose value \"" + planEntry.exposesValueName + "\" but code never declares it");
                 }
@@ -102,11 +136,29 @@ public final class GeneratedBlockValidator {
                 if ("c".equals(type) || "e".equals(type)) {
                     return Result.fail("planned as \"" + planEntry.role + "\" but type \"" + type + "\" implies an inner stack - use \"regular\" or a value type instead");
                 }
+                expectedNumberedPlaceholders = specParamCount;
                 break;
             default:
-                break;
+                return Result.fail("unsupported planned block role: " + planEntry.role);
         }
 
+        if (UNNUMBERED_CODE_PLACEHOLDER.matcher(code).find()) {
+            return Result.fail("planned block code must use numbered %1$s, %2$s, ... placeholders only");
+        }
+        java.util.regex.Matcher formatMatcher = NUMBERED_FORMAT_PLACEHOLDER.matcher(code);
+        while (formatMatcher.find()) {
+            if (!"s".equals(formatMatcher.group(2))) {
+                return Result.fail("planned block code must use %1$s-style text substitution, not %b/%d formatters");
+            }
+        }
+        if (maxCodePlaceholder != expectedNumberedPlaceholders) {
+            return Result.fail("planned block code needs numbered placeholders up to %" + expectedNumberedPlaceholders + "$s; found up to %" + maxCodePlaceholder + "$s");
+        }
+        for (int i = 1; i <= expectedNumberedPlaceholders; i++) {
+            if (!numberedPlaceholders.contains(i)) {
+                return Result.fail("planned block code is missing numbered placeholder %" + i + "$s");
+            }
+        }
         return Result.ok();
     }
 

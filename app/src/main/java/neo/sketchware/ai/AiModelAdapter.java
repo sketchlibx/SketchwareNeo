@@ -68,8 +68,8 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         h.cardModel.setStrokeColor(ColorStateList.valueOf(ThemeUtils.getColor(h.itemView.getContext(), isActive ? R.attr.colorPrimary : R.attr.colorOutlineVariant)));
         h.cardModel.setStrokeWidth(isActive ? SketchwareUtil.dpToPx(2) : SketchwareUtil.dpToPx(1));
         
-        h.textStatus.setText("Ready • " + (p != null && p.isLocal() ? "LOCAL" : "CLOUD"));
-        h.imageProviderIcon.setImageResource(getProviderIcon(c.providerId));
+        h.textStatus.setText(AiProviderVisuals.statusLabel(c));
+        AiProviderVisuals.bind(h.imageProviderIcon, c.providerId);
         
         h.buttonMore.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(v.getContext(), v);
@@ -106,19 +106,7 @@ public class AiModelAdapter extends RecyclerView.Adapter<AiModelAdapter.ViewHold
         return items.size();
     }
     
-    private int getProviderIcon(String id) {
-        if (id == null) return R.drawable.ic_mtrl_ai;
-        switch (id) {
-            case "openai": return R.drawable.ic_mtrl_openai;
-            case "gemini": return R.drawable.ic_mtrl_gemini;
-            case "grok": return R.drawable.ic_mtrl_customai;
-            case "claude": return R.drawable.ic_mtrl_claude;
-            case "nvidia": return R.drawable.ic_mtrl_customai;
-            case "deepseek": return R.drawable.ic_mtrl_deepseek;
-            case "custom": case "local": return R.drawable.ic_mtrl_customai;
-            default: return R.drawable.ic_mtrl_ai;
-        }
-    }
+
     
     static class ViewHolder extends RecyclerView.ViewHolder {
         MaterialCardView cardModel;

@@ -1,6 +1,11 @@
 package neo.sketchware.ai;
 
 import android.content.Context;
+import android.util.Xml;
+
+import org.xmlpull.v1.XmlPullParser;
+
+import java.io.StringReader;
 
 public final class LayoutGenTask {
 
@@ -24,10 +29,16 @@ public final class LayoutGenTask {
     public static void generate(Context context, String currentXml, String userPrompt, AiResponseCallback callback) {
         String userMessage = "Current XML:\n" + currentXml + "\n\nRequested change:\n" + userPrompt;
 
-        AiManager.sendPrompt(context, SYSTEM_PROMPT, userMessage, new AiResponseCallback() {
+        AiManager.sendPrompt(context, SYSTEM_PROMPT, userMessage, AiManager.Feature.LAYOUTS, new AiResponseCallback() {
             @Override
             public void onSuccess(String responseText) {
-                callback.onSuccess(stripCodeFences(responseText));
+                String xml = stripCodeFences(responseText);
+                String issue = validateXml(xml);
+                if (issue != null) {
+                    callback.onFailure("Generated layout was not applied because its XML is invalid: " + issue + " Please retry the request.");
+                    return;
+                }
+                callback.onSuccess(xml);
             }
 
             @Override
@@ -37,8 +48,25 @@ public final class LayoutGenTask {
         });
     }
 
+    private static String validateXml(String xml) {
+        if (xml == null || xml.trim().isEmpty()) return "the response is empty";
+        try {
+            XmlPullParser parser = Xml.newPullParser();
+            parser.setInput(new StringReader(xml));
+            String root = null;
+            int event;
+            while ((event = parser.next()) != XmlPullParser.END_DOCUMENT) {
+                if (event == XmlPullParser.START_TAG && root == null) root = parser.getName();
+            }
+            if (root == null) return "no root element was found";
+            return null;
+        } catch (Exception e) {
+            return e.getMessage() == null ? "XML parsing failed" : e.getMessage();
+        }
+    }
+
     private static String stripCodeFences(String text) {
-        String trimmed = text.trim();
+        String trimmed = text == null ? "" : text.trim();
         if (trimmed.startsWith("```")) {
             int firstNewline = trimmed.indexOf('\n');
             if (firstNewline != -1) trimmed = trimmed.substring(firstNewline + 1);

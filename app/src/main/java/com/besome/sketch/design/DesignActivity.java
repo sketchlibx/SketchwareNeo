@@ -686,8 +686,26 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             SketchwareUtil.toast("Please allow overlay permission");
         }
         fProgress = new FloatingProgressWindow();
+        tryAutoBuildWhenReady();
     }
     
+    private boolean autoBuildScheduled;
+    private volatile boolean projectLoaded;
+
+    private void tryAutoBuildWhenReady() {
+        if (autoBuildScheduled || !projectLoaded || !getIntent().getBooleanExtra("auto_build", false)) return;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) return;
+        autoBuildScheduled = true;
+        // Keep the intent flag until the required overlay permission is available.
+        getIntent().removeExtra("auto_build");
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed() && btnRun != null && currentBuildTask == null) {
+                btnRun.performClick();
+            }
+        }, 650L);
+    }
+
 private void checkAndInitGit() {
         String gitWorkspacePath = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/git_workspace";
         File gitWorkspace = new File(gitWorkspacePath);
@@ -843,6 +861,7 @@ private void checkAndInitGit() {
     @Override
     public void onResume() {
         super.onResume();
+        tryAutoBuildWhenReady();
         if (!isStoragePermissionGranted()) finish();
         long freeMegabytes = GB.c();
         if (freeMegabytes < 100L && freeMegabytes > 0L) warnAboutInsufficientStorageSpace();
@@ -1459,6 +1478,8 @@ if (canceled) return;
                     activity.updateBottomMenu();
                     activity.refresh();
                     activity.h();
+                    activity.projectLoaded = true;
+                    activity.tryAutoBuildWhenReady();
                     if (savedInstanceState == null) {
                         activity.checkForUnsavedProjectData();
                     }

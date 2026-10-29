@@ -41,6 +41,8 @@ public class CustomEndpointProvider implements AiProvider {
     public void sendRequest(AiModelConfig config, String systemPrompt, String userPrompt, AiResponseCallback callback) {
         EXECUTOR.execute(() -> {
             try {
+                if (config == null) throw new IllegalArgumentException("No custom endpoint agent selected.");
+                if (TextUtils.isEmpty(config.modelName)) throw new IllegalArgumentException("Model ID is empty. Enter the model/deployment name expected by this endpoint.");
                 if (TextUtils.isEmpty(config.customEndpoint)) {
                     throw new IllegalArgumentException("Custom endpoint URL is not set");
                 }
@@ -60,7 +62,10 @@ public class CustomEndpointProvider implements AiProvider {
                 JSONObject body = new JSONObject();
                 body.put("model", config.modelName);
                 body.put("messages", messages);
-                body.put("temperature", config.temperature);
+                body.put("temperature", Math.max(0.0, Math.min(2.0, config.temperature)));
+                if (config.maxTokens > 0) body.put("max_tokens", Math.max(128, Math.min(config.maxTokens, 32768)));
+                if (config.topP > 0.0 && config.topP <= 1.0) body.put("top_p", config.topP);
+                body.put("stream", false);
 
                 Map<String, String> headers = new HashMap<>();
                 if (!TextUtils.isEmpty(config.apiKey)) {
@@ -69,15 +74,9 @@ public class CustomEndpointProvider implements AiProvider {
 
                 String response = AiHttpUtil.post(config.customEndpoint, headers, body.toString());
 
-                JSONObject json = new JSONObject(response);
-                String replyText = json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content");
-
-                postSuccess(callback, replyText);
+                postSuccess(callback, AiHttpUtil.extractChatCompletionText(response, "custom endpoint"));
             } catch (Exception e) {
-                postFailure(callback, e.getMessage() != null ? e.getMessage() : "Custom endpoint request failed");
+                postFailure(callback, AiHttpUtil.humanizeError(e, "custom endpoint"));
             }
         });
     }

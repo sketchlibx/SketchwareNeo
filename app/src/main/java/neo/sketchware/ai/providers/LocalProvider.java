@@ -148,7 +148,7 @@ public class LocalProvider implements AiProvider {
         body.put("messages", messages);
 
         JSONObject options = new JSONObject();
-        options.put("temperature", config.temperature);
+        options.put("temperature", Math.max(0.0, Math.min(2.0, config.temperature)));
         if (config.maxTokens > 0) {
             options.put("num_predict", config.maxTokens);
         }
@@ -178,7 +178,7 @@ public class LocalProvider implements AiProvider {
         JSONObject body = new JSONObject();
         body.put("model", config.modelName);
         body.put("messages", messages);
-        body.put("temperature", config.temperature);
+        body.put("temperature", Math.max(0.0, Math.min(2.0, config.temperature)));
         body.put("stream", false);
 
         if (config.maxTokens > 0) {
@@ -197,18 +197,13 @@ public class LocalProvider implements AiProvider {
     }
 
     private String parseResponse(String response, boolean ollama) throws Exception {
-        JSONObject json = new JSONObject(response);
-
         if (ollama) {
+            JSONObject json = new JSONObject(response);
             JSONObject message = json.optJSONObject("message");
             return message != null ? message.optString("content", "") : "";
         }
-
-        JSONArray choices = json.optJSONArray("choices");
-        if (choices == null || choices.length() == 0) return "";
-
-        JSONObject message = choices.getJSONObject(0).optJSONObject("message");
-        return message != null ? message.optString("content", "") : "";
+        // OpenAI-compatible local servers may return either a string or an array of text parts.
+        return AiHttpUtil.extractChatCompletionText(response, "Local AI");
     }
 
     private String normalizeEndpoint(String endpoint) {

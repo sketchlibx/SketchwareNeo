@@ -206,31 +206,93 @@ public final class AiManager {
         testConfig(context, getActiveConfig(context), callback);
     }
 
-    /** Entry point used by existing block/layout/error-generation features. */
+    public enum Feature { GENERAL, CHAT, BLOCKS, LOGIC, LAYOUTS, CUSTOM_BLOCKS, ERROR_FIX }
+
+    /** Entry point used by existing AI features that follow the globally selected agent. */
     public static void sendPrompt(Context context, String systemPrompt, String userPrompt, AiResponseCallback callback) {
+        sendPrompt(context, systemPrompt, userPrompt, Feature.GENERAL, callback);
+    }
+
+    /** Sends through the configured active agent and honours the existing global integration toggle. */
+    public static void sendPrompt(Context context, String systemPrompt, String userPrompt,
+                                  Feature feature, AiResponseCallback callback) {
         if (callback == null) return;
         if (context == null) {
             callback.onFailure("AI context is unavailable.");
             return;
         }
         if (!getPrefs(context).getBoolean("auto_agent", true)) {
-            callback.onFailure("AI integrations are disabled. Enable ‘Use active agent for existing AI generation’ in AI Settings.");
+            callback.onFailure("AI integrations are paused. Enable ‘Use active agent for existing AI generation’ in AI Settings.");
             return;
         }
-        sendPrompt(context, getActiveConfig(context), systemPrompt, userPrompt, callback);
+        sendPrompt(context, getActiveConfig(context), systemPrompt, userPrompt, feature, callback);
     }
 
-    /** Sends a request through the explicitly selected agent rather than silently using the active one. */
+    /** Backwards-compatible explicit-agent entry point. */
     public static void sendPrompt(Context context, AiModelConfig config, String systemPrompt,
                                   String userPrompt, AiResponseCallback callback) {
+        sendPrompt(context, config, systemPrompt, userPrompt, Feature.GENERAL, callback);
+    }
+
+    /** Sends through an explicit agent and enforces its per-feature capabilities. */
+    public static void sendPrompt(Context context, AiModelConfig config, String systemPrompt,
+                                  String userPrompt, Feature feature, AiResponseCallback callback) {
         if (callback == null) return;
-        if (config == null) { callback.onFailure("No AI agent selected. Add or select an agent from AI Agents."); return; }
+        if (context == null) {
+            callback.onFailure("AI context is unavailable.");
+            return;
+        }
+        if (config == null) {
+            callback.onFailure("No AI agent selected. Add or select an agent from AI Agents.");
+            return;
+        }
         AiProvider provider = AiProviderRegistry.get(config.providerId);
-        if (provider == null) { callback.onFailure("Unknown AI provider: " + config.providerId); return; }
-        if (userPrompt == null || userPrompt.trim().isEmpty()) { callback.onFailure("Enter a message to send."); return; }
+        if (provider == null) {
+            callback.onFailure("Unknown AI provider: " + config.providerId + ". Edit this agent and choose a supported provider.");
+            return;
+        }
+        if (userPrompt == null || userPrompt.trim().isEmpty()) {
+            callback.onFailure("Enter a message to send.");
+            return;
+        }
+        if (!isFeatureEnabled(config, feature)) {
+            callback.onFailure(featureLabel(feature) + " is disabled for this agent. Open Edit Agent → Advanced options and enable it, or select another agent.");
+            return;
+        }
+
         String agentPrompt = config.systemPrompt == null ? "" : config.systemPrompt.trim();
         String basePrompt = systemPrompt == null ? "" : systemPrompt.trim();
-        String mergedSystem = agentPrompt.isEmpty() ? basePrompt : (basePrompt.isEmpty() ? agentPrompt : agentPrompt + "\n\n" + basePrompt);
-        provider.sendRequest(config, mergedSystem, userPrompt, callback);
+        String mergedSystem = agentPrompt.isEmpty() ? basePrompt
+                : (basePrompt.isEmpty() ? agentPrompt : agentPrompt + "\n\n" + basePrompt);
+        String safeSystem = AiPromptOptimizer.optimizeSystem(mergedSystem);
+        String safeUser = AiPromptOptimizer.optimizeUser(userPrompt);
+        provider.sendRequest(config, safeSystem, safeUser, callback);
     }
+
+    private static boolean isFeatureEnabled(AiModelConfig config, Feature feature) {
+        if (feature == null || feature == Feature.GENERAL) return true;
+        switch (feature) {
+            case CHAT: return config.enableChat;
+            case BLOCKS: return config.enableBlocks;
+            case LOGIC: return config.enableLogic;
+            case LAYOUTS: return config.enableLayouts;
+            case CUSTOM_BLOCKS: return config.enableCustomBlocks;
+            case ERROR_FIX: return config.enableErrorFix;
+            default: return true;
+        }
+    }
+
+    private static String featureLabel(Feature feature) {
+        if (feature == null) return "This feature";
+        switch (feature) {
+            case CHAT: return "Chat and explanations";
+            case BLOCKS: return "Block generation";
+            case LOGIC: return "Event logic generation";
+            case LAYOUTS: return "Layout generation";
+            case CUSTOM_BLOCKS: return "Custom block generation";
+            case ERROR_FIX: return "Build error fixing";
+            default: return "This feature";
+        }
+    }
+
 }

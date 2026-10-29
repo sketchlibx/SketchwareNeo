@@ -40,6 +40,9 @@ public class NvidiaProvider implements AiProvider {
     public void sendRequest(AiModelConfig config, String systemPrompt, String userPrompt, AiResponseCallback callback) {
         EXECUTOR.execute(() -> {
             try {
+                if (config == null) throw new IllegalArgumentException("No NVIDIA NIM agent selected.");
+                if (config.apiKey == null || config.apiKey.trim().isEmpty()) throw new IllegalArgumentException("NVIDIA API key is missing. Add an API key from NVIDIA's developer console.");
+                if (config.modelName == null || config.modelName.trim().isEmpty()) throw new IllegalArgumentException("NVIDIA model ID is empty. Enter an enabled NIM model ID.");
                 JSONObject systemMessage = new JSONObject();
                 systemMessage.put("role", "system");
                 systemMessage.put("content", systemPrompt);
@@ -55,7 +58,8 @@ public class NvidiaProvider implements AiProvider {
                 JSONObject body = new JSONObject();
                 body.put("model", config.modelName);
                 body.put("messages", messages);
-                body.put("temperature", config.temperature);
+                body.put("temperature", Math.max(0.0, Math.min(1.0, config.temperature)));
+                if (config.maxTokens > 0) body.put("max_tokens", Math.max(128, Math.min(config.maxTokens, 32768)));
                 body.put("stream", false);
 
                 Map<String, String> headers = new HashMap<>();
@@ -63,15 +67,9 @@ public class NvidiaProvider implements AiProvider {
 
                 String response = AiHttpUtil.post("https://integrate.api.nvidia.com/v1/chat/completions", headers, body.toString());
 
-                JSONObject json = new JSONObject(response);
-                String content = json.getJSONArray("choices")
-                        .getJSONObject(0)
-                        .getJSONObject("message")
-                        .getString("content");
-
-                postSuccess(callback, content);
+                postSuccess(callback, AiHttpUtil.extractChatCompletionText(response, "NVIDIA NIM"));
             } catch (Exception e) {
-                postFailure(callback, e.getMessage() != null ? e.getMessage() : "NVIDIA NIM request failed");
+                postFailure(callback, AiHttpUtil.humanizeError(e, "NVIDIA NIM"));
             }
         });
     }

@@ -40,6 +40,7 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
     public static final String EXTRA_RESULT_BLOCKS_JSON = "resultBlocksJson";
 
     private static final int CHUNK_SIZE = 4;
+    private static final int MAX_AUTO_CHUNK_RETRIES = 1;
 
     private enum Stage { PREPARING, PLANNING, GENERATING, VALIDATING, PREVIEW, ERROR }
 
@@ -67,6 +68,8 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
     private List<List<BlockPlanEntry>> chunks;
     private int currentChunkIndex;
     private String lastPlanJson;
+    private int currentChunkAttempts = 0;
+    private String currentChunkRepairHint;
 
     private final List<JSONObject> validBlocks = new ArrayList<>();
     private final List<String> invalidReports = new ArrayList<>();
@@ -119,6 +122,16 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
     }
 
     private void startPipeline() {
+        validBlocks.clear();
+        invalidReports.clear();
+        allGeneratedNames.clear();
+        checkedNames.clear();
+        plan = null;
+        chunks = null;
+        currentChunkIndex = 0;
+        currentChunkAttempts = 0;
+        currentChunkRepairHint = null;
+        lastPlanJson = null;
         showStage(Stage.PREPARING, "Preparing request...", null);
         showStage(Stage.PLANNING, "Understanding the SDK and planning the blocks needed...", null);
 
@@ -128,7 +141,11 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
                 if (cancelled) return;
                 try {
                     plan = BlockPlanEntry.parse(responseText);
-                    lastPlanJson = responseText;
+                    String normalizedPlan = responseText == null ? "" : responseText.trim();
+                    int planStart = normalizedPlan.indexOf('{');
+                    int planEnd = normalizedPlan.lastIndexOf('}');
+                    lastPlanJson = planStart >= 0 && planEnd >= planStart
+                            ? normalizedPlan.substring(planStart, planEnd + 1) : normalizedPlan;
                     if (plan.entries.isEmpty()) {
                         showError("AI didn't plan any blocks. Try describing the request differently.", BlockGenerationActivity.this::retryPlanning);
                         return;
@@ -169,7 +186,7 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
 
     private void generateNextChunk() {
         if (cancelled) return;
-        if (currentChunkIndex >= chunks.size()) {
+        if (chunks == null || currentChunkIndex >= chunks.size()) {
             finalizeAndShowPreview();
             return;
         }
@@ -202,7 +219,7 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
         Set<String> namesToAvoid = new HashSet<>(existingNames);
         namesToAvoid.addAll(allGeneratedNames);
 
-        MultiBlockGenTask.generateChunk(this, lastPlanJson, chunkJson.toString(), String.join(", ", namesToAvoid), new AiResponseCallback() {
+        MultiBlockGenTask.generateChunk(this, lastPlanJson, chunkJson.toString(), String.join(", ", namesToAvoid), currentChunkRepairHint, new AiResponseCallback() {
             @Override
             public void onSuccess(String responseText) {
                 if (cancelled) return;
@@ -213,65 +230,126 @@ public class BlockGenerationActivity extends BaseAppCompatActivity {
             public void onFailure(String errorMessage) {
                 if (cancelled) return;
                 showError("Generating batch " + (currentChunkIndex + 1) + "/" + totalChunks + " failed: " + errorMessage,
-                        BlockGenerationActivity.this::generateNextChunk);
+                        BlockGenerationActivity.this::retryCurrentChunkManually);
             }
         });
     }
 
     private void processChunkResponse(String responseText, List<BlockPlanEntry> chunk) {
-        String jsonText = responseText.trim();
+        String jsonText = responseText == null ? "" : responseText.trim();
         int start = jsonText.indexOf('{');
         int end = jsonText.lastIndexOf('}');
         if (start == -1 || end == -1 || end < start) {
-            invalidReports.add("Batch " + (currentChunkIndex + 1) + ": AI response wasn't valid JSON, batch skipped");
-            currentChunkIndex++;
-            generateNextChunk();
+            retryOrSkipChunk("The response did not contain a JSON object.");
             return;
         }
-        JSONArray blocksArray;
+
+        final JSONArray blocksArray;
         try {
             JSONObject root = new JSONObject(jsonText.substring(start, end + 1));
             blocksArray = root.getJSONArray("blocks");
         } catch (JSONException e) {
-            invalidReports.add("Batch " + (currentChunkIndex + 1) + ": didn't match {\"blocks\":[...]}, batch skipped");
-            currentChunkIndex++;
-            generateNextChunk();
+            retryOrSkipChunk("The response must match {\"blocks\":[...]}; the JSON could not be parsed.");
             return;
         }
 
         Map<String, BlockPlanEntry> byName = new HashMap<>();
         for (BlockPlanEntry e : chunk) byName.put(e.name, e);
 
-        for (int i = 0; i < blocksArray.length(); i++) {
-            JSONObject b;
-            try {
-                b = blocksArray.getJSONObject(i);
-            } catch (JSONException e) {
-                invalidReports.add("Batch " + (currentChunkIndex + 1) + " item " + (i + 1) + ": not a JSON object");
-                continue;
-            }
-            String name = b.optString("name", "");
-            BlockPlanEntry planEntry = byName.get(name);
-            GeneratedBlockValidator.Result result = GeneratedBlockValidator.validate(b, planEntry, existingNames, allGeneratedNames);
-            if (!result.ok) {
-                invalidReports.add((name.isEmpty() ? "Unnamed block" : name) + ": " + result.error);
-                continue;
-            }
-            validBlocks.add(b);
-            allGeneratedNames.add(name);
+        List<JSONObject> stagedBlocks = new ArrayList<>();
+        List<String> issues = new ArrayList<>();
+        Set<String> stagedNames = new HashSet<>(allGeneratedNames);
+        Set<String> returnedNames = new HashSet<>();
+        Set<String> acceptedPlannedNames = new HashSet<>();
 
-            if (planEntry != null && planEntry.exposesValueName != null) {
+        for (int i = 0; i < blocksArray.length(); i++) {
+            JSONObject block;
+            try {
+                block = blocksArray.getJSONObject(i);
+            } catch (JSONException e) {
+                issues.add("Item " + (i + 1) + " was not a JSON object.");
+                continue;
+            }
+
+            String name = block.optString("name", "").trim();
+            BlockPlanEntry planEntry = byName.get(name);
+            if (planEntry == null) {
+                issues.add(name.isEmpty() ? "An unnamed/unplanned block was returned." : "Unexpected block returned: " + name);
+                continue;
+            }
+            if (!returnedNames.add(name)) {
+                issues.add("Duplicate block returned: " + name);
+                continue;
+            }
+
+            GeneratedBlockValidator.Result validation = GeneratedBlockValidator.validate(block, planEntry, existingNames, stagedNames);
+            if (!validation.ok) {
+                issues.add(name + ": " + validation.error);
+                continue;
+            }
+
+            stagedNames.add(name);
+            stagedBlocks.add(block);
+            acceptedPlannedNames.add(name);
+
+            if (planEntry.exposesValueName != null && !stagedNames.contains(planEntry.exposesValueName)
+                    && !existingNames.contains(planEntry.exposesValueName)) {
                 try {
-                    JSONObject getter = GeneratedBlockValidator.buildValueGetterBlock(planEntry, b.optString("color", "#4A90D9"));
-                    if (!allGeneratedNames.contains(planEntry.exposesValueName) && !existingNames.contains(planEntry.exposesValueName)) {
-                        validBlocks.add(getter);
-                        allGeneratedNames.add(planEntry.exposesValueName);
-                    }
-                } catch (JSONException ignored) {}
+                    JSONObject getter = GeneratedBlockValidator.buildValueGetterBlock(planEntry, block.optString("color", "#4A90D9"));
+                    stagedBlocks.add(getter);
+                    stagedNames.add(planEntry.exposesValueName);
+                } catch (JSONException ignored) {
+                    issues.add("Could not create the value getter for " + name + ".");
+                }
             }
         }
 
+        List<String> missing = new ArrayList<>();
+        for (BlockPlanEntry entry : chunk) {
+            if (!acceptedPlannedNames.contains(entry.name)) missing.add(entry.name);
+        }
+        if (!missing.isEmpty()) issues.add("Missing or invalid planned block(s): " + String.join(", ", missing));
+
+        // Do not partially commit a malformed chunk before its single repair attempt. Otherwise
+        // retried valid items would be rejected as duplicates and could never be recovered.
+        if (!issues.isEmpty() && currentChunkAttempts < MAX_AUTO_CHUNK_RETRIES) {
+            retryOrSkipChunk(String.join("; ", issues));
+            return;
+        }
+
+        if (!issues.isEmpty()) {
+            invalidReports.add("Batch " + (currentChunkIndex + 1) + " after retry: " + String.join("; ", issues));
+        }
+        for (JSONObject block : stagedBlocks) {
+            validBlocks.add(block);
+            String name = block.optString("name", "");
+            if (!name.isEmpty()) allGeneratedNames.add(name);
+        }
+
         currentChunkIndex++;
+        currentChunkAttempts = 0;
+        currentChunkRepairHint = null;
+        generateNextChunk();
+    }
+
+    private void retryOrSkipChunk(String reason) {
+        if (currentChunkAttempts < MAX_AUTO_CHUNK_RETRIES) {
+            currentChunkAttempts++;
+            currentChunkRepairHint = "The previous attempt failed validation: " + reason;
+            textDetail.setText("Repairing batch " + (currentChunkIndex + 1) + " of " + (chunks == null ? 0 : chunks.size()) + "…\nOnly valid JSON and all requested blocks will be accepted.");
+            generateNextChunk();
+            return;
+        }
+        invalidReports.add("Batch " + (currentChunkIndex + 1) + " skipped after one repair attempt: " + reason);
+        currentChunkIndex++;
+        currentChunkAttempts = 0;
+        currentChunkRepairHint = null;
+        generateNextChunk();
+    }
+
+    private void retryCurrentChunkManually() {
+        currentChunkAttempts = 0;
+        currentChunkRepairHint = null;
         generateNextChunk();
     }
 

@@ -101,7 +101,12 @@ public class AiModelEditActivity extends BaseAppCompatActivity {
         
         binding.buttonSave.setOnClickListener(v -> save());
         binding.buttonTestConnection.setOnClickListener(v -> testConnection());
-        
+        binding.buttonAdvancedOptions.setOnClickListener(v -> {
+            boolean expand = binding.layoutAdvancedOptions.getVisibility() != View.VISIBLE;
+            binding.layoutAdvancedOptions.setVisibility(expand ? View.VISIBLE : View.GONE);
+            binding.buttonAdvancedOptions.setText(expand ? "Hide advanced options" : "Advanced options (optional)");
+        });
+
         binding.buttonModeLocal.setOnClickListener(v -> selectProviderType(true));
         binding.buttonModeCloud.setOnClickListener(v -> selectProviderType(false));
     }

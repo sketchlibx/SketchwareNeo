@@ -55,8 +55,9 @@ public final class BlockPlanTask {
             "\"exposesValue\" = for a \"callback\" that reports a result value back to the user (e.g. an " +
             "error message, a loaded object, a parsed string) - name the value and its Java type. Most " +
             "callbacks (e.g. a plain \"ad closed\" event) have no value to expose - use null. " +
-            "Keep the plan to exactly the blocks actually needed - do not pad, do not omit a real " +
-            "callback the SDK has. A typical ads SDK integration needs roughly: 1 init + " +
+            "Keep the plan compact for free-tier API quotas: prefer the core requested API surface and " +
+            "cap one plan at 32 high-value blocks. Do not pad, but include the real callbacks needed " +
+            "for the requested integration. A typical ads SDK integration needs roughly: 1 init + " +
             "(1 action + 1 listener_wrapper + 2-5 callbacks) per ad type it supports. A parsing/data " +
             "library typically needs no listener_wrapper/callback at all - just \"action\" blocks.";
 
@@ -68,6 +69,6 @@ public final class BlockPlanTask {
             prompt.append("Library/SDK/API or topic: ").append(libraryOrTopic.trim()).append("\n\n");
         }
         prompt.append(userPrompt);
-        AiManager.sendPrompt(context, SYSTEM_PROMPT, prompt.toString(), callback);
+        AiManager.sendPrompt(context, SYSTEM_PROMPT, prompt.toString(), AiManager.Feature.BLOCKS, callback);
     }
 }

@@ -40,6 +40,9 @@ public class ClaudeProvider implements AiProvider {
     public void sendRequest(AiModelConfig config, String systemPrompt, String userPrompt, AiResponseCallback callback) {
         EXECUTOR.execute(() -> {
             try {
+                if (config == null) throw new IllegalArgumentException("No Claude agent selected.");
+                if (config.apiKey == null || config.apiKey.trim().isEmpty()) throw new IllegalArgumentException("Anthropic API key is missing. Edit the agent and add an API key.");
+                if (config.modelName == null || config.modelName.trim().isEmpty()) throw new IllegalArgumentException("Claude model ID is empty. Enter a model ID supported by your API account.");
                 JSONObject userMessage = new JSONObject();
                 userMessage.put("role", "user");
                 userMessage.put("content", userPrompt);
@@ -49,12 +52,12 @@ public class ClaudeProvider implements AiProvider {
 
                 JSONObject body = new JSONObject();
                 body.put("model", config.modelName);
-                body.put("max_tokens", 4096);
+                body.put("max_tokens", Math.max(128, Math.min(config.maxTokens > 0 ? config.maxTokens : 4096, 32768)));
                 body.put("system", systemPrompt);
                 body.put("messages", messages);
                 // Anthropic's Messages API only accepts temperature in [0.0, 1.0], unlike our
                 // Settings UI's 0.0-2.0 range - clamp so a value above 1.0 doesn't fail the request.
-                body.put("temperature", Math.min(config.temperature, 1.0));
+                body.put("temperature", Math.max(0.0, Math.min(config.temperature, 1.0)));
 
                 Map<String, String> headers = new HashMap<>();
                 headers.put("x-api-key", config.apiKey);
@@ -63,13 +66,18 @@ public class ClaudeProvider implements AiProvider {
                 String response = AiHttpUtil.post("https://api.anthropic.com/v1/messages", headers, body.toString());
 
                 JSONObject json = new JSONObject(response);
-                String replyText = json.getJSONArray("content")
-                        .getJSONObject(0)
-                        .getString("text");
-
-                postSuccess(callback, replyText);
+                JSONArray contentBlocks = json.optJSONArray("content");
+                StringBuilder reply = new StringBuilder();
+                if (contentBlocks != null) {
+                    for (int i = 0; i < contentBlocks.length(); i++) {
+                        JSONObject block = contentBlocks.optJSONObject(i);
+                        if (block != null && "text".equals(block.optString("type", "text"))) reply.append(block.optString("text", ""));
+                    }
+                }
+                if (reply.toString().trim().isEmpty()) throw new java.io.IOException("Claude returned no readable text. Check model access and output token settings.");
+                postSuccess(callback, reply.toString().trim());
             } catch (Exception e) {
-                postFailure(callback, e.getMessage() != null ? e.getMessage() : "Claude request failed");
+                postFailure(callback, AiHttpUtil.humanizeError(e, "Claude"));
             }
         });
     }

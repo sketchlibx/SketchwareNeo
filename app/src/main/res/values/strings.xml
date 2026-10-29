@@ -2380,4 +2380,9 @@ Please try again later"</string>
     <string name="design_library_description_google_billing">Use Google Play In app purchase</string>
     <string name="design_library_message_google_billing">Requirements: Google Play Billing Library requires minSdk 23. Product IDs must match Play Console.\nDebug blocks show only a sanitized response code/message; purchase tokens are not exposed in blocks or event parameters.</string>
     <string name="component_description_google_billing">Google Play Billing component for product queries, purchase flows, and purchase management.</string>
+    <string name="ai_chat_history">Chat history</string>
+    <string name="ai_chat_clear">Clear current chat</string>
+    <string name="ai_chat_attach">Attach a text file</string>
+    <string name="ai_chat_mic">Dictate message</string>
+    <string name="ai_chat_send">Send message or stop generation</string>
 </resources>

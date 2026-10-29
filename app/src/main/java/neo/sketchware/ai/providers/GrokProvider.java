@@ -31,26 +31,24 @@ public class GrokProvider implements AiProvider {
     @Override public void sendRequest(AiModelConfig config, String systemPrompt, String userPrompt, AiResponseCallback callback) {
         EXECUTOR.execute(() -> {
             try {
+                if (config == null) throw new IllegalArgumentException("No Grok agent selected.");
+                if (config.apiKey == null || config.apiKey.trim().isEmpty()) throw new IllegalArgumentException("xAI API key is missing. Edit the agent and add an API key.");
+                if (config.modelName == null || config.modelName.trim().isEmpty()) throw new IllegalArgumentException("Grok model ID is empty. Enter a model ID supported by your xAI account.");
                 JSONObject body = new JSONObject();
-                body.put("model", TextUtils.isEmpty(config.modelName) ? "grok-4.7" : config.modelName);
+                body.put("model", config.modelName.trim());
                 JSONArray messages = new JSONArray();
                 JSONObject system = new JSONObject(); system.put("role", "system"); system.put("content", systemPrompt); messages.put(system);
                 JSONObject user = new JSONObject(); user.put("role", "user"); user.put("content", userPrompt); messages.put(user);
                 body.put("messages", messages);
-                body.put("temperature", config.temperature);
-                if (config.maxTokens > 0) body.put("max_tokens", config.maxTokens);
+                body.put("temperature", Math.max(0.0, Math.min(2.0, config.temperature)));
+                if (config.maxTokens > 0) body.put("max_tokens", Math.max(128, Math.min(config.maxTokens, 32768)));
                 if (config.topP > 0 && config.topP <= 1) body.put("top_p", config.topP);
                 Map<String,String> headers = new HashMap<>(); headers.put("Authorization", "Bearer " + config.apiKey);
                 String response = AiHttpUtil.post(ENDPOINT, headers, body.toString());
-                JSONObject json = new JSONObject(response);
-                JSONArray choices = json.optJSONArray("choices");
-                if (choices == null || choices.length() == 0) throw new IllegalStateException("Grok returned no choices");
-                JSONObject message = choices.getJSONObject(0).optJSONObject("message");
-                String content = message == null ? "" : message.optString("content", "");
-                if (TextUtils.isEmpty(content)) throw new IllegalStateException("Grok returned an empty response");
+                String content = AiHttpUtil.extractChatCompletionText(response, "Grok");
                 MAIN_HANDLER.post(() -> callback.onSuccess(content));
             } catch (Exception e) {
-                MAIN_HANDLER.post(() -> callback.onFailure(TextUtils.isEmpty(e.getMessage()) ? "Grok request failed" : e.getMessage()));
+                MAIN_HANDLER.post(() -> callback.onFailure(AiHttpUtil.humanizeError(e, "Grok")));
             }
         });
     }

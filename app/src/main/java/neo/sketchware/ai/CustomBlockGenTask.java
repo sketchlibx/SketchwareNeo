@@ -2,6 +2,11 @@ package neo.sketchware.ai;
 
 import android.content.Context;
 
+import org.json.JSONObject;
+
+import java.util.HashSet;
+import java.util.Set;
+
 public final class CustomBlockGenTask {
 
     private static final String SYSTEM_PROMPT =
@@ -26,16 +31,19 @@ public final class CustomBlockGenTask {
             "and more predictable. " +
             "Spec syntax for parameters (place these inline in the spec text where that parameter's input " +
             "socket should appear): %s = string input socket, %b = boolean input socket, %d = number input " +
-            "socket, %s.inputOnly = plain inline text field with no plug (not a socket for another block). " +
+            "socket, %f = decimal input socket, %i = integer input socket, %s.inputOnly = plain inline text field with no plug (not a socket for another block). " +
             "For a special typed socket use %m.<kind> where <kind> is one of: varMap, view, textview, edittext, " +
             "imageview, listview, list, listMap, listStr, listInt, intent, color, activity, resource, " +
             "customViews, layout, anim, drawable, ResString. Every %m must be immediately followed by a dot and " +
             "one of those exact kinds - never a bare %m. " +
-            "The code field is a Java code template using the SAME placeholder tokens (%s, %b, %d) in the same " +
-            "left-to-right order as they appear in spec - each placeholder in code will be substituted with the " +
-            "actual value/expression the user plugs into that socket at that position when the project builds. " +
-            "Keep the code minimal, correct Java, and make sure the number and order of %s/%b/%d placeholders in " +
-            "code matches the number and order of %s/%b/%d sockets in spec exactly.";
+            "The code field is a Java code template processed by String.format with Java EXPRESSION TEXT as its " +
+            "arguments. Therefore use %s in code for EVERY input socket in the same left-to-right order, regardless " +
+            "of whether the spec socket is %s, %b, %d, %f, %i, %s.inputOnly, or typed %m.<kind>. Never use %b or %d in " +
+            "the code template: those format the expression text itself and break generated Java. For type 'c', " +
+            "append exactly one additional %s placeholder for its inner stack; for type 'e', append two %s stack " +
+            "placeholders after all spec inputs. Use no stack placeholders for other types. Do not put literal " +
+            "formatter tokens inside Java string literals. Keep the code minimal, correct Java, and match the exact " +
+            "placeholder count/order required by the spec and block type.";
 
     private CustomBlockGenTask() {}
 
@@ -46,6 +54,29 @@ public final class CustomBlockGenTask {
                     .append(existingBlockNames);
         }
 
-        AiManager.sendPrompt(context, SYSTEM_PROMPT, fullPrompt.toString(), callback);
+        AiManager.sendPrompt(context, SYSTEM_PROMPT, fullPrompt.toString(), AiManager.Feature.CUSTOM_BLOCKS, new AiResponseCallback() {
+            @Override public void onSuccess(String responseText) {
+                try {
+                    String jsonText = responseText == null ? "" : responseText.trim();
+                    int start = jsonText.indexOf('{');
+                    int end = jsonText.lastIndexOf('}');
+                    if (start < 0 || end < start) throw new org.json.JSONException("No JSON object was returned.");
+                    JSONObject block = new JSONObject(jsonText.substring(start, end + 1));
+                    Set<String> existing = new HashSet<>();
+                    if (existingBlockNames != null) {
+                        for (String name : existingBlockNames.split("[,\\s]+")) if (!name.trim().isEmpty()) existing.add(name.trim());
+                    }
+                    GeneratedBlockValidator.Result validation = GeneratedBlockValidator.validate(block, null, existing, new HashSet<String>());
+                    if (!validation.ok) {
+                        callback.onFailure("Generated block failed validation: " + validation.error + ". Try a simpler block request.");
+                        return;
+                    }
+                    callback.onSuccess(block.toString());
+                } catch (Exception e) {
+                    callback.onFailure("AI returned an invalid block definition: " + (e.getMessage() == null ? "invalid JSON" : e.getMessage()));
+                }
+            }
+            @Override public void onFailure(String errorMessage) { callback.onFailure(errorMessage); }
+        });
     }
 }
