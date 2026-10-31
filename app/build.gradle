@@ -17,7 +17,7 @@ android {
         //noinspection ExpiredTargetSdkVersion since we don't target getting Sketchware Neo on Google Play.
         targetSdk = 28
         minSdk = 26
-        versionCode = 160
+        versionCode = 161
         versionName = "v7.0.1"
 
         buildConfigField("String", "GIT_HASH", "\"${gitCommitHash}\"")
@@ -84,6 +84,10 @@ android {
         exclude group: "org.jetbrains.kotlin", module: "kotlin-scripting-jvm"
         exclude group: "org.jetbrains.kotlin", module: "kotlin-script-runtime"
     }
+}
+
+configurations.configureEach {
+    resolutionStrategy.force("org.eclipse.jdt:ecj:3.32.0")
 }
 
 dependencies {

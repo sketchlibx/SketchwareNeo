@@ -30,15 +30,6 @@
             android:layout_marginTop="4dp"
             android:text="Either enter a hex color code or pick a color from the list below." />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="14dp"
-            android:layout_marginTop="6dp"
-            android:text="Custom colors are saved in .sketchware/resources/colors/colors.xml"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
-
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

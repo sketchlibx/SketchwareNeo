@@ -676,7 +676,7 @@ public class ProjectBuilder {
                 String diagnostic = "Java compiler crashed with a LinkageError (" + hostRuntimeMismatch.getMessage()
                         + ") instead of compiling. This means the bundled 'ecj' library version requires "
                         + "a real desktop JDK to run and is incompatible with Android's runtime — pin "
-                        + "org.eclipse.jdt:ecj to an older version (3.33.0 or earlier) in libs_versions.toml.";
+                        + "org.eclipse.jdt:ecj to version 3.32.0 in gradle/libs.versions.toml.";
                 LogUtil.e(TAG, diagnostic, hostRuntimeMismatch);
                 broadcastBuildOutput(diagnostic);
                 throw new zy(diagnostic);
