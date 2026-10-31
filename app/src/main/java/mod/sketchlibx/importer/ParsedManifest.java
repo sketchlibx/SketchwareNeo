@@ -46,6 +46,7 @@ public class ParsedManifest {
 
         public String rawClassName;
         public String simpleClassName;
+        public String qualifiedClassName;
         public boolean exported = false;
         public String permission = "";
 
@@ -72,6 +73,9 @@ public class ParsedManifest {
          * e.g. ".MainActivity" + "com.example" → "MainActivity"
          */
         public String simpleClassName;
+
+        /** Fully-qualified name resolved against the manifest package. */
+        public String qualifiedClassName;
 
         /**
          * android:screenOrientation value, raw string from manifest.

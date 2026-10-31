@@ -56,71 +56,25 @@ import pro.sketchware.activities.editor.gradle.CustomGradleBuildManager;
 import pro.sketchware.utility.SketchwareUtil;
 
 /**
- * Main entry point for the Android Studio → Sketchware Neo import pipeline.
+ * Imports an Android Studio project into Sketchware Neo. The pipeline extracts and
+ * checks the ZIP, reads the manifest and Gradle files, imports source and layouts,
+ * writes the project, then copies resources, assets and native files.
  *
- * Orchestration order (no step starts until the previous one succeeds):
- *
- * [1]  Extract ZIP to temp directory
- * [2]  Detect project root + app module   (ModuleDetector)
- * [3]  Validate structure                 (ImportValidator)
- * [4]  Parse AndroidManifest.xml          (ManifestParser)
- * [5]  Parse build.gradle / kts           (GradleParser)
- * [6]  Classify source files              (SourceClassifier)
- * [7]  Import layout XML → view/file data (LayoutImporter)
- * [8]  Detect libraries                   (LibraryDetector)
- * [9]  Write all Sketchware project files (SketchwareWriter)
- * [10] Map resources                      (ResourceMapper) — runs AFTER [9]
- *      because it needs the sc_id-derived destination paths that
- *      SketchwareWriter.write() creates; any resulting corrections to the
- *      already-written project go through SketchwareWriter.patchIconFlags()
- *      / patchResourceData() — never raw a.a.a.lC / a.a.a.oB calls here.
- * [11] Copy source files to data/<id>/files/java/
- * [12] Copy assets/
- * [13] Copy native libs (if any)
- * [14] Copy local .aar / .jar
- * [15] Cleanup temp directory
- *
- * Atomicity guarantee:
- * SketchwareWriter.write() is the ONLY step that performs the initial
- * project write. If it throws, SketchwareWriter.rollback() removes any
- * partially-written files before this task reports failure. Any later
- * correction to the written project (icon flags, resource data) goes
- * through SketchwareWriter's dedicated patch* methods, so it remains the
- * single owner of the Sketchware project store end-to-end.
- * No existing Sketchware project is ever touched.
- *
- * sc_id isolation:
- * lC.b() (called inside SketchwareWriter) reads the existing project list
- * and always returns max(existing_ids) + 1. Confirmed from lC.java source.
- *
- * Resource path methods (IMPORTANT — confirmed from wq.java source):
- * wq's single-letter field names do NOT correspond to the same-letter
- * accessor methods. The correct accessors are:
- *   images → wq.g()   sounds → wq.t()   fonts → wq.d()
- * (wq.n() resolves to the mysc/list project-registry root, NOT images —
- * do not use it for resource paths.)
- *
- * Usage:
- * new ASProjectImporter(context, zipPath, new ASProjectImporter.Callback() {
- *     public void onProgress(String message)       { ... }
- *     public void onSuccess(String scId)           { ... }
- *     public void onFailure(String reason)         { ... }
- * }).execute();
- *
- * For verbose debug logging, use the three-argument showPicker() which
- * prompts the user before starting. Alternatively construct directly:
- * new ASProjectImporter(context, zipPath, ImportLogger.create(true), callback).execute();
+ * SketchwareWriter owns the initial write and rollback. Later resource changes use
+ * its patch methods. Resource paths must use wq.g() for images, wq.t() for sounds
+ * and wq.d() for fonts; wq.n() is the project registry path. New project IDs are
+ * assigned by the existing project store. Existing projects are not modified.
  */
 public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter.Result> {
 
-    // ── Version ───────────────────────────────────────────────────────────────
+     
 
     /** Bumped here so the verbose log header always shows the correct version. */
     static final String IMPORTER_VERSION = "2.0.0";
 
     private static final String TAG = "ASProjectImporter";
 
-    // ── Callback interface ─────────────────────────────────────────────────────
+     
 
     public interface Callback {
         /** Called on UI thread with human-readable progress messages. */
@@ -136,7 +90,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         void onFailure(String reason);
     }
 
-    // ── Result carrier (internal) ─────────────────────────────────────────────
+     
 
     static class Result {
         final boolean success;
@@ -147,7 +101,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         Result(String r, boolean f)  { this.success = false; this.scId = null; this.failReason = r; }
     }
 
-    // ── Fields ────────────────────────────────────────────────────────────────
+     
 
     private final Context      context;
     private final String       zipFilePath;
@@ -161,15 +115,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
     /** Writer instance kept so rollback() can be called on failure. */
     private SketchwareWriter writer;
 
-    // ── Static Helper: File Picker & UI ───────────────────────────────────────
+     
 
-    /**
-     * Shows the file picker. After the user selects a ZIP, shows the
-     * "Enable Verbose Logging?" dialog before starting the import.
-     *
-     * The pipeline behaviour is completely unaffected by logging — only
-     * diagnostic output is added.
-     */
+    /** Shows the ZIP picker and asks whether to enable verbose logging before import. */
     public static void showPicker(Activity activity, ProjectsFragment fragment) {
         FilePickerOptions options = new FilePickerOptions();
         options.setExtensions(new String[]{"zip"});
@@ -197,10 +145,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 .show(fragment.getChildFragmentManager(), "filePicker");
     }
 
-    /**
-     * Internal: boots the import after the verbose-logging decision is made.
-     * Exists only to avoid duplicating the progress-dialog + callback wiring.
-     */
+    /** Starts the import after the logging choice, without duplicating callback setup. */
     private static void startImport(Activity activity, ProjectsFragment fragment,
                                     File zipFile, ImportLogger log) {
 
@@ -243,7 +188,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }).execute();
     }
 
-    // ── Constructors ──────────────────────────────────────────────────────────
+     
 
     /** Original constructor. Verbose logging is disabled. Existing callers unaffected. */
     public ASProjectImporter(Context context, String zipFilePath, Callback callback) {
@@ -266,7 +211,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         this.options = options == null ? new ImportOptions() : options.copy();
     }
 
-    // ── AsyncTask lifecycle ───────────────────────────────────────────────────
+     
 
     @Override
     protected Result doInBackground(Void... voids) {
@@ -311,11 +256,11 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         else                callback.onFailure(result.failReason);
     }
 
-    // ── Pipeline ──────────────────────────────────────────────────────────────
+     
 
     private Result runPipeline() throws Exception {
 
-        // ── [1] Extract ZIP ───────────────────────────────────────────────────
+         
         progress("Extracting project ZIP...");
         logger.step(1, "Extract ZIP");
         File zipFile = new File(zipFilePath);
@@ -334,7 +279,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.info("Temp dir          : " + tempDir.getAbsolutePath());
         logger.stepDone(true);
 
-        // ── [2] Detect module ─────────────────────────────────────────────────
+         
         progress("Detecting project structure...");
         logger.step(2, "Detect Module");
         ModuleDetector detector = new ModuleDetector();
@@ -353,7 +298,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         File appModuleDir = detection.appModuleDir;
         File srcMain      = new File(appModuleDir, "src/main");
 
-        // ── [3] Validate ──────────────────────────────────────────────────────
+         
         progress("Validating project structure...");
         logger.step(3, "Validate");
         ImportValidator validator = new ImportValidator();
@@ -368,7 +313,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.info("java sources        \u2714");
         logger.stepDone(true);
 
-        // ── [4] Parse manifest ────────────────────────────────────────────────
+         
         progress("Parsing AndroidManifest.xml...");
         logger.step(4, "Parse AndroidManifest.xml");
         ManifestParser manifestParser = new ManifestParser(srcMain);
@@ -386,7 +331,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         Log.d(TAG, "Package: " + manifest.packageName
                 + ", Activities: " + manifest.activities.size());
 
-        // ── [5] Parse gradle ──────────────────────────────────────────────────
+         
         progress("Parsing build configuration...");
         logger.step(5, "Parse build.gradle");
         GradleParser gradleParser = new GradleParser();
@@ -424,7 +369,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.info("Local Libs      : " + gradle.localLibPaths.size());
         logger.stepDone(true);
 
-        // ── [6] Classify source files ─────────────────────────────────────────
+         
         progress("Classifying source files...");
         logger.step(6, "Classify Source Files");
         SourceClassifier classifier = new SourceClassifier();
@@ -490,7 +435,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
         logger.stepDone(true);
 
-        // ── [7] Import layouts ────────────────────────────────────────────────
+         
         progress("Importing layout files...");
         logger.step(7, "Import Layouts");
         LayoutImporter layoutImporter = new LayoutImporter();
@@ -526,7 +471,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.stepDone(true);
         Log.d(TAG, "Imported layouts: " + layouts.size());
 
-        // ── [8] Detect libraries ──────────────────────────────────────────────
+         
         progress("Detecting libraries...");
         logger.step(8, "Detect Libraries");
         LibraryDetector libDetector = new LibraryDetector();
@@ -545,7 +490,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         stats.libraries = libCount;
         logger.stepDone(true);
 
-        // ── [9] Write all Sketchware files ────────────────────────────────────
+         
         progress("Creating Sketchware project...");
         logger.step(9, "Write Sketchware Project Files");
         writer = new SketchwareWriter();
@@ -606,29 +551,30 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
         logger.stepDone(true);
 
-        // ── [10] Resource copy ────────────────────────────────────────────────
-        // Must run after [9]: swImagesPath/swSoundsPath/swFontsPath and filesPath
-        // are all sc_id-derived, and sc_id only exists once SketchwareWriter.write()
-        // has run. Any resulting correction to the already-written project is
-        // applied through SketchwareWriter.patchIconFlags()/patchResourceData() —
-        // never via raw a.a.a.lC / a.a.a.oB calls here (see class javadoc).
+         
+        // Resource paths are based on the generated sc_id; use SketchwareWriter's patch methods for later updates.
+         
+         
+         
+         
         progress("Copying image and media resources...");
         logger.step(10, "Map Resources");
         logger.info("res dir : " + resDir.getAbsolutePath());
 
         ResourceMapper resMapper = new ResourceMapper();
-        // CONFIRMED from wq.java: wq's single-letter methods do NOT map to the
-        // same-letter fields. images = wq.g() (field n), sounds = wq.t() (field o),
-        // fonts = wq.d() (field p). wq.n() is the mysc/list project-registry root —
-        // using it here would silently dump resource files into the same directory
-        // that holds every project's "project" metadata file.
+        // Use wq.g(), wq.t() and wq.d() for image, sound and font paths; wq.n() is the project registry.
+         
+         
+         
+         
         String swImagesPath = wq.g() + "/" + scId;
         String swSoundsPath = wq.t() + "/" + scId;
         String swFontsPath  = wq.d() + "/" + scId;
 
+        String projectIconPath = wq.e() + File.separator + scId + File.separator + "icon.png";
         ResourceMapper.ResourceResult resResult = resMapper.process(
                 resDir, filesPath, swImagesPath, swSoundsPath, swFontsPath,
-                manifest.iconResName);
+                manifest.iconResName, projectIconPath);
 
         stats.drawables = countFilesInPrefixedDirs(resDir, "drawable", "mipmap");
         stats.fonts     = countFilesInPrefixedDirs(resDir, "font");
@@ -648,10 +594,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
         if (resResult.hasCustomIcon) {
             try {
-                // isIconAdaptive is always false here — ResourceMapper does not
-                // currently detect adaptive icons (no source for the required
-                // mipmap-anydpi-v26 XML parsing was available during this audit;
-                // see AS_Importer_Deep_Audit_Report.md, Section 10).
+                // Adaptive icon XML is not handled yet.
+                 
+                 
+                 
                 boolean patched = writer.patchIconFlags(scId, true, false);
                 if (patched) {
                     logger.info("custom_icon flag patched in project map.");
@@ -665,18 +611,18 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
         logger.stepDone(true);
 
-        // Preserve the original XML resources and build metadata as reference files.
-        // Visual conversion is intentionally conservative; retaining the original XML
-        // prevents unsupported attributes/styles/layout constructs from being lost.
+        // Keep original XML and build files so unsupported details are not lost.
+         
+         
         preserveOriginalProjectReferences(detection.projectRoot, appModuleDir, srcMain, filesPath);
 
-        // ── [11] Copy Java / Kotlin source files ──────────────────────────────
+         
         progress("Copying source files...");
         logger.step(11, "Copy Source Files");
-        // Preserve the complete source tree for reference, then add only the files that
-        // Sketchware's own compiler paths can safely consume. When block conversion is
-        // selected, the original Activity must NOT be placed in files/java: Neo treats a
-        // root-level Activity.java there as an override of the Activity generated from blocks.
+        // Keep the original source tree, but do not place block-converted Activities in files/java.
+         
+         
+         
         int copiedSources = copySourcesForSketchware(javaSrc, kotlinSrc, filesPath, scId,
                 sources, manifest.packageName, gradle.applicationId);
         preserveOriginalGradleConfiguration(detection.projectRoot, appModuleDir, filesPath);
@@ -684,7 +630,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         logger.stepDone(true);
         Log.d(TAG, "Source files copied: " + copiedSources);
 
-        // ── [12] Copy assets/ ─────────────────────────────────────────────────
+         
         logger.step(12, "Copy Assets");
         File assetsDir = new File(srcMain, "assets");
         if (assetsDir.exists() && assetsDir.isDirectory()) {
@@ -698,14 +644,14 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             logger.stepSkipped("no assets directory");
         }
 
-        // ── [13] Copy native libraries + source-level JNI ────────────────────
+         
         logger.step(13, "Copy Native Libraries and JNI Source");
         if (gradle.hasNativeLibs) {
             boolean anyNativeContentCopied = false;
 
-            // Prebuilt .so files, preserving ABI folders (arm64-v8a, armeabi-v7a, etc).
-            // Neo's own FilePathUtil.getPathNativelibs(sc_id) resolves to
-            // data/<id>/files/native_libs; preserve the ABI subdirectory names.
+            // Copy prebuilt .so files and keep their ABI folders.
+             
+             
             File nativeLibsDest = new File(filesPath + "/native_libs");
             File jniLibsSrc = new File(srcMain, "jniLibs");
             if (jniLibsSrc.exists()) {
@@ -725,7 +671,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 anyNativeContentCopied = true;
             }
 
-            // Source-level JNI: only copy actual source, never build/.cxx/intermediates output.
+            // Copy native source files, not build output.
             File jniSourceDir = locateJniSourceDir(srcMain);
             if (jniSourceDir != null) {
                 progress("Copying JNI source (" + gradle.nativeBuildSystem + ")...");
@@ -759,7 +705,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             logger.stepSkipped("no native libraries declared");
         }
 
-        // ── [14] Copy local .aar / .jar ───────────────────────────────────────
+         
         logger.step(14, "Copy Local Libraries");
         if (!gradle.localLibPaths.isEmpty()) {
             progress("Copying and registering local libraries...");
@@ -789,14 +735,14 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             logger.stepSkipped("no local .aar / .jar libraries");
         }
 
-        // ── [15] Cleanup is handled by finally block in doInBackground ─────────
+         
         logger.step(15, "Cleanup Temp Directory");
-        // Actual deletion happens in cleanupTemp() → finally block.
-        // We pre-log here so the step appears in order; stepDone is not called
-        // for cleanup since it runs in finally and the logger may be finishing.
+        // Cleanup runs in finally, after the import work is complete.
+         
+         
         logger.info("Temp dir will be deleted in finally block.");
 
-        // ── File statistics block ─────────────────────────────────────────────
+         
         logger.stats(stats);
 
         progress("Import complete!");
@@ -804,45 +750,60 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return new Result(scId);
     }
 
-    // ── Manifest reconciliation ───────────────────────────────────────────────
+     
 
-    /**
-     * Ensures every activity declared in the manifest has a ClassifiedSource entry.
-     * (Same logic as original — no behaviour change.)
-     */
+    /** Adds a ClassifiedSource entry for each Activity declared in the manifest. */
     private void reconcileWithManifest(List<ClassifiedSource> sources,
                                        ParsedManifest manifest) {
         for (ParsedManifest.ActivityEntry entry : manifest.activities) {
-            boolean found = false;
-            for (ClassifiedSource cs : sources) {
-                if (cs.simpleClassName.equals(entry.simpleClassName)) {
-                    if (cs.kind != ClassifiedSource.Kind.ACTIVITY) {
-                        Log.d(TAG, "Upgrading " + cs.simpleClassName
-                                + " to ACTIVITY (found in manifest).");
-                        logger.info("Upgraded to ACTIVITY (manifest): " + cs.simpleClassName);
-                        ClassifiedSource upgraded = new ClassifiedSource(
-                                cs.file, cs.packageName, cs.simpleClassName,
-                                ClassifiedSource.Kind.ACTIVITY);
-                        upgraded.associatedLayout   = cs.associatedLayout;
-                        upgraded.sketchwareFileName = cs.sketchwareFileName;
-                        sources.set(sources.indexOf(cs), upgraded);
-                    }
-                    found = true;
+            String manifestClass = resolveManifestClassName(entry.rawClassName, manifest.packageName);
+            ClassifiedSource match = null;
+            for (ClassifiedSource source : sources) {
+                String sourceClass = source.packageName == null || source.packageName.isEmpty()
+                        ? source.simpleClassName : source.packageName + "." + source.simpleClassName;
+                if (manifestClass.equals(sourceClass)) {
+                    match = source;
                     break;
                 }
             }
-            if (!found) {
-                Log.w(TAG, "Activity in manifest but no source found: "
-                        + entry.simpleClassName + " — creating placeholder.");
-                logger.warning("No source for manifest activity — placeholder created: "
-                        + entry.simpleClassName);
-                ClassifiedSource placeholder = new ClassifiedSource(
-                        null, manifest.packageName, entry.simpleClassName,
-                        ClassifiedSource.Kind.ACTIVITY);
-                placeholder.sketchwareFileName =
-                        SourceClassifier.classNameToSketchwareFileName(entry.simpleClassName);
-                sources.add(placeholder);
+            if (match == null) {
+                ClassifiedSource uniqueSimpleMatch = null;
+                int simpleMatches = 0;
+                for (ClassifiedSource source : sources) {
+                    if (entry.simpleClassName.equals(source.simpleClassName)) {
+                        uniqueSimpleMatch = source;
+                        simpleMatches++;
+                    }
+                }
+                if (simpleMatches == 1) match = uniqueSimpleMatch;
             }
+
+            if (match != null) {
+                if (match.kind != ClassifiedSource.Kind.ACTIVITY) {
+                    Log.d(TAG, "Upgrading " + match.simpleClassName + " to ACTIVITY (manifest declaration). ");
+                    logger.info("Upgraded to ACTIVITY (manifest): " + match.simpleClassName);
+                    ClassifiedSource upgraded = new ClassifiedSource(match.file, match.packageName,
+                            match.simpleClassName, ClassifiedSource.Kind.ACTIVITY);
+                    upgraded.associatedLayout = match.associatedLayout;
+                    upgraded.sketchwareFileName = match.sketchwareFileName;
+                    sources.set(sources.indexOf(match), upgraded);
+                }
+                continue;
+            }
+
+            if (!isApplicationOwnedManifestClass(manifestClass, manifest.packageName)) {
+                logger.info("Skipped external manifest Activity without project source: " + manifestClass);
+                continue;
+            }
+
+            Log.w(TAG, "Activity in manifest but no source found: " + manifestClass
+                    + " — creating a placeholder screen for manual implementation.");
+            logger.warning("No source for manifest Activity — placeholder created: " + manifestClass);
+            ClassifiedSource placeholder = new ClassifiedSource(
+                    null, packageOf(manifestClass), entry.simpleClassName,
+                    ClassifiedSource.Kind.ACTIVITY);
+            placeholder.sketchwareFileName = SourceClassifier.classNameToSketchwareFileName(entry.simpleClassName);
+            sources.add(placeholder);
         }
 
         reconcileComponents(sources, manifest.services, ClassifiedSource.Kind.SERVICE, "service");
@@ -851,27 +812,40 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
 
         if (!manifest.permissions.isEmpty()) {
             logger.info("Permissions declared in manifest: " + manifest.permissions.size());
-            for (String permission : manifest.permissions) {
-                logger.info("  uses-permission: " + permission);
-            }
+            for (String permission : manifest.permissions) logger.info("  uses-permission: " + permission);
             logger.info(manifest.permissions.size() + " standard permission(s) will be written to data/permission "
                     + "and injected with their supported attributes using Neo's attributes.json mechanism.");
         }
         if (manifest.unsupportedManifestItems != null) {
             for (String item : manifest.unsupportedManifestItems) logger.warning("Manifest item needs manual review: " + item);
         }
-
         if (manifest.applicationClassName != null) {
             logger.info("Custom Application class in manifest: " + manifest.applicationClassName);
         }
     }
 
-    /**
-     * Cross-checks a manifest component list (service/receiver/provider) against
-     * classified sources, attaching real exported/permission/authorities data
-     * where the Java class was found, and warning when a manifest entry has no
-     * matching source (can't be copied — only reported).
-     */
+    private String resolveManifestClassName(String rawName, String manifestPackage) {
+        if (rawName == null || rawName.trim().isEmpty()) return "";
+        String value = rawName.trim();
+        if (value.startsWith(".")) return (manifestPackage == null ? "" : manifestPackage) + value;
+        if (value.indexOf('.') < 0) return manifestPackage == null || manifestPackage.isEmpty()
+                ? value : manifestPackage + "." + value;
+        return value;
+    }
+
+    private String packageOf(String className) {
+        if (className == null) return "";
+        int index = className.lastIndexOf('.');
+        return index < 0 ? "" : className.substring(0, index);
+    }
+
+    private boolean isApplicationOwnedManifestClass(String className, String manifestPackage) {
+        if (className == null || className.isEmpty()) return false;
+        if (manifestPackage == null || manifestPackage.isEmpty()) return true;
+        return className.equals(manifestPackage) || className.startsWith(manifestPackage + ".");
+    }
+
+    /** Matches manifest components to source files and keeps their manifest settings. */
     private void reconcileComponents(List<ClassifiedSource> sources,
                                       List<ParsedManifest.ComponentEntry> manifestEntries,
                                       ClassifiedSource.Kind expectedKind,
@@ -900,7 +874,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    // ── Source file copy ──────────────────────────────────────────────────────
+     
 
     private void preserveOriginalProjectReferences(File projectRoot, File appModuleDir,
                                                     File srcMain, String filesPath) {
@@ -1032,9 +1006,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
 
             if (activity) {
                 if (options.convertJavaToBlocks) {
-                    // The real Activity logic is now data/logic. Keep the original source
-                    // only under android_studio_original so Neo's Java override hook cannot
-                    // shadow the generated Activity and make imported blocks appear inert.
+                    // Keep block-converted Activity source only in android_studio_original to avoid overriding generated logic.
+                     
+                     
                     continue;
                 }
                 if (file.getName().endsWith(".kt")) {
@@ -1063,9 +1037,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 continue;
             }
 
-            // Neo's Java manager and its import convention expose files directly from
-            // data/<id>/files/java. Package identity remains inside each source's package
-            // declaration; do not invent package-name directory trees here.
+            // Neo reads Java files directly from data/<id>/files/java; keep package names in the source declaration.
+             
+             
             File target = new File(javaDestination, file.getName());
             if (target.exists()) {
                 try {
@@ -1112,7 +1086,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                                        Map<String, String> activityNameMap, Map<String, String> layoutNameMap,
                                        String manifestPackage, String applicationId, String outputClassName) {
         String adapted = source;
-        // Rename screen class references so intent targets refer to Neo's generated Activity names.
+        // Update Activity names so imported Intent targets use the generated screen names.
         if (activityNameMap != null) for (Map.Entry<String, String> mapping : activityNameMap.entrySet()) {
             if (mapping.getKey() == null || mapping.getValue() == null) continue;
             String oldName = mapping.getKey();
@@ -1122,8 +1096,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                         java.util.regex.Matcher.quoteReplacement(newName));
             }
         }
-        // Activity classes can point at layout names that differ from Sketchware's
-        // screen ids. Fix both direct R.layout references and generated ViewBinding names.
+        // Update layout references too; XML names and Sketchware screen names may differ.
+         
         if (layoutNameMap != null) for (Map.Entry<String, String> mapping : layoutNameMap.entrySet()) {
             String oldLayout = mapping.getKey();
             String newLayout = mapping.getValue();
@@ -1140,8 +1114,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         String originalPackage = activity == null ? "" : activity.packageName;
         String targetPackage = applicationId == null ? "" : applicationId.trim();
         if (!targetPackage.isEmpty() && !targetPackage.equals(originalPackage)) {
-            // Rewrite to the project's generated Activity package. Add a wildcard import
-            // for the original package to retain access to same-package helper classes.
+            // Keep access to helper classes in the original package.
+             
             java.util.regex.Pattern packagePattern = java.util.regex.Pattern.compile("(?m)^\\s*package\\s+[A-Za-z0-9_.]+\\s*;?");
             java.util.regex.Matcher packageMatcher = packagePattern.matcher(adapted);
             if (packageMatcher.find()) {
@@ -1158,8 +1132,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 }
             }
         }
-        // Ensure public class name equals the generated filename; mapping above already
-        // updates all original Activity simple-name references in this source.
+        // Keep each public class name in sync with its generated Java filename.
+         
         if (activity != null && activity.simpleClassName != null && !activity.simpleClassName.equals(outputClassName)) {
             adapted = adapted.replaceAll("\\b" + Pattern.quote(activity.simpleClassName) + "\\b",
                     java.util.regex.Matcher.quoteReplacement(outputClassName));
@@ -1193,7 +1167,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    // ── Directory recursive copy ──────────────────────────────────────────────
+     
 
     private void copyDirectory(File src, File dest) {
         FileUtil.makeDir(dest.getAbsolutePath());
@@ -1209,7 +1183,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    // ── JNI source import (source-level, not prebuilt .so) ────────────────────
+     
 
     private static final String[] JNI_SOURCE_EXTENSIONS = {
             ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp", ".hxx"
@@ -1218,13 +1192,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             "CMakeLists.txt", "Android.mk", "Application.mk"
     };
 
-    /**
-     * Finds the module's JNI source root. Checks the CMake-conventional
-     * src/main/cpp first, then the classic ndk-build src/main/jni, then a
-     * bare jni/ at the module root (some older/migrated projects use this).
-     * Returns null if neither exists — a project can validly ship only
-     * prebuilt .so files with no source at all.
-     */
+    /** Checks src/main/cpp, src/main/jni, then module-level jni/. Returns null if none exists. */
     private File locateJniSourceDir(File srcMain) {
         File cpp = new File(srcMain, "cpp");
         if (cpp.exists() && cpp.isDirectory()) return cpp;
@@ -1232,8 +1200,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         File jniUnderSrcMain = new File(srcMain, "jni");
         if (jniUnderSrcMain.exists() && jniUnderSrcMain.isDirectory()) return jniUnderSrcMain;
 
-        // Classic ndk-build convention: <module>/jni/, i.e. a sibling of src/,
-        // not nested under src/main/ — srcMain is .../<module>/src/main.
+        // The classic ndk-build jni folder is next to src/, not inside src/main/.
+         
         File moduleRoot = srcMain.getParentFile() != null ? srcMain.getParentFile().getParentFile() : null;
         if (moduleRoot != null) {
             File jniAtModuleRoot = new File(moduleRoot, "jni");
@@ -1243,12 +1211,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return null;
     }
 
-    /**
-     * Copies the native source tree without filtering by extension. Real native builds
-     * frequently depend on static archives (.a), pkg-config/libtool metadata (.pc/.la),
-     * generated configuration headers, scripts and extensionless files beside .cpp/.h.
-     * Only known build output / VCS directories are excluded.
-     */
+    /** Copies native source files and their support files, skipping build and VCS folders. */
     private void copyJniSourceOnly(File src, File dest) {
         FileUtil.makeDir(dest.getAbsolutePath());
         File[] files = src.listFiles();
@@ -1293,14 +1256,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return count;
     }
 
-    /**
-     * Preserve the source project's Gradle configuration verbatim for recovery/review.
-     * Sketchware's build has its own generated project root, so blindly replacing its
-     * app_build.gradle with an Android Studio script is unsafe (it may rely on catalog
-     * aliases, included builds, product flavors, plugin management or extra modules).
-     * Supported SDK/dependency settings are mapped separately; these originals ensure
-     * the importer never discards custom Gradle logic it could not safely translate.
-     */
+    /** Keeps the original Gradle files for review; they are not safe to use as Neo's build script. */
     private void preserveOriginalGradleConfiguration(File projectRoot, File appModuleDir, String filesPath) {
         if (projectRoot == null || !projectRoot.isDirectory()) return;
         File outRoot = new File(filesPath, "android_studio_original/gradle_project");
@@ -1368,10 +1324,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    /**
-     * Copies only prebuilt ELF shared libraries while preserving relative ABI paths.
-     * The caller chooses the source subtree so unrelated AAR/JAR files aren't copied.
-     */
+    /** Copies prebuilt .so files and keeps their ABI folder paths. */
     private int copySharedLibrariesOnly(File source, File destination, File relativeRoot) {
         if (source == null || !source.isDirectory()) return 0;
         File[] files = source.listFiles();
@@ -1403,12 +1356,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return copied;
     }
 
-    /**
-     * The on-device NativeCompiler invokes CMake directly on files/jni. If a project
-     * has source files but no CMakeLists at that root, provide a simple safe fallback.
-     * Original Android.mk/module-level CMake files remain preserved separately and are
-     * never silently treated as having been translated.
-     */
+    /** Adds a simple CMake fallback only when no project CMake file exists. Original build files stay preserved. */
     private void ensureNeoNativeCmakeBuild(File nativeRoot, File appModuleDir) {
         if (nativeRoot == null || !nativeRoot.isDirectory()) return;
         File cmake = new File(nativeRoot, "CMakeLists.txt");
@@ -1417,10 +1365,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             logger.warning("Native folder contains no .c/.cc/.cpp/.cxx source files. A .h/.hpp or .a file alone is not a compilable native target.");
             return;
         }
-        // Do not pretend we can translate a complex native build by globbing sources.
-        // A generic target silently drops the flags/dependencies encoded by ndk-build,
-        // CMake fragments, pkg-config/Libtool metadata and static archives; that would
-        // create a predictably broken build for many real projects.
+        // Do not create a generic CMake target: it can drop project-specific flags and dependencies.
+         
+         
+         
         File moduleLevelCmake = appModuleDir == null ? null : new File(appModuleDir, "CMakeLists.txt");
         File cppModuleCmake = appModuleDir == null ? null : new File(appModuleDir, "src/main/cpp/CMakeLists.txt");
         if ((moduleLevelCmake != null && moduleLevelCmake.isFile())
@@ -1480,12 +1428,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    /**
-     * Finds literal System.loadLibrary("name") calls in the source module. A generic
-     * CMake target should not choose an arbitrary name because Android's runtime loader
-     * uses that name to locate lib{name}.so. Multiple names require a project-specific
-     * CMake file rather than an unsafe single-target guess.
-     */
+    /** Finds literal System.loadLibrary names so the generated target uses the right library name. */
     private Set<String> findSystemLoadLibraryNames(File appModuleDir) {
         Set<String> names = new LinkedHashSet<>();
         if (appModuleDir == null) return names;
@@ -1708,7 +1651,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return result.toString();
     }
 
-    // ── ZIP extraction ────────────────────────────────────────────────────────
+     
 
     private File extractZip(String zipPath) {
         File zipFile = new File(zipPath);
@@ -1782,32 +1725,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         }
     }
 
-    // ── Custom manifest builder ───────────────────────────────────────────────
+     
 
-    /**
-     * Finds the Sketchware fileName of the launcher screen, for
-     * data/Injection/androidmanifest/activity_launcher.txt.
-     *
-     * Preference order: (1) the ClassifiedSource matching whichever manifest
-     * activity is flagged isLauncher, (2) the first ACTIVITY-kind source at all,
-     * (3) the literal fallback "main" (matches SketchwareWriter.WriteInput's own
-     * default, and Sketchware's own requirement that a "main" activity always exists
-     * — see LayoutImporter.buildFileData()'s hasMain fallback).
-     */
-    /**
-     * Builds the real data/logic content: for every ACTIVITY-kind screen with a real
-     * source file, runs JavaLogicConverter against it and assembles the confirmed
-     * section set. CUSTOM_VIEW-kind screens are skipped entirely — confirmed
-     * (sketchware-neo-swb-analysis-complete.md §5) that Custom Views get ZERO
-     * compiled Java in Sketchware Neo (getJavaName() returns "" for any non-ACTIVITY
-     * fileType), so there is no logic destination for them to convert into at all.
-     *
-     * Section-name prefixing: every section is written as "@<javaName>_<suffix>"
-     * (javaName = ProjectFileBean.getActivityName(fileName) + ".java"). This prefix
-     * convention is carried over from earlier eC.class/jC.java bytecode evidence —
-     * see the caveat on SketchwareWriter.buildLogicData()'s javadoc for exactly what
-     * is and isn't independently re-confirmed here.
-     */
+    /** Finds the launcher screen name, preferring the manifest launcher Activity. */
+    /** Converts Activity source into logic data; Custom Views do not have Activity logic sections. */
     private String buildFullLogicData(List<ClassifiedSource> sources,
                                       List<LayoutImporter.ImportedLayout> layouts,
                                       boolean extractCustomMethodsToMoreBlocks) {
@@ -1859,9 +1780,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 sb.append("@").append(activityJavaName).append("_func\n");
                 sb.append(result.functionDeclarations);
             }
-            // The initialization section is part of the confirmed Sketchware Neo
-            // logic schema even when the Android Studio class has no onCreate override.
-            // Write the empty header explicitly rather than leaving the section absent.
+            // Write the empty initializeLogic section even when the source has no onCreate method.
+             
+             
             if (!result.sections.containsKey("onCreate_initializeLogic")) {
                 sb.append("@").append(activityJavaName).append("_onCreate_initializeLogic\n");
             }
@@ -1880,8 +1801,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
             }
         }
 
-        // Always emit required empty lifecycle/component/event sections for registered
-        // Activities without a readable source file, so data/file and data/logic agree.
+        // Add required empty lifecycle and event sections when source is missing.
+         
         if (layouts != null) for (LayoutImporter.ImportedLayout layout : layouts) {
             if (layout == null || layout.fileType != ProjectFileBean.PROJECT_FILE_TYPE_ACTIVITY
                     || convertedActivityScreens.contains(layout.sketchwareFileName)) continue;
@@ -1901,8 +1822,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         final Map<String, Integer> types = new java.util.LinkedHashMap<>();
     }
 
-    /** Reads the already-converted Sketchware view data (not raw XML) so event target
-     * IDs and targetType values match widgets that really exist in the imported screen. */
+    /** Reads imported widget data so event IDs and types match the actual screen. */
     private ViewInfo extractImportedViewInfo(List<LayoutImporter.ImportedLayout> layouts, String screenName) {
         ViewInfo info = new ViewInfo();
         if (layouts == null || screenName == null) return info;
@@ -1938,12 +1858,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return ProjectFileBean.getActivityName(fileName) + ".java";
     }
 
-    /**
-     * Maps the Android SDK/build properties to Sketchware settings after the project has
-     * received its permanent sc_id. Maven dependencies are imported only when the user
-     * has enabled that option; unresolved aliases/catalog coordinates are logged, never
-     * converted to invented Maven coordinates.
-     */
+    /** Applies SDK/build settings after the new project ID exists. Dependencies are added only when enabled. */
     private void applyImportedBuildSettings(String scId, ParsedGradle parsed,
                                             SketchwareWriter.WriteInput input, File appModuleDir, File projectRoot) throws Exception {
         ProjectSettings projectSettings = new ProjectSettings(scId);
@@ -1964,9 +1879,9 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         projectSettings.setValue("multidex", parsed.multiDexEnabled
                 ? ProjectSettings.SETTING_GENERIC_VALUE_TRUE : ProjectSettings.SETTING_GENERIC_VALUE_FALSE);
 
-        // Set Neo's own shrinker switches independently of the optional Maven dependency
-        // transfer. The writer starts the project with a safe default; now mirror explicit
-        // Android Studio release/minifier settings into Neo's persisted project config.
+        // Keep Neo's shrinker settings in sync with the imported Gradle release settings.
+         
+         
         ProguardHandler proguardHandler = new ProguardHandler(scId);
         proguardHandler.setProguardEnabled(parsed.minifyEnabledInRelease);
         if (parsed.explicitFields.contains(ParsedGradle.FIELD_R8_ENABLED)) {
@@ -1996,10 +1911,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         metadata.g = true;
         String generated = Lx.getBuildGradleString(parsed.compileSdk, parsed.minSdk,
                 String.valueOf(parsed.targetSdk), metadata, parsed.viewBindingEnabled);
-        // Lx's standard template deliberately defaults release minification to false.
+        // Preserve the source minify setting in both the custom Gradle file and Neo's project settings.
         // Preserve the source project's explicit release setting in the imported custom
-        // Gradle script as well as Neo's ProguardHandler state; either side alone would
-        // leave the restored project's build settings inconsistent.
+         
+         
         if (parsed.minifyEnabledInRelease) {
             generated = generated.replace("minifyEnabled false", "minifyEnabled true");
         }
@@ -2118,9 +2033,7 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
         return "VERSION_17";
     }
 
-    /** Resolves the subset of Gradle Version Catalog aliases whose Maven coordinates and
-     * explicit versions can be read statically. Unresolved aliases are left as warnings;
-     * this intentionally does not evaluate Gradle scripts or execute arbitrary build logic. */
+    /** Reads simple version-catalog aliases without running Gradle scripts. Unresolved aliases are reported. */
     private List<GradleDependency> resolveVersionCatalogDependencies(String buildFile, File projectRoot) {
         List<GradleDependency> result = new ArrayList<>();
         if (buildFile == null || projectRoot == null) return result;
@@ -2358,8 +2271,8 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
                 return ProjectFileBean.getActivityName(fileName);
             }
         }
-        // A manifest Activity with no source has a blank registered shell; use Neo's
-        // generated class naming rule rather than the Android Studio class filename.
+        // Use Neo's generated screen name for Activities without source files.
+         
         return ProjectFileBean.getActivityName(SourceClassifier.classNameToSketchwareFileName(activity.simpleClassName));
     }
 
@@ -2425,10 +2338,10 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
     private String readImportedProguardRules(ParsedGradle gradle, File appModuleDir) {
         StringBuilder combined = new StringBuilder();
         java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
-        // ParsedGradle versions from older importer revisions could capture the argument
-        // to getDefaultProguardFile() (typically a .txt file), not the project's own rules.
-        // Re-scan the actual module script for literal *.pro paths following proguardFiles
-        // and consumerProguardFiles, which is the meaningful user-owned rules input.
+        // Read user .pro files from proguardFiles/consumerProguardFiles, not getDefaultProguardFile().
+         
+         
+         
         if (appModuleDir != null) {
             File gradleFile = new File(appModuleDir, "build.gradle");
             if (!gradleFile.isFile()) gradleFile = new File(appModuleDir, "build.gradle.kts");
@@ -2480,14 +2393,14 @@ public class ASProjectImporter extends AsyncTask<Void, String, ASProjectImporter
     }
 
     private String buildCustomManifest(ParsedManifest manifest) {
-        // Neo's ManifestInjector has explicit, source-confirmed channels for app/activity
-        // attributes, permissions and application components. The original manifest is
-        // also preserved under files/android_studio_original/ for elements without a
-        // confirmed injection channel (for example top-level <queries> declarations).
+        // Keep the original manifest for elements that Neo cannot inject, such as top-level <queries>.
+         
+         
+         
         return "";
     }
 
-    // ── Cleanup and reporting helpers ────────────────────────────────────────
+     
 
     /** Best-effort recursive deletion used for temporary folders and failed installs. */
     private static boolean deleteRecursively(File target) {

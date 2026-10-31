@@ -1,6 +1,8 @@
 package mod.sketchlibx.importer;
 
 import java.io.File;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * Represents one .java / .kt file after classification.
@@ -37,6 +39,12 @@ public class ClassifiedSource {
 
     /** Simple class name, e.g. "MainActivity" or "HomeFragment". */
     public final String simpleClassName;
+
+    /** Fully-qualified class identity; prevents same-name classes in different packages colliding. */
+    public String qualifiedClassName;
+
+    /** Every R.layout/ViewBinding layout reference found in this source file. */
+    public final Set<String> referencedLayouts = new LinkedHashSet<>();
 
     /** Classification result. */
     public final Kind kind;
@@ -78,6 +86,8 @@ public class ClassifiedSource {
         this.file            = file;
         this.packageName     = packageName;
         this.simpleClassName = simpleClassName;
+        this.qualifiedClassName = packageName == null || packageName.isEmpty()
+                ? simpleClassName : packageName + "." + simpleClassName;
         this.kind            = kind;
 
         // Derive Sketchware fileType from Kind

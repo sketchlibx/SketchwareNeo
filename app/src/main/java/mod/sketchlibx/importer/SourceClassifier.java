@@ -12,21 +12,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Classifies every .java / .kt file under src/main/java and src/main/kotlin.
- *
- * Replacement for the original regex-on-whole-file-content approach.
- * Uses line-by-line scanning to find the class declaration, which avoids
- * false positives from comments, string literals, or multi-class files.
- *
- * Also derives:
- *   - The associated layout name (via setContentView / ViewBinding)
- *   - The Sketchware fileName (reverse of ProjectFileBean.getActivityName())
+ * Finds Java and Kotlin classes under src/main and classifies their type.
+ * It also links classes to layouts and derives Sketchware screen names.
+ * Comments and string literals are ignored when reading class declarations.
  */
 public class SourceClassifier {
 
     private static final String TAG = "SourceClassifier";
 
-    // ── Superclass keyword sets ───────────────────────────────────────────────
+     
 
     private static final String[] ACTIVITY_SUPERS = {
             "AppCompatActivity", "Activity", "FragmentActivity",
@@ -60,7 +54,7 @@ public class SourceClassifier {
             "Application", "MultiDexApplication"
     };
 
-    // ── Java class declaration pattern ────────────────────────────────────────
+     
     // Handles: "public class Foo extends Bar" and "class Foo : Bar()"
     private static final Pattern JAVA_CLASS = Pattern.compile(
             "(?:public\\s+|private\\s+|protected\\s+|abstract\\s+|final\\s+)*" +
@@ -71,9 +65,11 @@ public class SourceClassifier {
             "(?:(?:public|private|protected|internal|open|abstract|data|sealed|inner|enum|annotation|expect|actual)\\s+)*"
           + "class\\s+(\\w+)\\s*(?:<[^>]*>\\s*)?(?:\\([^)]*\\)\\s*)?:\\s*([\\w.]+)");
 
-    // setContentView(R.layout.xxx)
     private static final Pattern SET_CONTENT_VIEW = Pattern.compile(
-            "setContentView\\s*\\(\\s*R\\.layout\\.(\\w+)\\s*\\)");
+            "(?<![A-Za-z0-9_$.])(?:this\\.)?setContentView\\s*\\(\\s*R\\.layout\\.(\\w+)\\s*\\)");
+
+    private static final Pattern SET_CONTENT_VIEW_ROOT = Pattern.compile(
+            "(?<![A-Za-z0-9_$.])(?:this\\.)?setContentView\\s*\\(\\s*([A-Za-z_$][A-Za-z0-9_$]*)\\.getRoot\\s*\\(\\s*\\)\\s*\\)");
 
     // ActivityXxxBinding.inflate → activity_xxx
     private static final Pattern VIEW_BINDING = Pattern.compile(
@@ -83,14 +79,9 @@ public class SourceClassifier {
     private static final Pattern R_LAYOUT = Pattern.compile(
             "R\\.layout\\.(\\w+)");
 
-    // ── Public API ────────────────────────────────────────────────────────────
+     
 
-    /**
-     * Scans all .java and .kt files under the given source root and returns
-     * a ClassifiedSource for each one.
-     *
-     * @param srcRoot  The java/ or kotlin/ folder under src/main.
-     */
+    /** Scans the source folder and returns one entry for each Java or Kotlin file. */
     public List<ClassifiedSource> classify(File srcRoot) {
         List<ClassifiedSource> results = new ArrayList<>();
         if (srcRoot == null || !srcRoot.exists()) return results;
@@ -98,7 +89,7 @@ public class SourceClassifier {
         return results;
     }
 
-    // ── Directory walk ────────────────────────────────────────────────────────
+     
 
     private void scanDir(File dir, List<ClassifiedSource> out) {
         File[] files = dir.listFiles();
@@ -113,7 +104,7 @@ public class SourceClassifier {
         }
     }
 
-    // ── Single file classification ────────────────────────────────────────────
+     
 
     private ClassifiedSource classifyFile(File f) {
         boolean isKotlin = f.getName().endsWith(".kt");
@@ -155,23 +146,24 @@ public class SourceClassifier {
         Matcher setContentViewMatcher = SET_CONTENT_VIEW.matcher(source);
         if (setContentViewMatcher.find()) layoutFromSCV = setContentViewMatcher.group(1);
 
-        Matcher viewBindingMatcher = VIEW_BINDING.matcher(source);
-        if (viewBindingMatcher.find()) layoutFromVB = bindingNameToLayout(viewBindingMatcher.group(1));
+        layoutFromVB = findPrimaryBindingLayout(source, simpleClass);
 
-        Matcher layoutMatcher = R_LAYOUT.matcher(source);
-        if (layoutMatcher.find()) layoutFromRLayout = layoutMatcher.group(1);
+        if (layoutFromSCV == null) {
+            Matcher layoutMatcher = R_LAYOUT.matcher(source);
+            if (layoutMatcher.find()) layoutFromRLayout = layoutMatcher.group(1);
+        }
 
         if (simpleClass == null) {
             Log.d(TAG, "No class declaration found in: " + f.getName());
             return null;
         }
 
-        // ── Classify based on superclass ──────────────────────────────────────
+         
         ClassifiedSource.Kind kind = classifyBySuperClass(superClass);
 
         ClassifiedSource cs = new ClassifiedSource(f, packageName, simpleClass, kind);
 
-        // ── Assign associated layout ──────────────────────────────────────────
+         
         // Priority: setContentView > ViewBinding > fallback by convention > any R.layout
         if (layoutFromSCV != null) {
             cs.associatedLayout = layoutFromSCV;
@@ -184,7 +176,7 @@ public class SourceClassifier {
             cs.associatedLayout = layoutFromRLayout;
         }
 
-        // ── Derive Sketchware fileName ────────────────────────────────────────
+         
         cs.sketchwareFileName = classNameToSketchwareFileName(simpleClass);
 
         Log.d(TAG, String.format("Classified %s → kind=%s, layout=%s, swName=%s",
@@ -193,7 +185,43 @@ public class SourceClassifier {
         return cs;
     }
 
-    // ── Superclass → Kind mapping ─────────────────────────────────────────────
+    private String findPrimaryBindingLayout(String source, String className) {
+        Matcher contentRoot = SET_CONTENT_VIEW_ROOT.matcher(source);
+        while (contentRoot.find()) {
+            String variable = contentRoot.group(1);
+            Pattern assignment = Pattern.compile("\\b" + Pattern.quote(variable)
+                    + "\\s*=\\s*(\\w+Binding)\\s*\\.\\s*(?:inflate|bind)\\s*\\(");
+            Matcher bindingAssignment = assignment.matcher(source);
+            String bindingClass = null;
+            while (bindingAssignment.find() && bindingAssignment.start() < contentRoot.start()) {
+                bindingClass = bindingAssignment.group(1);
+            }
+            if (bindingClass != null) return bindingNameToLayout(bindingClass);
+        }
+
+        String expected = null;
+        if (className != null && !className.isEmpty()) {
+            String base = className.endsWith("Activity")
+                    ? className.substring(0, className.length() - "Activity".length())
+                    : className.endsWith("Fragment")
+                    ? className.substring(0, className.length() - "Fragment".length())
+                    : className;
+            expected = base + "Binding";
+        }
+
+        Matcher bindings = VIEW_BINDING.matcher(source);
+        String first = null;
+        while (bindings.find()) {
+            String candidate = bindings.group(1);
+            if (first == null) first = candidate;
+            if (candidate.equals(expected) || candidate.equals("Activity" + expected)) {
+                return bindingNameToLayout(candidate);
+            }
+        }
+        return first == null ? null : bindingNameToLayout(first);
+    }
+
+     
 
     private ClassifiedSource.Kind classifyBySuperClass(String superClass) {
         if (superClass == null) return ClassifiedSource.Kind.OTHER;
@@ -207,29 +235,20 @@ public class SourceClassifier {
         return ClassifiedSource.Kind.OTHER;
     }
 
-    // ── className → Sketchware fileName ──────────────────────────────────────
+     
 
-    /**
-     * Reverse of ProjectFileBean.getActivityName(fileName):
-     *   "main"     → getActivityName → "MainActivity"
-     *   "my_login" → getActivityName → "MyLoginActivity"
-     *
-     * So reverse:
-     *   "MainActivity"    → strip "Activity" → "Main"   → snake_case → "main"
-     *   "MyLoginActivity" → strip "Activity" → "MyLogin" → snake_case → "my_login"
-     *   "HomeFragment"    → no suffix strip  → "HomeFragment" → "home_fragment"
-     */
+    /** Converts Activity and screen class names back to Sketchware file names. */
     public static String classNameToSketchwareFileName(String className) {
-        // Strip known suffixes so round-trip works with getActivityName()
+         
         String stripped = className;
         for (String suffix : new String[]{"Activity", "Fragment", "View", "Screen"}) {
             if (stripped.endsWith(suffix) && stripped.length() > suffix.length()) {
                 stripped = stripped.substring(0, stripped.length() - suffix.length());
-                break; // only strip one suffix
+                break;  
             }
         }
 
-        // CamelCase → snake_case
+         
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < stripped.length(); i++) {
             char c = stripped.charAt(i);
@@ -239,7 +258,7 @@ public class SourceClassifier {
         return sb.toString();
     }
 
-    // ── ViewBinding class name → layout name ─────────────────────────────────
+     
 
     /**
      * "ActivityMainBinding"   → "activity_main"
@@ -247,12 +266,12 @@ public class SourceClassifier {
      * "ItemUserBinding"       → "item_user"
      */
     private String bindingNameToLayout(String bindingClassName) {
-        // Remove "Binding" suffix
+         
         if (bindingClassName.endsWith("Binding")) {
             bindingClassName = bindingClassName.substring(
                     0, bindingClassName.length() - "Binding".length());
         }
-        // CamelCase → snake_case
+         
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < bindingClassName.length(); i++) {
             char c = bindingClassName.charAt(i);
@@ -262,7 +281,7 @@ public class SourceClassifier {
         return sb.toString();
     }
 
-    // ── Convention-based layout name derivation for Activities ───────────────
+     
 
     /**
      * "MainActivity"      → try "activity_main" (common convention)
@@ -283,7 +302,7 @@ public class SourceClassifier {
         return sb.toString(); // may not exist — caller must verify
     }
 
-    // ── Strip fully-qualified class names to simple names ────────────────────
+     
 
     private String simplifyClassName(String name) {
         if (name == null) return null;
@@ -346,7 +365,7 @@ public class SourceClassifier {
         return out.toString();
     }
 
-    // ── Line reader ───────────────────────────────────────────────────────────
+     
 
     private List<String> readLines(File f) {
         List<String> lines = new ArrayList<>();

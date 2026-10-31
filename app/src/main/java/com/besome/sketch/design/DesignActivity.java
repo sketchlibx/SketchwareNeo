@@ -246,10 +246,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     private final BroadcastReceiver buildCancelReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (BuildTask.ACTION_CANCEL_BUILD.equals(intent.getAction())) {
-                if (currentBuildTask != null) {
-                    currentBuildTask.cancelBuild();
-                }
+            if (BuildTask.ACTION_CANCEL_BUILD.equals(intent.getAction()) && currentBuildTask != null) {
+                String token = intent.getStringExtra("build_token");
+                if (token != null && token.equals(currentBuildTask.buildToken)) currentBuildTask.cancelBuild();
             }
         }
     };
@@ -382,15 +381,16 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         }
     }
 
-    private void indicateCompileErrorOccurred(String error) {
-        new CompileErrorSaver(sc_id).writeLogsToFile(error);
+    private void indicateCompileErrorOccurred(String projectId, String error) {
+        new CompileErrorSaver(projectId).writeLogsToFile(error);
+        if (isFinishing() || isDestroyed() || !projectId.equals(sc_id)) return;
         Snackbar snackbar = Snackbar.make(coordinatorLayout, "Show compile log", Snackbar.LENGTH_INDEFINITE);
         snackbar.setAction(Helper.getResString(R.string.common_word_show), v -> {
-            if (!mB.a()) {
+            if (!mB.a() && !isFinishing() && !isDestroyed() && projectId.equals(sc_id)) {
                 snackbar.dismiss();
                 Intent intent = new Intent(getApplicationContext(), CompileLogActivity.class);
                 intent.putExtra("error", error);
-                intent.putExtra("sc_id", sc_id);
+                intent.putExtra("sc_id", projectId);
                 intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
             }
@@ -532,8 +532,12 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         btnRun = findViewById(R.id.btn_run);
         btnRun.setOnClickListener(v -> {
-            if (currentBuildTask != null && !currentBuildTask.canceled && !currentBuildTask.isBuildFinished) {
-                currentBuildTask.cancelBuild();
+            if (currentBuildTask != null && currentBuildTask.running) {
+                if (!currentBuildTask.canceled && !currentBuildTask.isBuildFinished) {
+                    currentBuildTask.cancelBuild();
+                } else {
+                    Snackbar.make(btnRun, "The previous build is finishing. Run again when it has stopped.", Snackbar.LENGTH_LONG).show();
+                }
                 return;
             }
 
@@ -686,26 +690,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             SketchwareUtil.toast("Please allow overlay permission");
         }
         fProgress = new FloatingProgressWindow();
-        tryAutoBuildWhenReady();
     }
     
-    private boolean autoBuildScheduled;
-    private volatile boolean projectLoaded;
-
-    private void tryAutoBuildWhenReady() {
-        if (autoBuildScheduled || !projectLoaded || !getIntent().getBooleanExtra("auto_build", false)) return;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M
-                && !Settings.canDrawOverlays(this)) return;
-        autoBuildScheduled = true;
-        // Keep the intent flag until the required overlay permission is available.
-        getIntent().removeExtra("auto_build");
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!isFinishing() && !isDestroyed() && btnRun != null && currentBuildTask == null) {
-                btnRun.performClick();
-            }
-        }, 650L);
-    }
-
 private void checkAndInitGit() {
         String gitWorkspacePath = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/git_workspace";
         File gitWorkspace = new File(gitWorkspacePath);
@@ -861,7 +847,6 @@ private void checkAndInitGit() {
     @Override
     public void onResume() {
         super.onResume();
-        tryAutoBuildWhenReady();
         if (!isStoragePermissionGranted()) finish();
         long freeMegabytes = GB.c();
         if (freeMegabytes < 100L && freeMegabytes > 0L) warnAboutInsufficientStorageSpace();
@@ -1140,9 +1125,14 @@ private void checkAndInitGit() {
     private static class BuildTask extends BaseTask implements BuildProgressReceiver {
         public static final String ACTION_CANCEL_BUILD = "com.besome.sketch.design.ACTION_CANCEL_BUILD";
         private static final String CHANNEL_ID = "build_notification_channel";
+        private static final java.util.concurrent.Semaphore BUILD_LOCK = new java.util.concurrent.Semaphore(1, true);
+        private static final java.util.concurrent.atomic.AtomicInteger NEXT_NOTIFICATION_ID = new java.util.concurrent.atomic.AtomicInteger(1000);
+        private final Object terminalStateLock = new Object();
         private final ExecutorService executorService = Executors.newSingleThreadExecutor();
         private final NotificationManager notificationManager;
-        private final int notificationId = 1;
+        private final int notificationId = NEXT_NOTIFICATION_ID.incrementAndGet();
+        private final String buildToken = Integer.toString(notificationId) + "-" + Long.toString(System.nanoTime());
+        private final String buildScId;
         private final MaterialButton btnRun;
         private final MaterialButton btnOptions;
         private final LinearLayout progressContainer;
@@ -1162,6 +1152,7 @@ private void checkAndInitGit() {
 
         public BuildTask(DesignActivity activity, TerminalBuildBridge.Listener terminalListener) {
             super(activity);
+            buildScId = DesignActivity.sc_id;
             notificationManager = (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
             btnRun = activity.btnRun;
             btnOptions = activity.btnOptions;
@@ -1190,6 +1181,22 @@ private void checkAndInitGit() {
             terminalListener.onCanceled();
         }
 
+        private boolean markFailureUnlessCanceled() {
+            synchronized (terminalStateLock) {
+                if (canceled || isBuildFinished) return false;
+                isBuildFinished = true;
+                return true;
+            }
+        }
+
+        private boolean markSuccessUnlessCanceled() {
+            synchronized (terminalStateLock) {
+                if (canceled || isBuildFinished) return false;
+                isBuildFinished = true;
+                return true;
+            }
+        }
+
         public void execute() {
             running = true;
             onPreExecute();
@@ -1209,16 +1216,29 @@ private void checkAndInitGit() {
         
                 private void doInBackground() {
             DesignActivity activity = getActivity();
-            if (activity == null) return;
-            mod.sketchlibx.project.history.TimeMachineManager.takeSnapshot(DesignActivity.sc_id);
+            boolean buildLockAcquired = false;
             try {
-                var sc_id = DesignActivity.sc_id;
+                if (activity == null) {
+                    canceled = true;
+                    return;
+                }
+                onProgress("Waiting for another build to finish...", 1);
+                while (!canceled && !buildLockAcquired) {
+                    buildLockAcquired = BUILD_LOCK.tryAcquire(250, java.util.concurrent.TimeUnit.MILLISECONDS);
+                }
+                if (canceled) return;
+                new CompileErrorSaver(buildScId).deleteSavedLogs();
+                mod.sketchlibx.project.history.TimeMachineManager.takeSnapshot(buildScId);
+                var sc_id = buildScId;
                 CustomGradleBuildManager.prepareBuild(sc_id);
+                if (canceled) return;
                 var q = new yq(activity.getApplicationContext(), sc_id);
                 activity.q = q;
                 onProgress("Deleting temporary files...", 1);
                 FileUtil.deleteFile(q.projectMyscPath);
+                if (canceled) return;
                 q.c(activity.getApplicationContext());
+                if (canceled) return;
                 q.a();
                 q.a(activity.getApplicationContext(), wq.e("600"));
                 if (yB.a(lC.b(sc_id), "custom_icon")) {
@@ -1235,6 +1255,7 @@ private void checkAndInitGit() {
                         q.a(wq.e() + File.separator + sc_id + File.separator + "icon.png");
                     }
                 }
+                if (canceled) return;
                 onProgress("Generating source code...", 2);
                 kC kC = jC.d(sc_id);
                 kC.b(q.resDirectoryPath + File.separator + "drawable-xhdpi");
@@ -1262,14 +1283,12 @@ private void checkAndInitGit() {
                 onProgress("Generating view binding...", 11);
                 builder.generateViewBinding();
                 if (canceled) return;
-                
-                
                 onProgress("Java is compiling...", 13);
                 builder.compileJavaCode();
                 if (canceled) return;
                 onProgress("Compiling C/C++ Native Code...", 14);
-builder.compileNativeCode();
-if (canceled) return;
+                builder.compileNativeCode();
+                if (canceled) return;
                 StringfogHandler stringfogHandler = new StringfogHandler(sc_id);
                 stringfogHandler.start(this, builder);
                 if (canceled) return;
@@ -1277,12 +1296,8 @@ if (canceled) return;
                 proguardHandler.start(this, builder);
                 if (canceled) return;
                 onProgress(builder.getDxRunningText(), 17);
-                
                 boolean isMultiDexEnabled = new ProjectSettings(sc_id).getValue("multidex", "false").equals("true");
-                if (isMultiDexEnabled) {
-                    builder.setMultiDexEnabled(true);
-                }
-                
+                if (isMultiDexEnabled) builder.setMultiDexEnabled(true);
                 builder.createDexFilesFromClasses();
                 if (canceled) return;
                 onProgress("Merging DEX files...", 18);
@@ -1294,53 +1309,89 @@ if (canceled) return;
                 onProgress("Signing APK...", 20);
                 builder.signDebugApk();
                 if (canceled) return;
-                if (terminalListener == null) activity.installBuiltApk();
-                isBuildFinished = true;
-                neo.sketchware.plugin.PluginManager.notifyBuildSuccess(sc_id);
+                if (!markSuccessUnlessCanceled()) return;
+                if (terminalListener == null) {
+                    try {
+                        activity.installBuiltApk();
+                    } catch (RuntimeException installError) {
+                        activity.runOnUiThread(() -> SketchwareUtil.toastError("Build succeeded, but the APK installer could not be opened: "
+                                + (installError.getMessage() == null ? installError.getClass().getSimpleName() : installError.getMessage())));
+                    }
+                }
+                try {
+                    neo.sketchware.plugin.PluginManager.notifyBuildSuccess(sc_id);
+                } catch (RuntimeException notificationError) {
+                    Log.w("DesignActivity$BuildTask", "Build succeeded, but a plugin could not be notified.", notificationError);
+                }
                 reportTerminalSuccess(q.finalToInstallApkPath);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                synchronized (terminalStateLock) { canceled = true; }
             } catch (MissingFileException e) {
-                isBuildFinished = true;
-                reportTerminalFailure((e.isMissingDirectory() ? "A required directory is missing: " : "A required file is missing: ")
-                        + e.getMissingFile().getAbsolutePath());
-                activity.runOnUiThread(() -> {
+                if (!markFailureUnlessCanceled()) return;
+                String message = (e.isMissingDirectory() ? "A required directory is missing: " : "A required file is missing: ")
+                        + e.getMissingFile().getAbsolutePath();
+                reportTerminalFailure(message);
+                DesignActivity currentActivity = getActivity();
+                if (currentActivity != null) currentActivity.runOnUiThread(() -> {
                     boolean isMissingDirectory = e.isMissingDirectory();
-                    MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(activity);
+                    MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(currentActivity);
                     if (isMissingDirectory) {
                         dialog.setTitle("Missing directory detected");
-                        dialog.setMessage("A directory important for building is missing. " +
-                                "Sketchware Neo can try creating " + e.getMissingFile().getAbsolutePath() +
-                                " if you'd like to.");
+                        dialog.setMessage("A directory important for building is missing. "
+                                + "Sketchware Neo can try creating " + e.getMissingFile().getAbsolutePath()
+                                + " if you'd like to.");
                         dialog.setNeutralButton("Create", (v, which) -> {
                             v.dismiss();
-                            if (!e.getMissingFile().mkdirs()) {
-                                SketchwareUtil.toastError("Failed to create directory / directories!");
-                            }
+                            if (!e.getMissingFile().mkdirs()) SketchwareUtil.toastError("Failed to create directory / directories!");
                         });
                     } else {
                         dialog.setTitle("Missing file detected");
-                        dialog.setMessage("A file needed for building is missing. " +
-                                "Put the correct file back to " + e.getMissingFile().getAbsolutePath() +
-                                " and try building again.");
+                        dialog.setMessage("A file needed for building is missing. Put the correct file back to "
+                                + e.getMissingFile().getAbsolutePath() + " and try building again.");
                     }
                     dialog.setPositiveButton("Dismiss", null);
                     dialog.show();
                 });
-            } catch (zy zy) {
-                isBuildFinished = true;
-                reportTerminalFailure(zy.getMessage());
-                activity.indicateCompileErrorOccurred(zy.getMessage());
-                neo.sketchware.plugin.PluginManager.notifyBuildError(sc_id, zy.getMessage());
+            } catch (zy e) {
+                if (!markFailureUnlessCanceled()) return;
+                reportTerminalFailure(e.getMessage());
+                DesignActivity currentActivity = getActivity();
+                if (currentActivity != null) {
+                    currentActivity.indicateCompileErrorOccurred(buildScId, e.getMessage());
+                    neo.sketchware.plugin.PluginManager.notifyBuildError(buildScId, e.getMessage());
+                }
             } catch (Throwable tr) {
-                isBuildFinished = true;
+                if (!markFailureUnlessCanceled()) return;
                 LogUtil.e("DesignActivity$BuildTask", "Failed to build project", tr);
+                String error = Log.getStackTraceString(tr);
                 reportTerminalFailure(tr.getClass().getSimpleName() + ": " + tr.getMessage());
-                activity.indicateCompileErrorOccurred(Log.getStackTraceString(tr));
-                neo.sketchware.plugin.PluginManager.notifyBuildError(sc_id, Log.getStackTraceString(tr));
+                DesignActivity currentActivity = getActivity();
+                if (currentActivity != null) {
+                    currentActivity.indicateCompileErrorOccurred(buildScId, error);
+                    neo.sketchware.plugin.PluginManager.notifyBuildError(buildScId, error);
+                }
             } finally {
-                if (canceled) reportTerminalCanceled();
-                reportTerminalFailure("The build stopped before it finished.");
-                running = false;
-                activity.runOnUiThread(this::onPostExecute);
+                if (buildLockAcquired) BUILD_LOCK.release();
+                boolean canceledAtEnd;
+                boolean unfinishedAtEnd = false;
+                synchronized (terminalStateLock) {
+                    canceledAtEnd = canceled;
+                    if (canceledAtEnd) isBuildFinished = true;
+                    else if (!isBuildFinished) {
+                        isBuildFinished = true;
+                        unfinishedAtEnd = true;
+                    }
+                }
+                if (canceledAtEnd) reportTerminalCanceled();
+                else if (unfinishedAtEnd) reportTerminalFailure("The build stopped before it finished.");
+                executorService.shutdown();
+                DesignActivity currentActivity = getActivity();
+                if (currentActivity != null) currentActivity.runOnUiThread(this::onPostExecute);
+                else {
+                    running = false;
+                    if (notificationManager != null) notificationManager.cancel(notificationId);
+                }
             }
         }
         
@@ -1349,51 +1400,65 @@ if (canceled) return;
             int totalSteps = 20;
             DesignActivity activity = getActivity();
             if (activity == null) return;
-            if (terminalListener != null && step >= 0) terminalListener.onProgress(progress);
+            if (terminalListener != null && step >= 0 && !canceled) terminalListener.onProgress(progress);
             activity.runOnUiThread(() -> {
-                progressBar.setIndeterminate(step == -1);
-                if (!canceled) {
-                    updateNotification(progress + " (" + step + " / " + totalSteps + ")");
+                if (activity.isDestroyed()) return;
+                if (canceled) {
+                    progressBar.setIndeterminate(true);
+                    progressText.setText("Cancellation requested. Finishing the active build step…");
+                    return;
                 }
+                progressBar.setIndeterminate(step == -1);
                 progressText.setText(progress);
-                var progressInt = (step * 100) / totalSteps;
+                int progressInt = (step * 100) / totalSteps;
                 progressBar.setProgress(progressInt, true);
                 Log.d("DesignActivity$BuildTask", step + " / " + totalSteps);
+                updateNotification(progress + " (" + step + " / " + totalSteps + ")");
             });
-            fProgress.updateProgress(step);
+            if (!canceled && fProgress != null) fProgress.updateProgress(step);
         }
 
         private void onPostExecute() {
-            DesignActivity activity = getActivity();
-            if (activity == null) return;
-            fProgress.stop();
-            activity.runOnUiThread(() -> {
-                if (!activity.isDestroyed()) {
-                    if (isShowingNotification) {
-                        notificationManager.cancel(notificationId);
-                        isShowingNotification = false;
-                    }
-                    updateRunButton(false);
-                    activity.updateBottomMenu();
-                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                }
-            });
-        }
-
-        public void cancelBuild() {
-            canceled = true;
-            onProgress("Canceling build...", -1);
-            if (isShowingNotification) {
+            if (fProgress != null) fProgress.stop();
+            if (isShowingNotification && notificationManager != null) {
                 notificationManager.cancel(notificationId);
                 isShowingNotification = false;
             }
             DesignActivity activity = getActivity();
-            if (activity != null) {
-                activity.runOnUiThread(() -> {
-                    activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                });
+            if (activity == null) {
+                running = false;
+                return;
             }
-            fProgress.stop();
+            Runnable cleanup = () -> {
+                try {
+                    if (!activity.isDestroyed()) {
+                        updateRunButton(false);
+                        activity.updateBottomMenu();
+                        activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    }
+                } finally {
+                    running = false;
+                }
+            };
+            if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) cleanup.run();
+            else activity.runOnUiThread(cleanup);
+        }
+
+        public void cancelBuild() {
+            synchronized (terminalStateLock) {
+                if (!running || canceled || isBuildFinished) return;
+                canceled = true;
+            }
+            updateNotification("Cancellation requested; finishing the active build step…");
+            DesignActivity activity = getActivity();
+            if (activity != null) activity.runOnUiThread(() -> {
+                if (!activity.isDestroyed()) {
+                    btnRun.setEnabled(false);
+                    btnRun.setText("Stopping…");
+                    progressBar.setIndeterminate(true);
+                    progressText.setText("Cancellation requested. Waiting for the active compiler step to finish…");
+                }
+            });
         }
 
         private void maybeShowNotification() {
@@ -1406,8 +1471,8 @@ if (canceled) return;
                         .setContentTitle("Building project")
                         .setContentText("Starting build...")
                         .setOngoing(true)
-                        .setProgress(0, 0, true)
-                        .addAction(R.drawable.ic_cancel_white_96dp, "Cancel build", getCancelPendingIntent());
+                        .setProgress(0, 0, true);
+                if (!canceled) builder.addAction(R.drawable.ic_cancel_white_96dp, "Cancel build", getCancelPendingIntent());
                 notificationManager.notify(notificationId, builder.build());
                 isShowingNotification = true;
             }
@@ -1421,8 +1486,8 @@ if (canceled) return;
                     .setContentTitle("Building project")
                     .setContentText(progress)
                     .setOngoing(true)
-                    .setProgress(0, 0, true)
-                    .addAction(R.drawable.ic_cancel_white_96dp, "Cancel Build", getCancelPendingIntent());
+                    .setProgress(0, 0, true);
+            if (!canceled) builder.addAction(R.drawable.ic_cancel_white_96dp, "Cancel build", getCancelPendingIntent());
             notificationManager.notify(notificationId, builder.build());
         }
 
@@ -1430,7 +1495,9 @@ if (canceled) return;
             DesignActivity activity = getActivity();
             if (activity == null) return null;
             Intent cancelIntent = new Intent(BuildTask.ACTION_CANCEL_BUILD);
-            return PendingIntent.getBroadcast(activity, 0, cancelIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+            cancelIntent.putExtra("build_token", buildToken);
+            return PendingIntent.getBroadcast(activity, notificationId, cancelIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         }
 
         private void createNotificationChannelIfNeeded() {
@@ -1446,6 +1513,8 @@ if (canceled) return;
 
         private void updateRunButton(boolean isRunning) {
             var context = getActivity();
+            if (context == null || context.isDestroyed()) return;
+            btnRun.setEnabled(true);
             btnRun.setBackgroundTintList(ColorStateList.valueOf(ThemeUtils.getColor(context, isRunning ? R.attr.colorErrorContainer : R.attr.colorPrimary)));
             btnRun.setIcon(ContextCompat.getDrawable(context, isRunning ? R.drawable.ic_mtrl_stop : R.drawable.ic_mtrl_run));
             btnRun.setIconTint(ColorStateList.valueOf(ThemeUtils.getColor(context, isRunning ? R.attr.colorOnErrorContainer : R.attr.colorSurfaceContainerLowest)));
@@ -1478,8 +1547,6 @@ if (canceled) return;
                     activity.updateBottomMenu();
                     activity.refresh();
                     activity.h();
-                    activity.projectLoaded = true;
-                    activity.tryAutoBuildWhenReady();
                     if (savedInstanceState == null) {
                         activity.checkForUnsavedProjectData();
                     }

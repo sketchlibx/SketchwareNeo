@@ -293,31 +293,22 @@ public class ProjectBuilder {
             return;
         }
 
-        if (dexOutputDir.exists()) {
-            File[] staleDexFiles = dexOutputDir.listFiles((dir, name) -> name.matches("classes([0-9]+)?\\.dex"));
-            if (staleDexFiles != null) {
-                for (File staleDexFile : staleDexFiles) {
-                    if (!staleDexFile.delete() && staleDexFile.exists()) {
-                        throw new IOException("Could not remove stale DEX output before D8/Dx compilation: "
-                                + staleDexFile.getAbsolutePath());
-                    }
-                }
-            }
-        } else if (!dexOutputDir.mkdirs() && !dexOutputDir.isDirectory()) {
+        if (!dexOutputDir.isDirectory() && !dexOutputDir.mkdirs() && !dexOutputDir.isDirectory()) {
             throw new IOException("Could not create DEX output directory: " + dexOutputDir.getAbsolutePath());
         }
+        clearGeneratedDexOutputFiles(dexOutputDir);
 
         if (isD8Enabled()) {
             long savedTimeMillis = System.currentTimeMillis();
-            try {
-                DexCompiler.compileDexFiles(this);
-                LogUtil.d(TAG, "D8 took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
-            } catch (Exception e) {
-                LogUtil.e(TAG, "D8 failed to process .class files", e);
-                throw e;
-            }
-        } else {
-            long savedTimeMillis = System.currentTimeMillis();
+            DexCompiler.compileDexFiles(this);
+            validateGeneratedDexOutputFiles(dexOutputDir, "D8");
+            LogUtil.d(TAG, "D8 took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
+            return;
+        }
+
+        long savedTimeMillis = System.currentTimeMillis();
+        Exception dxFailure;
+        try {
             List<String> args = new ArrayList<>(Arrays.asList(
                     "--debug",
                     "--verbose",
@@ -327,22 +318,61 @@ public class ProjectBuilder {
             ));
             args.addAll(mll.getJarOnlyLibraryJars());
 
-            try {
-                LogUtil.d(TAG, "Running Dx with these arguments: " + args);
+            LogUtil.d(TAG, "Running Dx with these arguments: " + args);
+            Main.clearInternTables();
+            Main.Arguments arguments = new Main.Arguments();
+            Method parseMethod = Main.Arguments.class.getDeclaredMethod("parse", String[].class);
+            parseMethod.setAccessible(true);
+            parseMethod.invoke(arguments, (Object) args.toArray(new String[0]));
+            Main.run(arguments);
+            validateGeneratedDexOutputFiles(dexOutputDir, "Dx");
+            LogUtil.d(TAG, "Dx took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
+            return;
+        } catch (Exception failure) {
+            dxFailure = failure;
+            LogUtil.e(TAG, "Dx did not produce a complete, valid application DEX. Retrying this build with D8.", failure);
+        }
 
-                Main.clearInternTables();
-                Main.Arguments arguments = new Main.Arguments();
-                Method parseMethod = Main.Arguments.class.getDeclaredMethod("parse", String[].class);
-                parseMethod.setAccessible(true);
-                parseMethod.invoke(arguments, (Object) args.toArray(new String[0]));
+        if (dxFailure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Dx was interrupted; the D8 fallback was skipped because the build is stopping.", dxFailure);
+        }
 
-                Main.run(arguments);
-                LogUtil.d(TAG, "Dx took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
-            } catch (Exception e) {
-                LogUtil.e(TAG, "Dx failed to process .class files", e);
-                throw e;
+        clearGeneratedDexOutputFiles(dexOutputDir);
+        try {
+            DexCompiler.compileDexFiles(this);
+            validateGeneratedDexOutputFiles(dexOutputDir, "D8 fallback");
+            LogUtil.w(TAG, "The selected Dx path failed; D8 fallback generated valid application DEX files.");
+        } catch (Exception d8Failure) {
+            d8Failure.addSuppressed(dxFailure);
+            throw new IOException("Dx did not produce valid application DEX files, and the automatic D8 fallback also failed: "
+                    + (d8Failure.getMessage() == null ? d8Failure.getClass().getSimpleName() : d8Failure.getMessage()), d8Failure);
+        }
+    }
+
+    private void clearGeneratedDexOutputFiles(File dexOutputDir) throws IOException {
+        File[] entries = dexOutputDir.listFiles();
+        if (entries == null) {
+            throw new IOException("Could not inspect DEX output directory: " + dexOutputDir.getAbsolutePath());
+        }
+        for (File entry : entries) {
+            if (entry.isFile() && entry.getName().matches("classes([0-9]+)?\\.dex")) {
+                if (!entry.delete() && entry.exists()) {
+                    throw new IOException("Could not remove stale DEX output before compilation: " + entry.getAbsolutePath());
+                }
             }
         }
+    }
+
+    private void validateGeneratedDexOutputFiles(File dexOutputDir, String compilerName) throws IOException {
+        File[] dexFiles = dexOutputDir.listFiles((dir, name) -> name.matches("classes([0-9]+)?\\.dex"));
+        if (dexFiles == null || dexFiles.length == 0) {
+            throw new IOException(compilerName + " completed without generating classes*.dex under "
+                    + dexOutputDir.getAbsolutePath() + ". The DEX compiler did not produce application bytecode.");
+        }
+        Arrays.sort(dexFiles, (left, right) -> Integer.compare(
+                getDexOutputSequence(left.getName()), getDexOutputSequence(right.getName())));
+        for (File dexFile : dexFiles) validateDexOutputFile(dexFile, compilerName);
     }
 
     /** classes.dex sorts before classes2.dex, classes3.dex, and so on. */

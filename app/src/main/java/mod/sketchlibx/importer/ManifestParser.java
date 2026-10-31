@@ -176,6 +176,7 @@ public class ManifestParser {
                     String rawName = attr(p, NS, "name", "");
                     String simpleName = resolveClassName(rawName, out.packageName);
                     currentActivity = new ParsedManifest.ActivityEntry(rawName, simpleName);
+                    currentActivity.qualifiedClassName = resolveQualifiedClassName(rawName, out.packageName);
                     currentActivity.orientation = attr(p, NS, "screenOrientation", "");
                     currentActivity.softInputMode = attr(p, NS, "windowSoftInputMode", "");
                     currentActivity.theme = attr(p, NS, "theme", "");
@@ -290,6 +291,7 @@ public class ManifestParser {
         String rawName = attr(p, NS, "name", "");
         String simpleName = resolveClassName(rawName, pkg);
         ParsedManifest.ComponentEntry entry = new ParsedManifest.ComponentEntry(rawName, simpleName);
+        entry.qualifiedClassName = resolveQualifiedClassName(rawName, pkg);
         entry.exported = Boolean.parseBoolean(attr(p, NS, "exported", "false"));
         entry.permission = attr(p, NS, "permission", "");
         return entry;
@@ -322,6 +324,14 @@ public class ManifestParser {
         // Already simple or unknown package
         int dot = rawName.lastIndexOf('.');
         return (dot >= 0) ? rawName.substring(dot + 1) : rawName;
+    }
+
+    private String resolveQualifiedClassName(String rawName, String pkg) {
+        if (rawName == null || rawName.trim().isEmpty()) return "";
+        String name = rawName.trim();
+        if (name.startsWith(".")) return (pkg == null || pkg.isEmpty() ? "" : pkg) + name;
+        if (name.indexOf('.') >= 0) return name;
+        return (pkg == null || pkg.isEmpty()) ? name : pkg + "." + name;
     }
 
     // ── Strip @drawable/ / @mipmap/ prefix from icon name ────────────────────

@@ -9,6 +9,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.util.Log;
 import android.widget.BaseAdapter;
 
 import androidx.annotation.NonNull;
@@ -92,7 +93,10 @@ public class AndroidManifestInjection extends BaseAppCompatActivity {
         customManifestSwitch.setOnCheckedChangeListener((button, checked) -> {
             settings.setValue(ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, checked ? "true" : "false");
             openManifestButton.setVisibility(checked ? View.VISIBLE : View.GONE);
-            if (checked) ensureCustomManifestFile();
+            if (checked && !ensureCustomManifestFile()) {
+                settings.setValue(ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, "false");
+                customManifestSwitch.setChecked(false);
+            }
         });
         openManifestButton.setOnClickListener(v -> openCustomManifest());
     }
@@ -101,17 +105,36 @@ public class AndroidManifestInjection extends BaseAppCompatActivity {
         return FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/custom_manifest.xml";
     }
 
-    private void ensureCustomManifestFile() {
+    private boolean ensureCustomManifestFile() {
         String path = getCustomManifestPath();
-        if (!FileUtil.isExistFile(path)) {
-            String source = new yq(getApplicationContext(), sc_id).getFileSrc(
-                    "AndroidManifest.xml", jC.b(sc_id), jC.a(sc_id), jC.c(sc_id));
-            FileUtil.writeFile(path, source == null ? "" : source);
+        if (FileUtil.isExistFile(path)) return true;
+        try {
+            String source = generateManifestSource();
+            if (source == null || source.trim().isEmpty()) {
+                SketchwareUtil.toastError("AndroidManifest source could not be generated. Check the project's screen definitions and try again.");
+                return false;
+            }
+            FileUtil.writeFile(path, source);
+            return FileUtil.isExistFile(path) && !FileUtil.readFile(path).trim().isEmpty();
+        } catch (Exception e) {
+            Log.e("AndroidManifestInjection", "Could not create custom manifest source", e);
+            SketchwareUtil.toastError("Could not generate AndroidManifest source: " + safeMessage(e));
+            return false;
         }
     }
 
+    private String generateManifestSource() {
+        return new yq(getApplicationContext(), sc_id).getFileSrc(
+                "AndroidManifest.xml", jC.b(sc_id), jC.a(sc_id), jC.c(sc_id));
+    }
+
+    private String safeMessage(Exception exception) {
+        String message = exception.getMessage();
+        return message == null || message.trim().isEmpty() ? exception.getClass().getSimpleName() : message;
+    }
+
     private void openCustomManifest() {
-        ensureCustomManifestFile();
+        if (!ensureCustomManifestFile()) return;
         Intent intent = new Intent(this, SrcCodeEditor.class);
         intent.putExtra("content", getCustomManifestPath());
         intent.putExtra("title", "Custom AndroidManifest.xml");
@@ -378,18 +401,37 @@ public class AndroidManifestInjection extends BaseAppCompatActivity {
     private void showQuickManifestSourceDialog() {
         k();
         new Thread(() -> {
-            String source = new yq(getApplicationContext(), sc_id).getFileSrc("AndroidManifest.xml", jC.b(sc_id), jC.a(sc_id), jC.c(sc_id));
-
+            String source = null;
+            String error = null;
+            try {
+                source = generateManifestSource();
+                if (source == null || source.trim().isEmpty()) {
+                    error = "The manifest generator returned an empty source. Check that this project has at least one valid screen.";
+                }
+            } catch (Exception exception) {
+                error = safeMessage(exception);
+                Log.e("AndroidManifestInjection", "Could not generate manifest source preview", exception);
+            }
+            String finalSource = source;
+            String finalError = error;
             runOnUiThread(() -> {
-                if (isFinishing()) return;
                 h();
-                var intent = new Intent(this, CodeViewerActivity.class);
-                intent.putExtra("code", !source.isEmpty() ? source : "Failed to generate source.");
+                if (isFinishing() || isDestroyed()) return;
+                if (finalError != null) {
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Manifest source unavailable")
+                            .setMessage(finalError + "\n\nNo source file was changed.")
+                            .setPositiveButton("OK", null)
+                            .show();
+                    return;
+                }
+                Intent intent = new Intent(this, CodeViewerActivity.class);
+                intent.putExtra("code", finalSource);
                 intent.putExtra("sc_id", sc_id);
                 intent.putExtra("scheme", CodeViewerActivity.SCHEME_XML);
                 startActivity(intent);
             });
-        }).start();
+        }, "neo-manifest-source-preview").start();
     }
 
     private void makeup(LibraryItemView parent, int icon, String title, String description) {

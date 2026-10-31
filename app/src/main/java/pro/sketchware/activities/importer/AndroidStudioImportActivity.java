@@ -49,6 +49,9 @@ import mod.sketchlibx.importer.ASProjectImporter;
 import mod.sketchlibx.importer.AndroidStudioProjectInspector;
 import mod.sketchlibx.importer.ImportLogger;
 import mod.sketchlibx.importer.ImportOptions;
+import mod.sketchlibx.project.git.GitWorkspace;
+import mod.sketchlibx.project.git.GitSourceExporter;
+import pro.sketchware.utility.FileUtil;
 import pro.sketchware.R;
 import pro.sketchware.databinding.ActivityAndroidStudioImportBinding;
 
@@ -62,6 +65,9 @@ public class AndroidStudioImportActivity extends AppCompatActivity {
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private File sourceZip;
     private String repositoryUrl = "";
+    private volatile File clonedRepositoryDir;
+    private String clonedAccessToken = "";
+    private String clonedAuthUsername = "";
     private AndroidStudioProjectInspector.Report report;
     private boolean working;
 
@@ -221,6 +227,8 @@ public class AndroidStudioImportActivity extends AppCompatActivity {
 
         clearPreviousSelection();
         repositoryUrl = safeRepositoryUrl(url);
+        clonedAccessToken = token;
+        clonedAuthUsername = url.toLowerCase(Locale.ROOT).contains("gitlab") ? "oauth2" : "x-access-token";
         runWorking("Cloning repository…", () -> {
             File repo = new File(getCacheDir(), "as_git_" + System.nanoTime());
             File zip = new File(getCacheDir(), "as_git_archive_" + System.nanoTime() + ".zip");
@@ -249,19 +257,26 @@ public class AndroidStudioImportActivity extends AppCompatActivity {
                         git.checkout().setName(ref).setForced(true).call();
                     }
                 }
+                clonedRepositoryDir = repo;
                 zipDirectory(repo, zip);
                 String name = repositoryNameFromUrl(url);
                 inspectStagedZip(zip, name, "Cloned: " + name + " (" + safeRepositoryUrl(url) + ")");
             } catch (Exception e) {
                 deleteRecursively(zip);
-                throw e;
-            } finally {
                 deleteRecursively(repo);
+                if (clonedRepositoryDir == repo) clonedRepositoryDir = null;
+                throw e;
             }
         });
     }
 
     private void clearPreviousSelection() {
+        if (clonedRepositoryDir != null) {
+            deleteRecursively(clonedRepositoryDir);
+            clonedRepositoryDir = null;
+        }
+        clonedAccessToken = "";
+        clonedAuthUsername = "";
         File previous = sourceZip;
         sourceZip = null;
         if (previous != null) deleteRecursively(previous);
@@ -375,10 +390,50 @@ public class AndroidStudioImportActivity extends AppCompatActivity {
 
             @Override
             public void onSuccess(String scId) {
-                setWorking(false);
-                setResult(Activity.RESULT_OK, new Intent().putExtra("sc_id", scId));
-                Toast.makeText(AndroidStudioImportActivity.this, "Project imported successfully", Toast.LENGTH_LONG).show();
-                finish();
+                File cloned = clonedRepositoryDir;
+                if (cloned == null || !new File(cloned, ".git").isDirectory()) {
+                    setWorking(false);
+                    setResult(Activity.RESULT_OK, new Intent().putExtra("sc_id", scId));
+                    Toast.makeText(AndroidStudioImportActivity.this, "Project imported successfully", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                if (binding != null) {
+                    binding.statusText.setText("Connecting Git repository to the imported project…");
+                    binding.loadingOverlayText.setText("Connecting Git repository…");
+                }
+                io.execute(() -> {
+                    String failure = null;
+                    File workspace = GitWorkspace.directoryFor(new File(FileUtil.getExternalStorageDir()), scId);
+                    try {
+                        if (workspace.exists()) throw new java.io.IOException("A Git workspace already exists for this project.");
+                        if (!workspace.mkdirs() && !workspace.isDirectory()) throw new java.io.IOException("Cannot create Git workspace.");
+                        copyRepositoryFiles(cloned, workspace);
+                        copyDirectory(new File(cloned, ".git"), new File(workspace, ".git"));
+                        GitSourceExporter.regenerate(AndroidStudioImportActivity.this, scId, workspace);
+                        if (!clonedAccessToken.isEmpty()) {
+                            getSharedPreferences("git_config", MODE_PRIVATE).edit()
+                                    .putString("token", clonedAccessToken)
+                                    .putString("git_username", clonedAuthUsername)
+                                    .apply();
+                        }
+                    } catch (Exception e) {
+                        failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                        FileUtil.deleteFile(workspace.getAbsolutePath());
+                    }
+                    final String gitError = failure;
+                    main.post(() -> {
+                        setWorking(false);
+                        setResult(Activity.RESULT_OK, new Intent().putExtra("sc_id", scId).putExtra("git_initialized", gitError == null));
+                        String message = gitError == null
+                                ? "Project imported and Git repository connected. Open Git Client to manage Changes, History, Branches, Remotes, Settings, Pull and Push."
+                                : "Project imported, but Git setup failed: " + gitError;
+                        Toast.makeText(AndroidStudioImportActivity.this, message, Toast.LENGTH_LONG).show();
+                        deleteRecursively(cloned);
+                        clonedRepositoryDir = null;
+                        finish();
+                    });
+                });
             }
 
             @Override
@@ -573,8 +628,47 @@ public class AndroidStudioImportActivity extends AppCompatActivity {
         cancelled.set(true);
         io.shutdownNow();
         if (!working && sourceZip != null) deleteRecursively(sourceZip);
+        if (clonedRepositoryDir != null && isFinishing()) {
+            deleteRecursively(clonedRepositoryDir);
+            clonedRepositoryDir = null;
+        }
         binding = null;
         super.onDestroy();
+    }
+
+    private void copyRepositoryFiles(File source, File target) throws Exception {
+        File[] children = source.listFiles();
+        if (children == null) throw new java.io.IOException("Cannot read cloned repository files.");
+        for (File child : children) {
+            if (".git".equals(child.getName()) || (child.isDirectory() && shouldSkipDirectory(child.getName()))) continue;
+            File destination = new File(target, child.getName());
+            if (child.isDirectory()) {
+                if (!destination.exists() && !destination.mkdirs()) throw new java.io.IOException("Cannot create " + child.getName());
+                copyRepositoryFiles(child, destination);
+            } else {
+                File parent = destination.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) throw new java.io.IOException("Cannot create repository directory.");
+                try (InputStream in = new BufferedInputStream(new FileInputStream(child)); OutputStream out = new FileOutputStream(destination)) {
+                    copyStream(in, out, MAX_TREE_BYTES);
+                }
+            }
+        }
+    }
+
+    private void copyDirectory(File source, File target) throws Exception {
+        if (!source.exists()) throw new java.io.IOException("Git metadata is missing from the cloned repository.");
+        if (source.isDirectory()) {
+            if (!target.exists() && !target.mkdirs()) throw new java.io.IOException("Cannot create Git metadata directory.");
+            File[] children = source.listFiles();
+            if (children == null) throw new java.io.IOException("Cannot read Git metadata directory.");
+            for (File child : children) copyDirectory(child, new File(target, child.getName()));
+        } else {
+            File parent = target.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) throw new java.io.IOException("Cannot create Git metadata directory.");
+            try (InputStream in = new BufferedInputStream(new FileInputStream(source)); OutputStream out = new FileOutputStream(target)) {
+                copyStream(in, out, MAX_TREE_BYTES);
+            }
+        }
     }
 
     private static boolean deleteRecursively(File target) {

@@ -266,6 +266,16 @@ public class Fx {
         return param;
     }
 
+    private String getDefinedFunctionIdentifier(String spec) {
+        if (spec == null || spec.trim().isEmpty()) return "unknown";
+        String token = spec.trim();
+        int whitespace = token.indexOf(' ');
+        if (whitespace >= 0) token = token.substring(0, whitespace);
+        int labelSeparator = token.indexOf(':');
+        if (labelSeparator >= 0) token = token.substring(0, labelSeparator);
+        return ReturnMoreblockManager.getMbName(token);
+    }
+
     private ArrayList<String> extractParamsTypes(String input) {
         ArrayList<String> matches = new ArrayList<>();
         Pattern pattern = Pattern.compile("%\\w+(?:\\.\\w+)?|%\\w");
@@ -282,13 +292,13 @@ public class Fx {
         String opcode = "";
         switch (bean.opCode) {
             case "definedFunc":
-                int space = bean.spec.indexOf(" ");
+                String functionIdentifier = getDefinedFunctionIdentifier(bean.spec);
                 if (bean.parameters.isEmpty()) {
                     opcode = bean.type;
-                    moreBlock = "_" + (space < 0 ? bean.spec : bean.spec.substring(0, space)) + "()" + ReturnMoreblockManager.getMbEnd(bean.type);
+                    moreBlock = "_" + functionIdentifier + "()" + ReturnMoreblockManager.getMbEnd(bean.type);
                 } else {
                     ArrayList<String> paramsTypes = extractParamsTypes(bean.spec);
-                    opcode = "_" + bean.spec.substring(0, space) + "(";
+                    opcode = "_" + functionIdentifier + "(";
                     boolean hasStringParam = false;
 
                     for (int i = 0; i < params.size(); i++) {
@@ -537,8 +547,18 @@ public class Fx {
                 opcode = String.format("new DecimalFormat(%s).format(%s)", params.get(1), params.get(0));
                 break;
             case "addSourceDirectly":
-                String asd = bean.parameters.get(0);
-                opcode = (asd != null) ? asd : opcode;
+                String sourceValue = bean.parameters == null || bean.parameters.isEmpty() ? "" : bean.parameters.get(0);
+                if (sourceValue != null && sourceValue.matches("@[0-9]+")) {
+                    BlockBean sourceBlock = blockMap.get(sourceValue.substring(1));
+                    if (sourceBlock != null && "asdString".equals(sourceBlock.opCode)
+                            && sourceBlock.parameters != null && !sourceBlock.parameters.isEmpty()) {
+                        opcode = sourceBlock.parameters.get(0);
+                    } else {
+                        opcode = "";
+                    }
+                } else {
+                    opcode = sourceValue == null ? "" : sourceValue;
+                }
                 break;
             case "comment":
                 // A comment block must stay on one source line; pasted newlines

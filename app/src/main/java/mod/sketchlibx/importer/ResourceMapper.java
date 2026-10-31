@@ -18,22 +18,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Maps Android Studio resource files to Sketchware's resource structure.
- *
- * Responsibilities:
- *  - Copy image (drawable/mipmap) files to .sketchware/resources/images/<sc_id>/
- *  - Copy sound (raw) files to .sketchware/resources/sounds/<sc_id>/
- *  - Copy font files to .sketchware/resources/fonts/<sc_id>/
- *  - Copy other resources (values, anim, menu, xml, color) to files/resource/
- *  - Detect and copy the launcher icon to files/app-icon/icon.png
- *  - Build the Sketchware "resource" data string
- *
- * Density qualifier collision rule:
- *   drawable-xxhdpi/bg.png + drawable-hdpi/bg.png → prefer xxhdpi.
- *   Never silently overwrite. Logs a WARNING for every collision.
- *
- * Density priority (highest = most preferred):
- *   xxxhdpi > xxhdpi > xhdpi > hdpi > mdpi > ldpi > nodpi > (no qualifier)
+ * Copies Android resources into Sketchware's image, sound, font and files folders.
+ * It also selects the best density image, copies the launcher icon and builds
+ * the resource data string. On a name conflict, the higher-density image wins
+ * and the conflict is logged.
  */
 public class ResourceMapper {
 
@@ -57,7 +45,7 @@ public class ResourceMapper {
             .excludeFieldsWithoutExposeAnnotation()
             .create();
 
-    // ── Result holder ─────────────────────────────────────────────────────────
+     
 
     public static class ResourceResult {
         /** Sketchware "resource" data string: @images\n...\n@sounds\n...\n@fonts\n...\n */
@@ -66,18 +54,9 @@ public class ResourceMapper {
         public boolean hasCustomIcon = false;
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
+     
 
-    /**
-     * Processes all resources under src/main/res/.
-     *
-     * @param resDir         src/main/res directory
-     * @param filesPath      data/<sc_id>/files path (for non-Sketchware-resource files)
-     * @param swImagesPath   .sketchware/resources/images/<sc_id>/ path
-     * @param swSoundsPath   .sketchware/resources/sounds/<sc_id>/ path
-     * @param swFontsPath    .sketchware/resources/fonts/<sc_id>/  path
-     * @param iconResName    launcher icon name (without extension) from manifest
-     */
+    /** Processes resources from the module's src/main/res folder. */
     public ResourceResult process(
             File resDir,
             String filesPath,
@@ -85,16 +64,27 @@ public class ResourceMapper {
             String swSoundsPath,
             String swFontsPath,
             String iconResName) {
+        return process(resDir, filesPath, swImagesPath, swSoundsPath, swFontsPath, iconResName, null);
+    }
+
+    public ResourceResult process(
+            File resDir,
+            String filesPath,
+            String swImagesPath,
+            String swSoundsPath,
+            String swFontsPath,
+            String iconResName,
+            String projectIconPath) {
 
         ResourceResult result = new ResourceResult();
         if (!resDir.exists() || !resDir.isDirectory()) return result;
 
-        // Ensure target directories exist
+         
         FileUtil.makeDir(swImagesPath);
         FileUtil.makeDir(swSoundsPath);
         FileUtil.makeDir(swFontsPath);
 
-        // ── First pass: collect all images with density metadata ──────────────
+         
         // Map: filename (e.g. "bg.png") → best candidate File so far
         Map<String, DensityCandidate> bestImages = new HashMap<>();
 
@@ -109,7 +99,7 @@ public class ResourceMapper {
             String dName = dir.getName();
 
             if (dName.startsWith("drawable") || dName.startsWith("mipmap")) {
-                // Extract density qualifier from folder name
+                 
                 // "drawable-xxhdpi" → "xxhdpi", "drawable" → ""
                 String qualifier = extractQualifier(dName);
                 int priority = DENSITY_PRIORITY.getOrDefault(qualifier, 0);
@@ -121,8 +111,10 @@ public class ResourceMapper {
                     String fName = resFile.getName();
                     String lower = fName.toLowerCase();
 
+                    if (!resFile.isFile()) continue;
                     if (lower.endsWith(".png") || lower.endsWith(".jpg")
                             || lower.endsWith(".jpeg") || lower.endsWith(".webp")) {
+                        if (dName.startsWith("mipmap")) copyToFilesResource(resFile, filesPath, dName);
 
                         boolean webp = lower.endsWith(".webp");
                         String outputName = webp ? stripExtension(fName) + ".png" : fName;
@@ -131,14 +123,16 @@ public class ResourceMapper {
                             outputName = fName; // Don't lie about the format if decode failed.
                             Log.w(TAG, "WebP could not be decoded to PNG; preserving original extension: " + resFile.getAbsolutePath());
                         }
+                        boolean mipmapFolder = dName.startsWith("mipmap");
                         DensityCandidate existing = bestImages.get(outputName);
-                        if (existing == null || priority > existing.priority) {
+                        if (existing == null || (mipmapFolder && !existing.mipmap)
+                                || (mipmapFolder == existing.mipmap && priority > existing.priority)) {
                             if (existing != null) {
                                 Log.w(TAG, "Density/format collision: " + outputName
                                         + " — replacing density=" + existing.qualifier
                                         + " with density=" + qualifier);
                             }
-                            bestImages.put(outputName, new DensityCandidate(resFile, qualifier, priority, convertToPng));
+                            bestImages.put(outputName, new DensityCandidate(resFile, qualifier, priority, convertToPng, mipmapFolder));
                         }
 
                     } else if (lower.endsWith(".xml")) {
@@ -148,25 +142,29 @@ public class ResourceMapper {
                 }
 
             } else if (dName.startsWith("raw")) {
-                // Sounds
+                 
                 File[] files = dir.listFiles();
                 if (files == null) continue;
                 for (File resFile : files) {
+                    if (!resFile.isFile()) continue;
                     String fName = resFile.getName();
                     String destPath = swSoundsPath + File.separator + fName;
                     FileUtil.copyFile(resFile.getAbsolutePath(), destPath);
+                    copyToFilesResource(resFile, filesPath, dName);
                     soundEntries.add(new ResourceEntry(fName));
                     Log.d(TAG, "Sound: " + fName);
                 }
 
             } else if (dName.startsWith("font")) {
-                // Fonts
+                 
                 File[] files = dir.listFiles();
                 if (files == null) continue;
                 for (File resFile : files) {
+                    if (!resFile.isFile()) continue;
                     String fName = resFile.getName();
                     String destPath = swFontsPath + File.separator + fName;
                     FileUtil.copyFile(resFile.getAbsolutePath(), destPath);
+                    copyToFilesResource(resFile, filesPath, dName);
                     fontEntries.add(new ResourceEntry(fName));
                     Log.d(TAG, "Font: " + fName);
                 }
@@ -182,9 +180,9 @@ public class ResourceMapper {
             }
         }
 
-        // ── Second pass: copy best-density images ─────────────────────────────
+         
         List<ResourceEntry> imageEntries = new ArrayList<>();
-        String appIconTarget = filesPath + File.separator + "app-icon" + File.separator + "icon.png";
+        String appIconTarget = filesPath + File.separator + "app-icon" + File.separator + "app_icon.png";
 
         for (Map.Entry<String, DensityCandidate> entry : bestImages.entrySet()) {
             String fName    = entry.getKey();
@@ -192,15 +190,20 @@ public class ResourceMapper {
             File   srcFile  = candidate.file;
             String cleanName = stripExtension(fName);
 
-            // Is this the launcher icon?
+             
             if (cleanName.equals(iconResName)
                     || cleanName.startsWith(iconResName + "_foreground")
                     || cleanName.equals(iconResName + "_round")) {
                 // Use exact match for the main icon only (not foreground / round variants)
                 if (cleanName.equals(iconResName)) {
-                    if (copyImageAsPng(srcFile, new File(appIconTarget))) {
+                    boolean iconSaved = copyImageAsPng(srcFile, new File(appIconTarget));
+                    if (iconSaved) {
                         result.hasCustomIcon = true;
-                        Log.d(TAG, "Launcher icon converted/copied as valid PNG: " + fName + " → app-icon/icon.png");
+                        if (projectIconPath != null && !projectIconPath.trim().isEmpty()
+                                && !copyImageAsPng(srcFile, new File(projectIconPath))) {
+                            loggerWarning("Launcher icon was saved for the APK, but the project-list icon could not be written.");
+                        }
+                        Log.d(TAG, "Launcher icon saved to the app icon and project icon stores: " + fName);
                     } else {
                         loggerWarning("Could not decode launcher image '" + srcFile.getName() + "' as an image; default Sketchware launcher icon will be used.");
                     }
@@ -216,25 +219,14 @@ public class ResourceMapper {
             }
         }
 
-        // ── Build resource data string ─────────────────────────────────────────
+         
         result.resourceData = buildResourceData(imageEntries, soundEntries, fontEntries);
         return result;
     }
 
-    // ── Resource data string builder ──────────────────────────────────────────
+     
 
-    /**
-     * Confirmed format (from eC.class + ProjectResourceBean):
-     *
-     *   @images
-     *   {"resFullName":"bg.png","resName":"bg","resType":1}
-     *   @sounds
-     *   {"resFullName":"beep.mp3","resName":"beep","resType":1}
-     *   @fonts
-     *   {"resFullName":"roboto.ttf","resName":"roboto","resType":1}
-     *
-     * resType=1 = PROJECT_RES_TYPE_FILE (files on disk, not inline resource values)
-     */
+    /** Writes the @images, @sounds and @fonts sections used by Sketchware. */
     private String buildResourceData(
             List<ResourceEntry> images,
             List<ResourceEntry> sounds,
@@ -254,7 +246,7 @@ public class ResourceMapper {
         return sb.toString();
     }
 
-    // ── Copy file to files/resource/<dirName>/ ────────────────────────────────
+     
 
     private void copyToFilesResource(File resFile, String filesPath, String dirName) {
         File targetDir = new File(filesPath + File.separator + "resource" + File.separator + dirName);
@@ -264,11 +256,7 @@ public class ResourceMapper {
                 targetDir.getAbsolutePath() + File.separator + resFile.getName());
     }
 
-    /**
-     * Copy an image and return the exact filename used in data/resource. WebP is
-     * renamed to .png only after a successful real decode+PNG encode; if encoding
-     * fails, preserve the original bytes under the original extension instead.
-     */
+    /** Copies an image. WebP is renamed to PNG only after a successful conversion. */
     private String copyMappedImage(DensityCandidate candidate, String desiredName, String swImagesPath) {
         File source = candidate.file;
         FileUtil.makeDir(swImagesPath);
@@ -320,7 +308,7 @@ public class ResourceMapper {
         Log.w(TAG, message);
     }
 
-    // ── Density qualifier extraction ─────────────────────────────────────────
+     
 
     /**
      * "drawable-xxhdpi" → "xxhdpi"
@@ -339,25 +327,27 @@ public class ResourceMapper {
         return afterDash; // return raw if no recognized density found
     }
 
-    // ── Utility ───────────────────────────────────────────────────────────────
+     
 
     private String stripExtension(String fileName) {
         int dot = fileName.lastIndexOf('.');
         return (dot >= 0) ? fileName.substring(0, dot) : fileName;
     }
 
-    // ── Inner data classes ────────────────────────────────────────────────────
+     
 
     private static class DensityCandidate {
         final File file;
         final String qualifier;
         final int priority;
         final boolean convertToPng;
-        DensityCandidate(File file, String qualifier, int priority, boolean convertToPng) {
+        final boolean mipmap;
+        DensityCandidate(File file, String qualifier, int priority, boolean convertToPng, boolean mipmap) {
             this.file = file;
             this.qualifier = qualifier;
             this.priority = priority;
             this.convertToPng = convertToPng;
+            this.mipmap = mipmap;
         }
     }
 

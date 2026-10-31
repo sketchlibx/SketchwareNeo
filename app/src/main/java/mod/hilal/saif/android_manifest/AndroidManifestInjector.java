@@ -105,9 +105,29 @@ public class AndroidManifestInjector {
         addToApp(nx, projectId);
     }
 
+    public static boolean isApplicationAttributeUsed(String attributeName, String projectId) {
+        if (attributeName == null || attributeName.trim().isEmpty()) return false;
+        ArrayList<HashMap<String, Object>> attributes = readAndroidManifestAttributeInjections(projectId);
+        String marker = attributeName + "=";
+        for (HashMap<String, Object> item : attributes) {
+            if (item == null || !"_application_attrs".equals(item.get("name"))) continue;
+            Object value = item.get("value");
+            if (value instanceof String && ((String) value).contains(marker)) return true;
+        }
+        return false;
+    }
+
+    private static String classNameFromJavaName(String javaName) {
+        if (javaName == null) return "";
+        int extension = javaName.lastIndexOf(".java");
+        if (extension <= 0 || extension != javaName.length() - 5) return "";
+        return javaName.substring(0, extension);
+    }
+
     public static boolean getActivityAttrs(XmlBuilder nx, String projectId, String actName) {
         ArrayList<HashMap<String, Object>> attributes = readAndroidManifestAttributeInjections(projectId);
-        String className = actName.substring(0, actName.indexOf(".java"));
+        String className = classNameFromJavaName(actName);
+        if (className.isEmpty()) return false;
 
         for (int i = 0; i < attributes.size(); i++) {
             HashMap<String, Object> attribute = attributes.get(i);
@@ -144,14 +164,14 @@ public class AndroidManifestInjector {
 
     public static boolean isActivityAttributeUsed(String attribute, String sc_id, String activityName) {
         ArrayList<HashMap<String, Object>> attributes = readAndroidManifestAttributeInjections(sc_id);
-        String className = activityName.substring(0, activityName.indexOf(".java"));
+        String className = classNameFromJavaName(activityName);
 
         for (int i = 0; i < attributes.size(); i++) {
             HashMap<String, Object> attributeMap = attributes.get(i);
             Object name = attributeMap.get("name");
 
             if (name instanceof String) {
-                if (className.equals(name) || "_apply_for_all_activities".equals(name)) {
+                if ((!className.isEmpty() && className.equals(name)) || "_apply_for_all_activities".equals(name)) {
                     Object value = attributeMap.get("value");
 
                     if (value instanceof String) {
@@ -291,14 +311,14 @@ public class AndroidManifestInjector {
 
     public static void addToAct(XmlBuilder nx, String projectId, String actName) {
         ArrayList<HashMap<String, Object>> attributes = readAndroidManifestAttributeInjections(projectId);
-        String className = actName.substring(0, actName.indexOf(".java"));
+        String className = classNameFromJavaName(actName);
 
         for (int i = 0; i < attributes.size(); i++) {
             HashMap<String, Object> attribute = attributes.get(i);
             Object name = attribute.get("name");
 
             if (name instanceof String) {
-                if (className.equals(name) || "_apply_for_all_activities".equals(name)) {
+                if ((!className.isEmpty() && className.equals(name)) || "_apply_for_all_activities".equals(name)) {
                     Object value = attribute.get("value");
 
                     if (value instanceof String) {

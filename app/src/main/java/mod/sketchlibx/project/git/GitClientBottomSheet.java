@@ -60,6 +60,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.PushResult;
@@ -71,6 +72,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 import java.io.ByteArrayOutputStream;
@@ -269,7 +271,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private CredentialsProvider getCredentials() {
         SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
         String token = prefs.getString("token", "");
-        String username = prefs.getString("name", "");
+        String username = prefs.getString("git_username", prefs.getString("name", ""));
         return new UsernamePasswordCredentialsProvider(username, token);
     }
 
@@ -856,22 +858,26 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private String computeDiffText(ChangesAdapter.GitFile file) throws Exception {
-        if ("Untracked".equals(file.statusLabel)) {
-            File f = new File(repoDir, file.path);
-            if (!f.exists()) return "File not found.";
-            if (f.length() > 200_000) return "File too large to preview (" + (f.length() / 1024) + " KB).";
-            byte[] bytes = Files.readAllBytes(f.toPath());
-            return "New file (untracked):\n\n" + new String(bytes, StandardCharsets.UTF_8);
-        }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (DiffFormatter df = new DiffFormatter(out)) {
-            df.setRepository(git.getRepository());
+            Repository repository = git.getRepository();
+            df.setRepository(repository);
             df.setContext(3);
-            List<DiffEntry> entries = git.diff()
-                    .setCached(file.isStaged)
-                    .setPathFilter(PathFilter.create(file.path))
-                    .call();
-            if (entries.isEmpty()) return "No textual differences found.";
+            df.setDiffComparator(RawTextComparator.DEFAULT);
+            List<DiffEntry> entries;
+            if ("Untracked".equals(file.statusLabel)) {
+                File target = new File(repoDir, file.path).getCanonicalFile();
+                if (!target.toPath().startsWith(repoDir.getCanonicalFile().toPath())) throw new IOException("The selected path is outside the Git workspace.");
+                if (!target.isFile()) return "File not found.";
+                if (target.length() > 200_000) return "File too large to preview (" + (target.length() / 1024) + " KB).";
+                entries = df.scan(new EmptyTreeIterator(), new FileTreeIterator(repository));
+                List<DiffEntry> matching = new ArrayList<>();
+                for (DiffEntry entry : entries) if (file.path.equals(entry.getNewPath())) matching.add(entry);
+                entries = matching;
+            } else {
+                entries = git.diff().setCached(file.isStaged).setPathFilter(PathFilter.create(file.path)).call();
+            }
+            if (entries.isEmpty()) return "No textual differences found (the file may be binary or unchanged).";
             for (DiffEntry entry : entries) df.format(entry);
         }
         String result = out.toString("UTF-8");
@@ -882,7 +888,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         runGitTask("Loading diff...", true, () -> computeDiffText(file), new GitTaskCallback<String>() {
             @Override public void onSuccess(String diffText) {
                 TextView tv = new TextView(requireContext());
-                tv.setText(diffText);
+                tv.setText(formatDiffForDisplay(diffText));
                 tv.setTypeface(android.graphics.Typeface.MONOSPACE);
                 tv.setTextSize(12f);
                 tv.setTextIsSelectable(true);
@@ -900,9 +906,32 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
+    private CharSequence formatDiffForDisplay(String diffText) {
+        android.text.SpannableStringBuilder styled = new android.text.SpannableStringBuilder(diffText == null ? "" : diffText);
+        int added = ThemeUtils.getColor(requireContext(), R.attr.colorPrimary);
+        int removed = ThemeUtils.getColor(requireContext(), R.attr.colorError);
+        int meta = ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant);
+        int start = 0;
+        while (start < styled.length()) {
+            int end = android.text.TextUtils.indexOf(styled, '\n', start);
+            if (end < 0) end = styled.length();
+            if (end > start) {
+                char first = styled.charAt(start);
+                int color = first == '+' && !styled.toString().startsWith("+++", start) ? added
+                        : first == '-' && !styled.toString().startsWith("---", start) ? removed
+                        : first == '@' || styled.toString().startsWith("diff --", start) || styled.toString().startsWith("index ", start) ? meta : 0;
+                if (color != 0) styled.setSpan(new android.text.style.ForegroundColorSpan(color), start, end,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            start = end + 1;
+        }
+        return styled;
+    }
+
     private void setupHistoryTab(View view) {
         historyTabView = view;
         RecyclerView rvHistory = view.findViewById(R.id.rv_history);
+        rvHistory.setHasFixedSize(true);
         rvHistory.setLayoutManager(new LinearLayoutManager(requireContext()));
         historyAdapter = new HistoryAdapter(this::showCommitDetailsDialog);
         rvHistory.setAdapter(historyAdapter);
@@ -919,7 +948,10 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         boolean showStats = prefs.getBoolean("show_diff", false);
         
         String details = "Hash: " + shortHash + "\nAuthor: " + author + "\nDate: " + date + "\n\n" + commit.getFullMessage();
-        if (showStats) details += "\n\n[Diff stats enabled but rendering pending]";
+        if (showStats) {
+            try { details += "\n\n" + buildCommitDiffStats(commit); }
+            catch (Exception e) { details += "\n\nDiff stats unavailable: " + GitErrorMapper.map(e); }
+        }
 
         TextView tv = new TextView(requireContext());
         tv.setText(details);
@@ -940,6 +972,37 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 .setNegativeButton("Close", null)
                 .setNeutralButton("Revert", (d, w) -> confirmRevert(commit))
                 .show();
+    }
+
+    private String buildCommitDiffStats(RevCommit commit) throws Exception {
+        int files = 0, insertions = 0, deletions = 0;
+        try (DiffFormatter formatter = new DiffFormatter(DisabledOutputStream.INSTANCE);
+             ObjectReader reader = git.getRepository().newObjectReader();
+             RevWalk walk = new RevWalk(git.getRepository())) {
+            RevCommit parsedCommit = walk.parseCommit(commit.getId());
+            formatter.setRepository(git.getRepository());
+            formatter.setDiffComparator(RawTextComparator.DEFAULT);
+            AbstractTreeIterator oldTree;
+            if (parsedCommit.getParentCount() == 0) oldTree = new EmptyTreeIterator();
+            else {
+                RevCommit parsedParent = walk.parseCommit(parsedCommit.getParent(0).getId());
+                CanonicalTreeParser parent = new CanonicalTreeParser();
+                parent.reset(reader, parsedParent.getTree());
+                oldTree = parent;
+            }
+            CanonicalTreeParser current = new CanonicalTreeParser();
+            current.reset(reader, parsedCommit.getTree());
+            List<DiffEntry> entries = formatter.scan(oldTree, current);
+            files = entries.size();
+            for (DiffEntry entry : entries) {
+                org.eclipse.jgit.patch.FileHeader header = formatter.toFileHeader(entry);
+                for (org.eclipse.jgit.diff.Edit edit : header.toEditList()) {
+                    insertions += edit.getEndB() - edit.getBeginB();
+                    deletions += edit.getEndA() - edit.getBeginA();
+                }
+            }
+        }
+        return "Changes\n" + files + " files changed, " + insertions + " insertions(+), " + deletions + " deletions(-)";
     }
 
     private void confirmRevert(RevCommit commit) {
@@ -1230,6 +1293,10 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void setupSettingsTab(View view) {
+        View scroll = view.findViewById(R.id.git_settings_scroll);
+        if (scroll instanceof androidx.core.widget.NestedScrollView) {
+            ((androidx.core.widget.NestedScrollView) scroll).setFillViewport(true);
+        }
         SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
 
         TextInputEditText etName = view.findViewById(R.id.et_git_name);

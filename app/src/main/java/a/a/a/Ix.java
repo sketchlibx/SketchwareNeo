@@ -558,30 +558,43 @@ public class Ix {
         }
 
         XmlBuilder applicationTag = new XmlBuilder("application");
-        applicationTag.addAttribute("android", "allowBackup", "true");
+        if (!AndroidManifestInjector.isApplicationAttributeUsed("android:allowBackup", c.sc_id)) {
+            applicationTag.addAttribute("android", "allowBackup", "true");
+        }
         applicationTag.addAttribute("android", "icon", "@mipmap/ic_launcher");
         applicationTag.addAttribute("android", "label", "@string/app_name");
-        
-        applicationTag.addAttribute("android", "appComponentFactory", "androidx.core.app.CoreComponentFactory");
+        if (!AndroidManifestInjector.isApplicationAttributeUsed("android:appComponentFactory", c.sc_id)) {
+            applicationTag.addAttribute("android", "appComponentFactory", "androidx.core.app.CoreComponentFactory");
+        }
 
         String applicationClassName = settings.getValue(ProjectSettings.SETTING_APPLICATION_CLASS, ".SketchApplication");
         applicationTag.addAttribute("android", "name", applicationClassName);
-        if (addRequestLegacyExternalStorage) {
+        if (addRequestLegacyExternalStorage
+                && !AndroidManifestInjector.isApplicationAttributeUsed("android:requestLegacyExternalStorage", c.sc_id)) {
             applicationTag.addAttribute("android", "requestLegacyExternalStorage", "true");
         }
         if (!buildSettings.getValue(BuildSettings.SETTING_NO_HTTP_LEGACY, BuildSettings.SETTING_GENERIC_VALUE_FALSE)
-                .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)) {
+                .equals(BuildSettings.SETTING_GENERIC_VALUE_TRUE)
+                && !AndroidManifestInjector.isApplicationAttributeUsed("android:usesCleartextTraffic", c.sc_id)) {
             applicationTag.addAttribute("android", "usesCleartextTraffic", "true");
         }
         AndroidManifestInjector.getAppAttrs(applicationTag, c.sc_id);
 
         boolean hasDebugActivity = false;
         for (ProjectFileBean projectFileBean : b) {
-            if (!projectFileBean.fileName.contains("_fragment")) {
+            if (projectFileBean == null || projectFileBean.fileName == null
+                    || projectFileBean.fileName.contains("_fragment")) {
+                continue;
+            }
+            String javaName = projectFileBean.getJavaName();
+            if (javaName == null || !javaName.endsWith(".java")
+                    || javaName.lastIndexOf(".java") != javaName.length() - 5
+                    || javaName.length() <= 5) {
+                continue;
+            }
+            {
                 XmlBuilder activityTag = new XmlBuilder("activity");
-
-                String javaName = projectFileBean.getJavaName();
-                activityTag.addAttribute("android", "name", "." + javaName.substring(0, javaName.indexOf(".java")));
+                activityTag.addAttribute("android", "name", "." + javaName.substring(0, javaName.length() - 5));
 
                 if (!AndroidManifestInjector.getActivityAttrs(activityTag, c.sc_id, projectFileBean.getJavaName())) {
                     activityTag.addAttribute("android", "configChanges", "orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout");
@@ -633,8 +646,6 @@ public class Ix {
                         activityTag.addAttribute("android", "exported", "true");
                     }
                     activityTag.addChildNode(intentFilterTag);
-                } else if (targetsSdkVersion31OrHigher && !AndroidManifestInjector.isActivityExportedUsed(c.sc_id, javaName)) {
-                    activityTag.addAttribute("android", "exported", "false");
                 }
                 
                 applicationTag.addChildNode(activityTag);
@@ -650,16 +661,12 @@ public class Ix {
             activityTag.addAttribute("android", "screenOrientation", "portrait");
             activityTag.addAttribute("android", "theme", "@style/AppTheme.DebugActivity");
             
-            if (targetsSdkVersion31OrHigher) {
-                activityTag.addAttribute("android", "exported", "false");
-            }
             applicationTag.addChildNode(activityTag);
         }
         if (c.isAdMobEnabled) {
             XmlBuilder activityTag = new XmlBuilder("activity");
             activityTag.addAttribute("android", "name", "com.google.android.gms.ads.AdActivity");
             activityTag.addAttribute("android", "configChanges", "keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize");
-            activityTag.addAttribute("android", "exported", "false");
             activityTag.addAttribute("android", "theme", "@android:style/Theme.Translucent");
             applicationTag.addChildNode(activityTag);
 
@@ -679,7 +686,6 @@ public class Ix {
             XmlBuilder testingActivity = new XmlBuilder("activity");
             testingActivity.addAttribute("android", "name", "com.google.android.gms.ads.OutOfContextTestingActivity");
             testingActivity.addAttribute("android", "configChanges", "keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize");
-            testingActivity.addAttribute("android", "exported", "false");
             applicationTag.addChildNode(testingActivity);
         }
         if (c.isGoogleBillingEnabled) {
@@ -690,7 +696,6 @@ public class Ix {
             unityActivity.addAttribute("android", "name", "com.unity3d.ads.adplayer.FullScreenWebViewDisplay");
             unityActivity.addAttribute("android", "configChanges", "fontScale|keyboard|keyboardHidden|locale|mnc|mcc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|touchscreen");
             unityActivity.addAttribute("android", "enableOnBackInvokedCallback", "false");
-            unityActivity.addAttribute("android", "exported", "false");
             unityActivity.addAttribute("android", "hardwareAccelerated", "true");
             unityActivity.addAttribute("android", "theme", "@android:style/Theme.NoTitleBar.Fullscreen");
             applicationTag.addChildNode(unityActivity);
@@ -768,7 +773,6 @@ public class Ix {
             XmlBuilder billingActivity = new XmlBuilder("activity");
             billingActivity.addAttribute("android", "name", activityName);
             billingActivity.addAttribute("android", "configChanges", "keyboard|keyboardHidden|screenLayout|screenSize|orientation");
-            billingActivity.addAttribute("android", "exported", "false");
             billingActivity.addAttribute("android", "theme", "@android:style/Theme.Translucent.NoTitleBar");
             applicationTag.addChildNode(billingActivity);
         }
@@ -778,7 +782,6 @@ public class Ix {
         XmlBuilder activityTag = new XmlBuilder("activity");
         boolean specifiedActivityName = false;
         boolean specifiedConfigChanges = false;
-        boolean specifiedExported = false;
         
         for (HashMap<String, Object> hashMap : activityAttrs) {
             if (hashMap.containsKey("name") && hashMap.containsKey("value")) {
@@ -793,8 +796,6 @@ public class Ix {
                             specifiedActivityName = true;
                         } else if (value.contains("android:configChanges=")) {
                             specifiedConfigChanges = true;
-                        } else if (value.contains("android:exported=")) {
-                            specifiedExported = true;
                         }
                     }
                 }
@@ -805,10 +806,6 @@ public class Ix {
         }
         if (!specifiedConfigChanges) {
             activityTag.addAttribute("android", "configChanges", "orientation|screenSize");
-        }
-        
-        if (targetsSdkVersion31OrHigher && !specifiedExported) {
-             activityTag.addAttribute("android", "exported", "false");
         }
         
         applicationTag.addChildNode(activityTag);

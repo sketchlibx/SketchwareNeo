@@ -8,6 +8,7 @@ public class FilePathUtil {
 
     private static final File SKETCHWARE_DATA = new File(Environment.getExternalStorageDirectory(), ".sketchware/data/");
     private static final File SKETCHWARE_LOCAL_LIBS = new File(Environment.getExternalStorageDirectory(), ".sketchware/libs/local_libs");
+    private static final File SKETCHWARE_RESOURCE_ICONS = new File(Environment.getExternalStorageDirectory(), ".sketchware/resources/icons");
 
     public static String getLastCompileLogPath(String sc_id) {
         return new File(SKETCHWARE_DATA, sc_id + "/compile_log").getAbsolutePath();
@@ -51,6 +52,18 @@ public class FilePathUtil {
 
     public String getPathResource(String sc_id) {
         return new File(SKETCHWARE_DATA, sc_id + "/files/resource").getAbsolutePath();
+    }
+
+    public String getPathProjectIconDirectory(String sc_id) {
+        return new File(SKETCHWARE_RESOURCE_ICONS, sc_id == null ? "" : sc_id).getAbsolutePath();
+    }
+
+    public String getPathProjectIcon(String sc_id) {
+        return new File(getPathProjectIconDirectory(sc_id), "icon.png").getAbsolutePath();
+    }
+
+    public String getPathProjectIconMipmaps(String sc_id) {
+        return new File(getPathProjectIconDirectory(sc_id), "mipmaps").getAbsolutePath();
     }
 
     public String getPathProguard(String sc_id) {

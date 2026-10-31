@@ -73,9 +73,20 @@ public class InjectRootLayoutManager {
 
     public ViewBean toBean(String name) {
         Root root = getLayoutByFileName(name);
+        Map<String, String> attributes = new LinkedHashMap<>();
+        if (root.getAttributes() != null) {
+            for (Map.Entry<String, String> entry : root.getAttributes().entrySet()) {
+                String attributeName = entry.getKey();
+                if (attributeName == null || "xmlns".equals(attributeName)
+                        || attributeName.startsWith("xmlns:")) {
+                    continue;
+                }
+                attributes.put(attributeName, entry.getValue());
+            }
+        }
         ViewBean viewBean = new ViewBean("root", ViewBeanParser.getViewTypeByClassName(root.getClassName()));
         viewBean.convert = root.getClassName();
-        new ViewBeanFactory(viewBean).applyAttributes(root.getAttributes());
+        new ViewBeanFactory(viewBean).applyAttributes(attributes);
         return viewBean;
     }
 

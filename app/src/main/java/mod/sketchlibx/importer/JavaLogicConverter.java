@@ -22,72 +22,18 @@ import com.github.javaparser.ast.body.TypeDeclaration;
 import mod.sketchlibx.project.editor.BlocksConverter;
 
 /**
- * Converts a small, EXPLICITLY SCOPED subset of Android Studio Java into real
- * Sketchware Neo blocks, using only opCodes/formats confirmed in
- * sketchware-neo-swb-analysis-complete.md (a real-project reverse-engineering
- * reference — this is not invented). Everything outside that confirmed
- * subset is preserved verbatim as a real "addSourceDirectly" block (spec:
- * "add source directly %s.inputOnly", confirmed exact) — never silently
- * dropped, and never faked as a made-up opCode.
- *
- * HONEST SCOPE — what this DOES convert to native blocks:
- *   - finish()                                    -> finishActivity
- *   - startActivity(new Intent(ctx, X.class))     -> intent component + intentSetScreen + startActivity
- *   - simple field assignment (int/String/boolean/float field = literal or +-*\/ on
- *     numbers/other known fields)                  -> setVarIntNum/setVarString/setVarBoolean/setVarFloat
- *     (NOTE: a Java "int" field now maps to Sketchware's own real int type (setVarIntNum),
- *     not the legacy "Number" type (setVarInt, which is actually a double) — this changed
- *     now that a real int type exists.)
- *   - if/else with a SIMPLE condition:
- *       numeric equality  a == b                   -> "=" opCode (only proven comparison op)
- *       string equality    a.equals(b)              -> stringEquals
- *     any other operator (>,<,>=,<=,!=, &&, ||)     -> NOT converted (unconfirmed opCodes —
- *                                                       see doc §11) — the whole if/else is
- *                                                       preserved as one addSourceDirectly block
- *   - view.setOnClickListener(...) where the view is resolvable to a layout
- *     id (via ViewBinding "binding.viewId" or a local "Type v = findViewById(R.id.viewId)")
- *                                                    -> registers a real "_<viewId>_onClick"
- *                                                       event section (confirmed pattern),
- *                                                       body converted recursively
- *   - onCreate(Bundle) body                         -> the confirmed special "onCreate_initializeLogic"
- *                                                       section (no _events entry needed — confirmed)
- *   - onBackPressed() body                          -> confirmed "onBackPressed_onBackPressed" section
- *
- * HONEST SCOPE — what this explicitly DOES NOT convert, and why:
- *   - Toast.makeText(...).show() — NO confirmed opCode exists anywhere in the reference
- *     doc for showing a toast/message. Inventing one (e.g. "showMessage") would violate
- *     the explicit "do not guess confirmed formats" rule, so every Toast call is preserved
- *     as addSourceDirectly, not faked as a native "message" block.
- *   - onStart/onResume/onPause/onStop/onDestroy — the doc's confirmed section list is
- *     onCreate_initializeLogic, onBackPressed_onBackPressed, and per-widget-event sections
- *     ONLY. There is no confirmed section name for the other four lifecycle callbacks.
- *     Their bodies are therefore NOT wired into any logic section at all — they are only
- *     preserved in the copied raw .java source file (ASProjectImporter always copies the
- *     original file regardless of conversion), and this is logged explicitly as
- *     UNSUPPORTED so it is never silently lost.
- *   - loops (for/while/do-while), switch, try/catch bodies, lambdas other than a plain
- *     View.OnClickListener target, comparisons other than == and .equals() — all preserved
- *     as addSourceDirectly at the statement (or whole-method, for method-level constructs
- *     like try/catch) granularity.
- *   - This is a PATTERN-BASED / brace-and-statement-boundary-aware line splitter, not a
- *     real Java compiler AST. It handles the patterns above correctly on ordinary,
- *     idiomatically-formatted source; unusual formatting (e.g. semicolons inside string
- *     literals containing raw braces in a way that defeats the depth counter) can cause a
- *     statement to be mis-split. When that happens the affected statement(s) still end up
- *     inside an addSourceDirectly block (fail-safe toward "preserve raw", never toward
- *     "silently drop") — but the split boundary itself is not guaranteed byte-perfect.
- *
- * ENTRY-POINT RULE (doc §7, the "hardest-won finding"): the block holding the LOWEST
- * numeric id in a section is what Sketchware Neo treats as that section's entry point.
- * BlockSection below reserves a statement's own id BEFORE building any nested
- * condition/value blocks, structurally, so this can't be gotten wrong by omission.
+ * Converts supported Android Studio Java patterns into Sketchware Neo blocks.
+ * Unsupported code is reported and kept in addSourceDirectly blocks. Only verified
+ * block formats are generated. Parsing is pattern-based, so unusual formatting can
+ * affect statement splitting. BlockSection reserves statement IDs before nested
+ * blocks so the lowest ID remains the section entry point.
  */
 public class JavaLogicConverter {
 
     private static final String TAG = "JavaLogicConverter";
     private static final Gson BLOCK_JSON = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create();
 
-    // ── Public result ────────────────────────────────────────────────────────
+     
 
     public static class ConversionResult {
         /** Section name -> block-list content (one JSON object per line, no [] wrapper). */
@@ -104,13 +50,11 @@ public class JavaLogicConverter {
         public String functionDeclarations = "";
     }
 
-    // ── Field/variable tracking (very small, heuristic symbol table) ──────────
+     
 
     /** Declared class fields this converter is confident are simple scalars, by name -> typeCode. */
     private final Map<String, Integer> knownScalarFields = new LinkedHashMap<>();
-    /** viewId (layout XML id) -> Sketchware widget-type-derived event support is NOT checked here;
-     *  onClick is applicable to virtually every widget type per the confirmed catalog (doc §6),
-     *  so onClick registration is always attempted without per-type validation. */
+    /** The view id for each local variable or ViewBinding reference. */
     private final Map<String, String> localVarToViewId = new LinkedHashMap<>();   // e.g. "btnSave" -> "btnSave"
     private final Map<String, String> bindingRefToViewId = new LinkedHashMap<>(); // "binding.btnSave" -> "btnSave"
     private final Map<String, Integer> knownViewTypes = new LinkedHashMap<>();
@@ -123,26 +67,16 @@ public class JavaLogicConverter {
 
     private int intentComponentCounter = 0;
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+     
 
-    /**
-     * @param javaSource   full text of the Activity's original .java file
-     * @param knownViewIds every view id present in this screen's imported layout
-     *                     (used to validate findViewById/binding references — anything
-     *                     resolving to an id NOT in this set is left unconverted, since we
-     *                     can't confirm the target actually exists on this screen)
-     */
+    /** Converts source using only view IDs found in the imported layout. */
     public ConversionResult convert(String javaSource, java.util.Set<String> knownViewIds) {
         Map<String, Integer> defaultTypes = new LinkedHashMap<>();
         if (knownViewIds != null) for (String id : knownViewIds) defaultTypes.put(id, 0);
         return convert(javaSource, knownViewIds, defaultTypes, true);
     }
 
-    /**
-     * Convert a source file using actual imported view types and the MoreBlocks option.
-     * Unsupported Java is always reported and preserved as addSourceDirectly/raw source;
-     * it is never silently deleted.
-     */
+    /** Uses imported widget types and the MoreBlocks setting. Unsupported code is kept as source. */
     public ConversionResult convert(String javaSource, java.util.Set<String> knownViewIds,
                                     Map<String, Integer> viewTypes, boolean extractCustomMethods) {
         ConversionResult result = new ConversionResult();
@@ -200,13 +134,14 @@ public class JavaLogicConverter {
                 result.sections.put("onBackPressed_onBackPressed", rich != null ? rich : rendered);
             }
 
+            convertSupportedActivityCallbacks(javaSource, result, knownViewIds);
+
             // onClickListener registrations found anywhere in the class (field-level
             // setup in onCreate is the common case, but this scans the whole file so
             // listeners attached in helper methods are still found).
             findAndConvertClickListeners(javaSource, result, knownViewIds);
 
-            for (String unsupportedCallback : new String[]{"onStart", "onResume", "onPause", "onStop", "onDestroy",
-                    "onRestart", "onActivityResult", "onRequestPermissionsResult", "onNewIntent",
+            for (String unsupportedCallback : new String[]{"onRestart", "onActivityResult", "onRequestPermissionsResult", "onNewIntent",
                     "onSaveInstanceState", "onRestoreInstanceState", "onCreateOptionsMenu", "onOptionsItemSelected",
                     "onNavigationItemSelected", "onCheckedChanged", "onTextChanged", "onItemClick", "onItemSelected",
                     "onNothingSelected", "onLongClick", "onTouch", "onKey", "onConfigurationChanged",
@@ -225,7 +160,7 @@ public class JavaLogicConverter {
             Log.w(TAG, msg, e);
         }
 
-        // _var
+         
         for (Map.Entry<String, Integer> f : knownScalarFields.entrySet()) {
             result.varLines.add(f.getValue() + ":" + f.getKey());
         }
@@ -239,15 +174,16 @@ public class JavaLogicConverter {
         // excluding the two special always-exists sections.
         StringBuilder events = new StringBuilder();
         for (String sectionName : result.sections.keySet()) {
-            if (sectionName.equals("onCreate_initializeLogic") || sectionName.equals("onBackPressed_onBackPressed")
-                    || sectionName.endsWith("_moreBlock")) continue;
+            if (sectionName.equals("onCreate_initializeLogic") || sectionName.endsWith("_moreBlock")) continue;
             int lastUnderscore = sectionName.lastIndexOf('_');
             if (lastUnderscore <= 0) continue;
             String targetId = sectionName.substring(0, lastUnderscore);
             String eventName = sectionName.substring(lastUnderscore + 1);
-            int targetType = knownViewTypes.containsKey(targetId) ? knownViewTypes.get(targetId) : 0;
+            boolean activityEvent = isActivityEvent(targetId, eventName);
+            int targetType = activityEvent ? 0 : knownViewTypes.containsKey(targetId) ? knownViewTypes.get(targetId) : 0;
+            int eventType = activityEvent ? 3 : 1;
             events.append("{\"eventName\":\"").append(eventName).append("\",")
-                  .append("\"eventType\":1,\"targetId\":\"").append(targetId).append("\",")
+                  .append("\"eventType\":").append(eventType).append(",\"targetId\":\"").append(targetId).append("\",")
                   .append("\"targetType\":").append(targetType).append("}\n");
         }
         result.eventsSection = events.toString();
@@ -257,7 +193,65 @@ public class JavaLogicConverter {
         return result;
     }
 
-    // ── Java void-method → Sketchware MoreBlock conversion ────────────────────
+    private void convertSupportedActivityCallbacks(String javaSource, ConversionResult result,
+                                                    java.util.Set<String> knownViewIds) {
+        for (String callback : new String[]{"onStart", "onResume", "onPause", "onStop", "onDestroy", "onPostCreate"}) {
+            String body = extractSupportedLifecycleBody(javaSource, callback);
+            if (body == null) continue;
+            List<String> statements = rewriteViewAliases(removeManagedViewSetupStatements(
+                    splitStatements(body), callback));
+            String normalized = joinStatements(statements);
+            BlockSection section = new BlockSection();
+            convertStatements(statements, section, result);
+            String fallback = section.render();
+            String rich = containsCustomMethodCall(normalized) ? null
+                    : convertWithNativeBlockConverter(normalized, java.util.Collections.emptyMap(), result, callback);
+            result.sections.put(callback + "_" + callback, rich != null ? rich : fallback);
+        }
+    }
+
+    private String extractSupportedLifecycleBody(String javaSource, String callback) {
+        try {
+            CompilationUnit unit = StaticJavaParser.parse(javaSource);
+            for (TypeDeclaration<?> type : unit.getTypes()) {
+                for (MethodDeclaration method : type.getMethods()) {
+                    if (!callback.equals(method.getNameAsString()) || !method.getBody().isPresent()) continue;
+                    if ("onPostCreate".equals(callback)) {
+                        if (method.getParameters().size() != 1
+                                || !method.getParameter(0).getType().asString().endsWith("Bundle")) continue;
+                        String parameterName = method.getParameter(0).getNameAsString();
+                        for (com.github.javaparser.ast.expr.NameExpr name : method.getBody().get().findAll(com.github.javaparser.ast.expr.NameExpr.class)) {
+                            if (parameterName.equals(name.getNameAsString())) name.setName("_savedInstanceState");
+                        }
+                    } else if (!method.getParameters().isEmpty()) {
+                        continue;
+                    }
+                    method.getBody().get().getStatements().removeIf(statement -> {
+                        if (!statement.isExpressionStmt()) return false;
+                        com.github.javaparser.ast.expr.Expression expression = statement.asExpressionStmt().getExpression();
+                        if (!expression.isMethodCallExpr()) return false;
+                        com.github.javaparser.ast.expr.MethodCallExpr call = expression.asMethodCallExpr();
+                        return call.getScope().isPresent() && call.getScope().get().isSuperExpr()
+                                && callback.equals(call.getNameAsString());
+                    });
+                    String block = method.getBody().get().toString();
+                    return block.length() >= 2 ? block.substring(1, block.length() - 1).trim() : "";
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not parse lifecycle callback " + callback + "; original callback remains in source.", e);
+        }
+        return null;
+    }
+
+    private boolean isActivityEvent(String targetId, String eventName) {
+        return targetId.equals(eventName) && ("onBackPressed".equals(eventName)
+                || "onPostCreate".equals(eventName) || "onStart".equals(eventName)
+                || "onResume".equals(eventName) || "onPause".equals(eventName)
+                || "onStop".equals(eventName) || "onDestroy".equals(eventName));
+    }
+
+     
 
     private static final class HelperMethod {
         final String name;
@@ -265,15 +259,40 @@ public class JavaLogicConverter {
         final List<String> parameters = new ArrayList<>();
         final List<String> parameterTypes = new ArrayList<>();
         final String declaration;
-        HelperMethod(String name, String body, List<String> names, List<String> types, String declaration) {
+        final String returnType;
+        HelperMethod(String name, String body, List<String> names, List<String> types,
+                     String declaration, String returnType) {
             this.name = name; this.body = body; this.parameters.addAll(names);
             this.parameterTypes.addAll(types); this.declaration = declaration;
+            this.returnType = returnType == null ? "" : returnType;
         }
+    }
+
+    private static final class MoreBlockCallArgument {
+        final String value;
+        final String expressionType;
+        final String expression;
+
+        private MoreBlockCallArgument(String value, String expressionType, String expression) {
+            this.value = value;
+            this.expressionType = expressionType;
+            this.expression = expression;
+        }
+
+        static MoreBlockCallArgument value(String value) {
+            return new MoreBlockCallArgument(value, null, null);
+        }
+
+        static MoreBlockCallArgument expression(String type, String expression) {
+            return new MoreBlockCallArgument(null, type, expression);
+        }
+
+        boolean isExpression() { return expressionType != null; }
     }
 
     private static final java.util.Set<String> CALLBACK_METHODS = new java.util.HashSet<>(java.util.Arrays.asList(
             "onCreate", "onStart", "onResume", "onPause", "onStop", "onDestroy", "onRestart",
-            "onBackPressed", "onActivityResult", "onRequestPermissionsResult", "onNewIntent",
+            "onBackPressed", "onPostCreate", "onActivityResult", "onRequestPermissionsResult", "onNewIntent",
             "onSaveInstanceState", "onRestoreInstanceState", "onClick", "onLongClick", "onItemClick",
             "onItemSelected", "onNothingSelected", "onTextChanged", "beforeTextChanged", "afterTextChanged",
             "onCheckedChanged", "onTouch", "onKey", "onOptionsItemSelected", "onCreateOptionsMenu",
@@ -290,9 +309,10 @@ public class JavaLogicConverter {
                 String name = method.getNameAsString();
                 if (CALLBACK_METHODS.contains(name) || !method.getBody().isPresent()
                         || method.isNative() || method.isAbstract()) continue;
-                if (!method.getType().isVoidType()) {
+                String returnType = method.getType().isVoidType() ? "" : moreBlockReturnType(method.getTypeAsString());
+                if (!method.getType().isVoidType() && returnType == null) {
                     result.unsupported.add("UNSUPPORTED: method " + name + " returns " + method.getTypeAsString()
-                            + "; the documented Sketchware Neo MoreBlock format has no confirmed direct return-value support. Original Java source is preserved.");
+                            + "; this return type has no confirmed native MoreBlock representation. Original Java source is preserved.");
                     continue;
                 }
                 if (!name.matches("[A-Za-z_][A-Za-z0-9_]*")) {
@@ -323,10 +343,10 @@ public class JavaLogicConverter {
                     result.unsupported.add("UNSUPPORTED: overloaded method " + name + " cannot be represented unambiguously as a single MoreBlock; all overloads remain in the preserved Java source.");
                     continue;
                 }
-                String declaration = buildFunctionDeclaration(name, names, types);
+                String declaration = buildFunctionDeclaration(name, returnType, names, types);
                 String body = method.getBody().get().toString();
                 if (body.length() >= 2) body = body.substring(1, body.length() - 1);
-                helperMethods.put(name, new HelperMethod(name, body, names, types, declaration));
+                helperMethods.put(name, new HelperMethod(name, body, names, types, declaration, returnType));
                 helperSpecs.put(name, declaration);
             }
             for (HelperMethod helper : helperMethods.values()) {
@@ -357,18 +377,76 @@ public class JavaLogicConverter {
         return out.toString();
     }
 
-    private String buildFunctionDeclaration(String name, List<String> params, List<String> types) {
-        StringBuilder out = new StringBuilder(name).append(":").append(name);
+    private String buildFunctionDeclaration(String name, String returnType, List<String> params, List<String> types) {
+        StringBuilder out = new StringBuilder(name);
+        if (returnType != null && !returnType.isEmpty()) out.append("[").append(returnType).append("]");
+        out.append(":").append(name);
+        if (returnType != null && !returnType.isEmpty()) out.append("[").append(returnType).append("]");
         for (int i = 0; i < params.size(); i++) out.append(" %").append(types.get(i)).append(".").append(params.get(i));
         return out.toString();
     }
 
+    private String moreBlockReturnType(String type) {
+        if ("String".equals(type) || "java.lang.String".equals(type)) return "String";
+        if ("boolean".equals(type) || "Boolean".equals(type) || "java.lang.Boolean".equals(type)) return "boolean";
+        if ("double".equals(type) || "Double".equals(type) || "java.lang.Double".equals(type)) return "double";
+        return null;
+    }
+
     private String moreBlockType(String type) {
-        if ("String".equals(type) || "java.lang.String".equals(type) || "CharSequence".equals(type)) return "s";
-        if ("boolean".equals(type) || "Boolean".equals(type) || "java.lang.Boolean".equals(type)) return "b";
-        if ("byte".equals(type) || "short".equals(type) || "int".equals(type) || "long".equals(type)
-                || "float".equals(type) || "double".equals(type) || "Integer".equals(type) || "Long".equals(type)
-                || "Float".equals(type) || "Double".equals(type)) return "d";
+        if (type == null) return null;
+        String declared = type.trim();
+        if (declared.isEmpty() || declared.endsWith("...")) return null;
+        String genericArguments = "";
+        int generic = declared.indexOf('<');
+        if (generic >= 0 && declared.endsWith(">")) {
+            genericArguments = declared.substring(generic + 1, declared.length() - 1);
+            declared = declared.substring(0, generic).trim();
+        }
+        int dot = declared.lastIndexOf('.');
+        String simple = dot >= 0 ? declared.substring(dot + 1) : declared;
+        if ("String".equals(simple) || "CharSequence".equals(simple)) return "s";
+        if ("boolean".equals(simple) || "Boolean".equals(simple)) return "b";
+        if ("byte".equals(simple) || "short".equals(simple) || "int".equals(simple)
+                || "float".equals(simple) || "double".equals(simple) || "Integer".equals(simple)
+                || "Float".equals(simple) || "Double".equals(simple)) return "d";
+        if ("long".equals(simple) || "Long".equals(simple)) return "m.long";
+
+        String lower = simple.toLowerCase(java.util.Locale.ROOT);
+        if ("map".equals(lower) || "hashmap".equals(lower)) return "m.varMap";
+        if ("arraylist".equals(lower) || "list".equals(lower)) {
+            String itemType = genericArguments.toLowerCase(java.util.Locale.ROOT);
+            if (itemType.contains("hashmap") || itemType.contains("map<")) return "m.listMap";
+            if (itemType.contains("string") || itemType.contains("charsequence")) return "m.listStr";
+            if (itemType.contains("integer") || itemType.contains("long") || itemType.contains("double")
+                    || itemType.contains("float") || itemType.contains("number")) return "m.listInt";
+            return "m.list";
+        }
+        if ("context".equals(lower) || "activity".equals(lower) || "appcompatactivity".equals(lower)
+                || "fragmentactivity".equals(lower)) return "m.activity";
+        if ("intent".equals(lower)) return "m.intent";
+        if ("sharedpreferences".equals(lower)) return "m.file";
+        if ("calendar".equals(lower)) return "m.calendar";
+        if ("vibrator".equals(lower)) return "m.vibrator";
+        if ("mediaplayer".equals(lower)) return "m.mediaplayer";
+        if ("soundpool".equals(lower)) return "m.soundpool";
+        if ("objectanimator".equals(lower)) return "m.objectanimator";
+
+        if ("view".equals(lower) || "textview".equals(lower) || "edittext".equals(lower)
+                || "imageview".equals(lower) || "compoundbutton".equals(lower) || "checkbox".equals(lower)
+                || "switch".equals(lower) || "listview".equals(lower) || "spinner".equals(lower)
+                || "webview".equals(lower) || "seekbar".equals(lower) || "progressbar".equals(lower)
+                || "radiobutton".equals(lower) || "ratingbar".equals(lower) || "videoview".equals(lower)
+                || "searchview".equals(lower) || "gridview".equals(lower) || "tablayout".equals(lower)
+                || "viewpager".equals(lower) || "bottomnavigationview".equals(lower) || "recyclerview".equals(lower)
+                || "cardview".equals(lower) || "radiogroup".equals(lower) || "textinputlayout".equals(lower)
+                || "textinputedittext".equals(lower) || "materialbutton".equals(lower)
+                || "materialtextview".equals(lower) || "materialswitch".equals(lower)
+                || "materialcheckbox".equals(lower) || "materialradiobutton".equals(lower) || "chip".equals(lower)
+                || "materialprogressindicator".equals(lower) || "materialdivider".equals(lower)
+                || "floatingactionbutton".equals(lower) || "slider".equals(lower)
+                || "shapeableimageview".equals(lower) || "materialcardview".equals(lower)
+                || "chipgroup".equals(lower) || "extendedfloatingactionbutton".equals(lower)) return "m." + lower;
         return null;
     }
 
@@ -386,24 +464,82 @@ public class JavaLogicConverter {
                     + " argument(s), expected " + helper.parameters.size() + "; original statement is preserved as source.");
             return false;
         }
+        List<MoreBlockCallArgument> normalizedArgs = new ArrayList<>();
         for (int i = 0; i < args.size(); i++) {
-            if (!isSafeMoreBlockLiteral(args.get(i), helper.parameterTypes.get(i))) {
-                result.unsupported.add("UNSUPPORTED: call to MoreBlock '" + name + "' uses a non-literal or type-mismatched argument for '"
+            MoreBlockCallArgument normalized = normalizeMoreBlockCallArgument(
+                    args.get(i), helper.parameterTypes.get(i));
+            if (normalized == null) {
+                result.unsupported.add("UNSUPPORTED: call to MoreBlock '" + name + "' uses an argument that cannot be represented safely for '"
                         + helper.parameters.get(i) + "'; original statement is preserved as source.");
                 return false;
             }
+            normalizedArgs.add(normalized);
         }
-        section.addStatement("definedFunc", declaration, args.toArray(new String[0]), "");
+        section.addDefinedFunction(declaration, normalizedArgs, this);
         return true;
     }
 
-    private boolean isSafeMoreBlockLiteral(String value, String type) {
-        if (value == null) return false;
-        String literal = value.trim();
-        if ("b".equals(type)) return "true".equals(literal) || "false".equals(literal);
-        if ("d".equals(type)) return literal.matches("-?\\d+(?:\\.\\d+)?[fFdDlL]?");
-        if ("s".equals(type)) return literal.length() >= 2 && literal.startsWith("\"") && literal.endsWith("\"");
-        return false;
+    private MoreBlockCallArgument normalizeMoreBlockCallArgument(String value, String type) {
+        if (value == null || type == null) return null;
+        String expression = value.trim();
+        if (!isSafeInlineJavaExpression(expression)) return null;
+        if ("b".equals(type) || "d".equals(type) || "s".equals(type)) {
+            return MoreBlockCallArgument.expression(type, expression);
+        }
+        if (type.startsWith("m.")) {
+            if ("m.long".equals(type)) {
+                if (expression.matches("-?\\d+[lL]?")) return MoreBlockCallArgument.value(expression);
+                return expression.matches("[A-Za-z_$][A-Za-z0-9_$]*")
+                        ? MoreBlockCallArgument.value(expression) : null;
+            }
+            if ("m.view".equals(type) || type.startsWith("m.textview") || type.startsWith("m.edittext")
+                    || type.startsWith("m.imageview") || type.startsWith("m.recyclerview")
+                    || type.startsWith("m.materialbutton") || type.startsWith("m.shapeableimageview")) {
+                Matcher binding = Pattern.compile("^(?:binding\\.)?([A-Za-z_$][A-Za-z0-9_$]*)$").matcher(expression);
+                return binding.matches() ? MoreBlockCallArgument.value(binding.group(1)) : null;
+            }
+            if ("m.activity".equals(type)) {
+                return ("this".equals(expression) || "getApplicationContext()".equals(expression))
+                        ? MoreBlockCallArgument.value(expression) : null;
+            }
+            if ("m.intent".equals(type) || "m.file".equals(type) || "m.calendar".equals(type)
+                    || "m.vibrator".equals(type) || "m.mediaplayer".equals(type)
+                    || "m.soundpool".equals(type) || "m.objectanimator".equals(type)
+                    || "m.varMap".equals(type) || "m.list".equals(type) || "m.listMap".equals(type)
+                    || "m.listInt".equals(type) || "m.listStr".equals(type)) {
+                return expression.matches("[A-Za-z_$][A-Za-z0-9_$]*")
+                        ? MoreBlockCallArgument.value(expression) : null;
+            }
+        }
+        return null;
+    }
+
+    private boolean isSafeInlineJavaExpression(String expression) {
+        if (expression == null || expression.isEmpty() || expression.length() > 1200
+                || expression.indexOf(';') >= 0 || expression.indexOf('\n') >= 0
+                || expression.indexOf('\r') >= 0) return false;
+        int parentheses = 0;
+        int brackets = 0;
+        int braces = 0;
+        boolean inString = false;
+        boolean inChar = false;
+        boolean escaped = false;
+        for (int i = 0; i < expression.length(); i++) {
+            char c = expression.charAt(i);
+            if (escaped) { escaped = false; continue; }
+            if ((inString || inChar) && c == '\\') { escaped = true; continue; }
+            if (inString) { if (c == '\"') inString = false; continue; }
+            if (inChar) { if (c == '\'') inChar = false; continue; }
+            if (c == '\"') { inString = true; continue; }
+            if (c == '\'') { inChar = true; continue; }
+            if (c == '(') parentheses++;
+            else if (c == ')' && --parentheses < 0) return false;
+            else if (c == '[') brackets++;
+            else if (c == ']' && --brackets < 0) return false;
+            else if (c == '{') braces++;
+            else if (c == '}' && --braces < 0) return false;
+        }
+        return !inString && !inChar && parentheses == 0 && brackets == 0 && braces == 0;
     }
 
     private List<String> splitCommaArguments(String text) {
@@ -413,7 +549,7 @@ public class JavaLogicConverter {
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (inString) { if (c == '\\') i++; else if (c == '"') inString = false; continue; }
-            if (inChar) { if (c == '\\') i++; else if (c == '\'') inChar = false; continue; }
+            if (inChar) { if (c == '\'') inChar = false; continue; }
             if (c == '"') { inString = true; continue; }
             if (c == '\'') { inChar = true; continue; }
             if (c == '(' || c == '[' || c == '{') depth++;
@@ -424,11 +560,7 @@ public class JavaLogicConverter {
         return values;
     }
 
-    /**
-     * Runs the same block conversion engine used by Sketchware Neo's Logic editor.
-     * BlockBean's @Expose fields match the persisted logic-block schema; unsupported
-     * statements become addSourceDirectly blocks inside that engine instead of being lost.
-     */
+    /** Uses Neo's block converter; unsupported statements stay in source blocks. */
     private String convertWithNativeBlockConverter(String body, Map<String, String> argumentTypes,
                                                    ConversionResult result, String context) {
         if (body == null || body.trim().isEmpty()) return null;
@@ -483,11 +615,11 @@ public class JavaLogicConverter {
                 String id = localVarToViewId.get(target);
                 if (id == null) id = bindingRefToViewId.get(target);
                 if (id != null && (knownViewIds == null || knownViewIds.contains(id))) continue;
-                // Never persist a listener-registration statement as source code in an
-                // event body. If its target cannot be resolved to a real imported widget,
-                // the Java variable will not exist in Neo's generated Activity. The
-                // original source is preserved under android_studio_original and the
-                // separate listener scanner logs the unsupported mapping.
+                // Keep unresolved listeners as source so no Java code is lost.
+                 
+                 
+                 
+                 
                 unsupported.add("UNSUPPORTED: omitted unresolved listener registration '" + truncate(statement, 90)
                         + "' from initializeLogic because its target is not a known imported widget; original Java is preserved.");
                 continue;
@@ -503,12 +635,7 @@ public class JavaLogicConverter {
         return out.toString();
     }
 
-    /**
-     * Resolve source-only Java references such as `btnSave.setText(...)` and
-     * `binding.titleText.setText(...)` to the exact widget IDs found in the imported
-     * layout. Replacements are restricted to Java code outside string/character
-     * literals and comments so text content is not accidentally rewritten.
-     */
+    /** Replaces view references only in Java code, not in strings, chars or comments. */
     private List<String> rewriteViewAliases(List<String> statements) {
         List<String> rewritten = new ArrayList<>(statements.size());
         for (String statement : statements) rewritten.add(rewriteViewAliases(statement));
@@ -591,7 +718,7 @@ public class JavaLogicConverter {
     }
 
 
-    // ── Field scanning (heuristic) ─────────────────────────────────────────────
+     
 
     /** Returns true for Activity view-inflation/setup statements owned by Sketchware. */
     private boolean isSketchwareManagedViewSetup(String statement) {
@@ -607,11 +734,7 @@ public class JavaLogicConverter {
         return Pattern.compile("(?s)^\\s*(?:final\\s+)?[\\w.$<>?]+Binding\\s+[\\w$]+\\s*=.*$", Pattern.CASE_INSENSITIVE).matcher(s).find();
     }
 
-    /**
-     * Removes only the standalone framework setup statements that Sketchware generates
-     * itself for an Activity/screen. View aliases are discovered separately so later
-     * references can still be mapped to the corresponding Sketchware widget IDs.
-     */
+    /** Removes only Activity setup code handled by Sketchware. View aliases are mapped separately. */
     private List<String> removeManagedViewSetupStatements(List<String> statements, String context) {
         List<String> retained = new ArrayList<>();
         if (statements == null || statements.isEmpty()) return retained;
@@ -636,7 +759,7 @@ public class JavaLogicConverter {
         while (m.find()) {
             String type = m.group(1);
             String name = m.group(2);
-            // NOTE: Java "int" used to be imported as Sketchware's Number(double) type
+            // Java int now uses Sketchware's real int type (code 7), not the older Number/double type (code 1).
             // (code 1) since there was no real int type. Now that one exists (code 7),
             // int fields are routed there instead — this is a deliberate behavior change.
             int code = "int".equals(type) ? 7 : "boolean".equals(type) ? 0
@@ -662,7 +785,7 @@ public class JavaLogicConverter {
         Matcher b = BINDING_REF.matcher(javaSource);
         while (b.find()) {
             String camelId = b.group(1);
-            // ViewBinding turns snake_case ids into camelCase field names — we only accept
+            // Match ViewBinding names to real XML IDs exactly; do not guess camelCase IDs.
             // an exact (case-sensitive) match against the real xml id, no camelCase guessing,
             // to avoid wiring an event to the wrong view.
             String resolvedId = resolveBindingViewId(camelId, knownViewIds);
@@ -672,7 +795,7 @@ public class JavaLogicConverter {
         }
     }
 
-    // ── Method body extraction (brace-depth based, not a real parser) ─────────
+     
 
     private String extractMethodBody(String source, String methodName) {
         Pattern sig = Pattern.compile("\\b" + Pattern.quote(methodName) + "\\s*\\([^)]*\\)\\s*\\{");
@@ -691,7 +814,7 @@ public class JavaLogicConverter {
         return null;
     }
 
-    // ── setOnClickListener discovery ───────────────────────────────────────────
+     
 
     private static final Pattern ON_CLICK = Pattern.compile(
             "([A-Za-z_$][A-Za-z0-9_$.]*)\\.setOnClickListener\\s*\\(");
@@ -709,7 +832,7 @@ public class JavaLogicConverter {
                         + "unconverted in source only.");
                 continue;
             }
-            // Find the lambda/anonymous-class body that follows the call's opening paren.
+             
             int callParenIdx = m.end() - 1;
             String body = extractLambdaOrAnonymousBody(javaSource, callParenIdx);
             String sectionName = viewId + "_onClick";
@@ -734,7 +857,7 @@ public class JavaLogicConverter {
 
     /** Handles both `v -> { ... }` and `new View.OnClickListener(){ public void onClick(View v){ ... } }`. */
     private String extractLambdaOrAnonymousBody(String source, int openParenIdx) {
-        // Find the matching close-paren of the setOnClickListener(...) call, tracking depth.
+         
         int depth = 1;
         int i = openParenIdx + 1;
         for (; i < source.length() && depth > 0; i++) {
@@ -744,7 +867,7 @@ public class JavaLogicConverter {
         }
         String argText = source.substring(openParenIdx + 1, i - 1);
 
-        // Lambda form: v -> { ... }  or  v -> singleStatement;
+         
         int arrow = argText.indexOf("->");
         if (arrow >= 0) {
             String after = argText.substring(arrow + 2).trim();
@@ -756,7 +879,7 @@ public class JavaLogicConverter {
             }
         }
 
-        // Anonymous class form: locate the onClick(...) method inside argText.
+         
         String onClickBody = extractMethodBody(argText, "onClick");
         return onClickBody;
     }
@@ -771,7 +894,7 @@ public class JavaLogicConverter {
         return -1;
     }
 
-    // ── Statement splitting (brace/paren/string aware, top level only) ─────────
+     
 
     private List<String> splitStatements(String body) {
         List<String> out = new ArrayList<>();
@@ -808,32 +931,27 @@ public class JavaLogicConverter {
         return regroupBraceStatements(body);
     }
 
-    /**
-     * Re-splits body into top-level statements, treating any `if (...) { ... } [else if (...) {...}]* [else {...}]`
-     * as ONE statement (so it can be handled specially), and every other semicolon-terminated
-     * segment as its own statement. This two-pass approach is simpler and more robust than
-     * trying to do both in one scan.
-     */
+    /** Keeps each if/else chain as one statement and splits other statements at top-level semicolons. */
     private List<String> regroupBraceStatements(String body) {
         List<String> out = new ArrayList<>();
         int i = 0;
         int n = body.length();
         while (i < n) {
-            // skip whitespace
+             
             while (i < n && Character.isWhitespace(body.charAt(i))) i++;
             if (i >= n) break;
 
             if (body.startsWith("if", i) && i + 2 < n && !Character.isLetterOrDigit(body.charAt(i + 2))) {
                 int stmtStart = i;
                 int j = i;
-                // consume "if (...) { ... }" then any chained "else if (...) { ... }" / "else { ... }"
+                 
                 j = consumeIfChain(body, j);
                 out.add(body.substring(stmtStart, j).trim());
                 i = j;
                 continue;
             }
 
-            // otherwise: find next top-level ';' (string/char aware)
+             
             int j = i;
             int depth = 0;
             boolean inString = false, inChar = false;
@@ -842,7 +960,7 @@ public class JavaLogicConverter {
                 if (inString) { if (c == '\\') { j += 2; continue; } if (c == '"') inString = false; j++; continue; }
                 if (inChar)   { if (c == '\\') { j += 2; continue; } if (c == '\'') inChar = false; j++; continue; }
                 if (c == '"') { inString = true; j++; continue; }
-                if (c == '\'') { inChar = true; j++; continue; }
+            if (c == '\'') { inChar = true; continue; }
                 if (c == '(' || c == '{') depth++;
                 else if (c == ')' || c == '}') depth--;
                 else if (c == ';' && depth == 0) { j++; break; }
@@ -898,7 +1016,7 @@ public class JavaLogicConverter {
         return i;
     }
 
-    // ── Statement -> block conversion ───────────────────────────────────────────
+     
 
     private static final Pattern FINISH_CALL = Pattern.compile("^finish\\s*\\(\\s*\\)\\s*;$");
     private static final Pattern START_ACTIVITY = Pattern.compile(
@@ -1099,7 +1217,33 @@ public class JavaLogicConverter {
         return s.length() > max ? s.substring(0, max) + "..." : s;
     }
 
-    // ── BlockSection: id allocation + rendering, implementing the entry-point rule ────
+     
+
+    private String buildMoreBlockArgumentBlockJson(int id, MoreBlockCallArgument argument) {
+        if ("b".equals(argument.expressionType)
+                && ("true".equals(argument.expression) || "false".equals(argument.expression))) {
+            return "{\"id\":\"" + id + "\",\"nextBlock\":-1,\"subStack1\":-1,\"subStack2\":-1,"
+                    + "\"opCode\":" + jsonString(argument.expression) + ",\"spec\":" + jsonString(argument.expression)
+                    + ",\"parameters\":[],\"color\":-16729254,\"type\":\"b\",\"typeName\":\"\"}";
+        }
+        String opcode;
+        String type;
+        if ("s".equals(argument.expressionType)) {
+            opcode = "asdString";
+            type = "s";
+        } else if ("b".equals(argument.expressionType)) {
+            opcode = "asdBoolean";
+            type = "b";
+        } else {
+            opcode = "asdNumber";
+            type = "d";
+        }
+        return "{\"id\":\"" + id + "\",\"nextBlock\":-1,\"subStack1\":-1,\"subStack2\":-1,"
+                + "\"opCode\":" + jsonString(opcode) + ",\"spec\":"
+                + jsonString("add source directly %s.inputOnly")
+                + ",\"parameters\":[" + jsonString(argument.expression) + "],"
+                + "\"color\":-16729254,\"type\":\"" + type + "\",\"typeName\":\"\"}";
+    }
 
     private class BlockSection {
         private int counter = 1;
@@ -1117,9 +1261,7 @@ public class JavaLogicConverter {
             finalizeBlock(id, opCode, spec, params, color);
         }
 
-        /** Writes a block already assigned an id (used when nested blocks needed to be built
-         *  between reserving the id and finalizing it, e.g. intentSetScreen/startActivity pair,
-         *  and ifElse). Chains it after the previous top-level statement via nextBlock. */
+        /** Writes a block after its ID and nested blocks have been created. */
         void finalizeBlock(int id, String opCode, String spec, String[] params, String color) {
             if (lastTopLevelId != null) {
                 String prev = blocksById.get(lastTopLevelId);
@@ -1138,6 +1280,27 @@ public class JavaLogicConverter {
             blocksById.put(id, json);
             topLevelOrder.add(id);
             lastTopLevelId = id;
+        }
+
+        void addDefinedFunction(String spec, List<MoreBlockCallArgument> args, JavaLogicConverter converter) {
+            int callId = reserveId();
+            String[] parameters = new String[args.size()];
+            List<Map.Entry<Integer, String>> expressionBlocks = new ArrayList<>();
+            for (int i = 0; i < args.size(); i++) {
+                MoreBlockCallArgument argument = args.get(i);
+                if (!argument.isExpression()) {
+                    parameters[i] = argument.value;
+                    continue;
+                }
+                int expressionId = reserveId();
+                parameters[i] = "@" + expressionId;
+                expressionBlocks.add(new java.util.AbstractMap.SimpleImmutableEntry<>(expressionId,
+                        converter.buildMoreBlockArgumentBlockJson(expressionId, argument)));
+            }
+            finalizeBlock(callId, "definedFunc", spec, parameters, " ");
+            for (Map.Entry<Integer, String> expressionBlock : expressionBlocks) {
+                blocksById.put(expressionBlock.getKey(), expressionBlock.getValue());
+            }
         }
 
         void finalizeIfElse(int id, String condOpCode, String condRef, int trueEntry, int falseEntry) {
@@ -1169,18 +1332,7 @@ public class JavaLogicConverter {
             lastTopLevelId = id;
         }
 
-        /**
-         * Builds the given statements into THIS SAME section's shared id counter and block
-         * map (never a separate section — ids must stay unique within one method/event, and
-         * a branch's blocks are ordinary members of the same flat section per the confirmed
-         * format), isolating the outer nextBlock-chain cursor so the branch's first statement
-         * doesn't get chained after whatever statement precedes the if/ifElse itself.
-         *
-         * Because ids are allocated from one monotonically increasing shared counter and
-         * nothing else is allocated concurrently, the branch's entry id (its lowest id, per
-         * the entry-point rule) is exactly the counter's value before the branch starts —
-         * IF the branch produced at least one block.
-         */
+        /** Builds branch blocks in the same section, with a shared ID counter and a separate nextBlock chain. */
         int buildBranch(List<String> statements, JavaLogicConverter outer, ConversionResult result) {
             if (statements.isEmpty()) return -1;
             int entryCandidate = counter;

@@ -14,39 +14,30 @@ import java.util.regex.Pattern;
 import dev.aldi.sayuti.block.ExtraBlockFile;
 
 /**
- * Converts a Java event method body into Sketchware BlockBeans.
- *
- * CRASH FIX: Annotations (@Override etc.) are skipped in preprocessing.
- * The crash occurred because addSourceDirectly parameters starting with '@'
- * were misinterpreted as block ID references by LogicEditorActivity.a().
- *
- * Architecture:
- * - stmtBlocks  : ordered sequence/control-flow blocks (come first in result)
- * - exprBlocks  : expression sub-blocks referenced via "@id" (appended after)
- * The first block in the result is always the sequence root, which is what
- * LogicEditorActivity.a() uses as the anchor for positioning.
- *
- * Block ID range >= 99_000_000 so LogicEditorActivity.a() auto-remaps them.
+ * Converts Java event code into Sketchware BlockBeans. Statement blocks come first;
+ * expression blocks follow and are linked by @id. IDs start above 99,000,000 so
+ * LogicEditorActivity can remap them. Annotations are skipped before parsing so
+ * names such as @Override are not mistaken for block references.
  */
 public final class BlocksConverter {
 
-    // ── Types ──────────────────────────────────────────────────────────────────
+     
     private enum ExprType { NUMBER, STRING, BOOLEAN, UNKNOWN }
 
-    // ── ID counter ─────────────────────────────────────────────────────────────
+     
     private int idCounter = 99_000_001;
     private int newId() { return idCounter++; }
 
-    // ── Block collections ──────────────────────────────────────────────────────
-    // exprBlocks are appended after stmtBlocks so the first block in the
+     
+    // Keep statement blocks first so the first block is the sequence root.
     // final list is always the sequence root (required by LogicEditorActivity.a).
     private final List<BlockBean> exprBlocks = new ArrayList<>();
-    /** MoreBlock input name -> Sketchware type token (s/b/d). Empty for ordinary events. */
+    /** MoreBlock input name -> Sketchware type token (s/b/d/m.*). Empty for ordinary events. */
     private Map<String, String> argumentTypes = Collections.emptyMap();
     /** Source-level scalar types inferred from method arguments and local declarations. */
     private final Map<String, ExprType> variableTypes = new HashMap<>();
 
-    // ── Custom block matching ──────────────────────────────────────────────────
+     
     // Loaded once per convert() call via lazy init from ExtraBlockFile.
     // Each CustomBlockMatcher reverse-engineers one custom block's String.format
     // code template into a regex, then maps capture groups back to BlockBean params.
@@ -70,14 +61,14 @@ public final class BlocksConverter {
         synchronized (CB_LOCK) { customBlockMatchers = null; }
     }
 
-    // ── Pattern spec param type regex ──────────────────────────────────────────
+     
     private static final Pattern SPEC_PARAM_PAT =
             Pattern.compile("%s(?:\\.inputOnly)?|%b|%d|%f|%i|%m\\.\\w+");
     // Detects a Java String.format specifier: %s, %1$s, %2$d, etc.
     private static final Pattern FMT_SPEC_PAT =
             Pattern.compile("%(([0-9]+)\\$)?([sdbf])");
 
-    // ── CustomBlockMatcher ─────────────────────────────────────────────────────
+     
     private static final class CustomBlockMatcher {
         final String   name;           // opCode
         final String   spec;           // spec for BlockBean
@@ -99,7 +90,7 @@ public final class BlocksConverter {
         }
     }
 
-    // ── Build all custom matchers ──────────────────────────────────────────────
+     
     private static ArrayList<CustomBlockMatcher> buildCustomMatchers() {
         ArrayList<CustomBlockMatcher> list = new ArrayList<>();
         try {
@@ -126,7 +117,7 @@ public final class BlocksConverter {
                 if (code.contains("\n") || code.contains("\r") ||
                     code.contains("{") || code.contains("}")) continue;
 
-                // Strip trailing semicolon before building the pattern
+                 
                 if (code.endsWith(";")) code = code.substring(0, code.length() - 1).trim();
 
                 ExprType[] specTypes = buildSpecParamTypes(spec);
@@ -139,19 +130,7 @@ public final class BlocksConverter {
         return list;
     }
 
-    /**
-     * Extracts the expression type for each parameter in a custom block spec,
-     * in left-to-right order of appearance.
-     *
-     * %s / %s.inputOnly → STRING
-     * %b                → BOOLEAN
-     * %d                → NUMBER
-     * %f                → NUMBER (float-typed custom-block param; Fx applies the
-     *                     "1.5f" vs "1.5d" literal suffix later, based on opcode)
-     * %i                → NUMBER (real-int-typed custom-block param; Fx keeps it
-     *                     suffix-/decimal-free later, based on opcode)
-     * %m.view etc.      → UNKNOWN (pass-through: strip binding. prefix only)
-     */
+    /** Maps %s, %b, %d, %f, %i and %m inputs to their value types. */
     private static ExprType[] buildSpecParamTypes(String spec) {
         List<ExprType> types = new ArrayList<>();
         Matcher m = SPEC_PARAM_PAT.matcher(spec);
@@ -167,15 +146,7 @@ public final class BlocksConverter {
         return types.toArray(new ExprType[0]);
     }
 
-    /**
-     * Converts a String.format code template into a compiled regex.
-     *
-     * Supports:
-     *   Sequential  — %s, %d, %f, %b → consumed in order
-     *   Positional  — %1$s, %2$d …   → arbitrary order, tracked via groupToSpecIdx
-     *
-     * Returns null if the template is too complex to pattern-match safely.
-     */
+    /** Builds a safe regex for sequential and numbered String.format inputs. */
     private static CustomBlockMatcher buildMatcherForCode(
             String name, String spec, String bType, String code, ExprType[] specTypes) {
 
@@ -191,7 +162,7 @@ public final class BlocksConverter {
             String lit = code.substring(lastEnd, m.start());
             regex.append(Pattern.quote(lit));
 
-            // Add a capture group
+             
             regex.append("(.+?)");
             captureCount++;
 
@@ -205,7 +176,7 @@ public final class BlocksConverter {
         }
 
         // If no format specifiers found, the code is a literal — exact match with no params
-        // Append trailing literal
+         
         String trailingLit = code.substring(lastEnd);
         regex.append(Pattern.quote(trailingLit));
         regex.append("(?:;)?$");   // optional trailing semicolon
@@ -225,7 +196,7 @@ public final class BlocksConverter {
     private int recognizedCount = 0;
     private int fallbackCount   = 0;
 
-    // ── Result type ────────────────────────────────────────────────────────────
+     
     public static final class ConversionResult {
         public final ArrayList<BlockBean> blocks;
         public final String error;          // null = success
@@ -237,28 +208,22 @@ public final class BlocksConverter {
         }
     }
 
-    // ── Parse tree ─────────────────────────────────────────────────────────────
+     
     private static final class Node {
         BlockBean bean;
         List<Node> body1 = new ArrayList<>(); // if-body / loop-body
         List<Node> body2 = new ArrayList<>(); // else-body
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PUBLIC ENTRY POINT
-    // ══════════════════════════════════════════════════════════════════════════
+     
+     
+     
 
     public static ConversionResult convert(String javaCode) {
         return convert(javaCode, Collections.emptyMap());
     }
 
-    /**
-     * Converts a Java method body, optionally identifying parameters belonging to a
-     * Sketchware MoreBlock. Such identifiers become real getArg value blocks rather
-     * than accidental getVar references.
-     *
-     * @param argumentTypes parameter name -> type token: s (text), b (boolean), d (number)
-     */
+    /** Converts a method body; MoreBlock parameters become getArg blocks. */
     public static ConversionResult convert(String javaCode, Map<String, String> argumentTypes) {
         if (javaCode == null || javaCode.isBlank())
             return new ConversionResult(new ArrayList<>(), "Input is empty.", 0, 0);
@@ -298,9 +263,9 @@ public final class BlocksConverter {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PREPROCESSOR & TOKENIZER
-    // ══════════════════════════════════════════════════════════════════════════
+     
+     
+     
 
     private static final Pattern P_METHOD_DECL = Pattern.compile(
             "^(?:public|private|protected|static|final|abstract|native|synchronized)"
@@ -379,9 +344,9 @@ public final class BlocksConverter {
         return finalOut;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // PARSER
-    // ══════════════════════════════════════════════════════════════════════════
+     
+     
+     
 
     private static final Pattern P_IF        = Pattern.compile("^if\\s*\\((.+)\\)\\s*\\{?\\s*$");
     private static final Pattern P_FOR       = Pattern.compile("^for\\s*\\(int\\s+\\w+\\s*=\\s*0\\s*;\\s*\\w+\\s*<\\s*(.+?)\\s*;.*\\)\\s*\\{?\\s*$");
@@ -420,11 +385,11 @@ public final class BlocksConverter {
         m = P_WHILE.matcher(line);
         if (m.matches()) return parseWhile(lines, pos, m.group(1).trim());
 
-        // ── View event listeners (container blocks with inline body) ───────────
+         
         m = P_LISTENER_HEADER.matcher(line);
         if (m.matches()) return parseListener(lines, pos, viewName(m.group(1)), m.group(2));
 
-        // Generic block parser for unsupported structures like switch, try, catch, do, or generic for-loops
+         
         if (line.startsWith("switch") || line.startsWith("try") || line.startsWith("catch") || line.startsWith("do ") || (line.startsWith("for") && !P_FOR.matcher(line).matches())) {
             return parseGenericControl(lines, pos, line);
         }
@@ -436,26 +401,16 @@ public final class BlocksConverter {
     }
 
     /** Parses an already-collected inline listener body (one logical string) into a container Node. */
-    /**
-     * Parses a multi-line view listener (setOnClickListener / setOnLongClickListener /
-     * setOnTouchListener). The header line (already matched by P_LISTENER_HEADER) and
-     * the inner method-signature line (e.g. "public void onClick(View _view) {") are
-     * consumed, then the body is collected brace-depth-aware until the method's own
-     * closing '}', followed by the listener's closing "});".
-     *
-     * Trailing "return true;" boilerplate (required by OnLongClickListener / OnTouchListener
-     * interfaces) is stripped — it carries no user logic and would otherwise generate a
-     * spurious returnBoolean block.
-     */
+    /** Reads a multi-line listener body and removes its trailing return-true boilerplate. */
     private Node parseListener(List<String> lines, int[] pos, String viewN, String setterMethod) {
         int myId = newId();
-        pos[0]++; // consume header line
+        pos[0]++;  
 
         if (pos[0] < lines.size() && P_LISTENER_METHOD_SIG.matcher(lines.get(pos[0])).matches()) {
-            pos[0]++; // consume "public void onClick(View _view) {" line
+            pos[0]++;  
         }
 
-        // Collect inner body lines, brace-depth aware (body may itself contain if/for/etc.)
+         
         List<String> bodyLines = new ArrayList<>();
         int depth = 0;
         while (pos[0] < lines.size()) {
@@ -475,13 +430,13 @@ public final class BlocksConverter {
             }
         }
 
-        // Strip trailing "return true;" boilerplate
+         
         while (!bodyLines.isEmpty()
                 && P_RETURN_TRUE_BOILERPLATE.matcher(bodyLines.get(bodyLines.size() - 1).trim()).matches()) {
             bodyLines.remove(bodyLines.size() - 1);
         }
 
-        // Consume the listener's closing "});"
+         
         if (pos[0] < lines.size() && P_LISTENER_CLOSE.matcher(lines.get(pos[0])).matches()) {
             pos[0]++;
         }
@@ -616,19 +571,19 @@ public final class BlocksConverter {
         return node;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // STATEMENT RECOGNIZER
-    // ══════════════════════════════════════════════════════════════════════════
+     
+     
+     
 
-    // ── Pre-compiled patterns ──────────────────────────────────────────────────
+     
 
-    // Toast / message
+     
     private static final Pattern P_TOAST1 = Pattern.compile(
             "^Toast\\.makeText\\([^,]+,\\s*(.+?),\\s*Toast\\.LENGTH_\\w+\\)\\.show\\(\\)\\s*;?$");
     private static final Pattern P_TOAST2 = Pattern.compile(
             "^SketchwareUtil\\.showMessage\\([^,]+,\\s*(.+?)\\)\\s*;?$");
 
-    // Control
+     
     private static final Pattern P_FINISH   = Pattern.compile("^finish\\(\\)\\s*;?$");
     private static final Pattern P_BREAK    = Pattern.compile("^break\\s*;?$");
 
@@ -665,14 +620,14 @@ public final class BlocksConverter {
     private static final Pattern P_SET_SY         = Pattern.compile("^([\\w.]+)\\.setScaleY\\((?:\\(float\\))?\\(?(.+?)\\)?\\)\\s*;?$");
     private static final Pattern P_SET_TITLE      = Pattern.compile("^setTitle\\((.+)\\)\\s*;?$");
 
-    // Intent
+     
     private static final Pattern P_START_ACT      = Pattern.compile("^startActivity\\((\\w+)\\)\\s*;?$");
     private static final Pattern P_INTENT_EXTRA   = Pattern.compile("^([\\w.]+)\\.putExtra\\((.+?),\\s*(.+)\\)\\s*;?$");
     private static final Pattern P_INTENT_SCREEN  = Pattern.compile("^([\\w.]+)\\.setClass\\([^,]+,\\s*(\\w+)\\.class\\)\\s*;?$");
     private static final Pattern P_INTENT_ACTION  = Pattern.compile("^([\\w.]+)\\.setAction\\((?:Intent\\.)?(.+)\\)\\s*;?$");
     private static final Pattern P_INTENT_DATA    = Pattern.compile("^([\\w.]+)\\.setData\\(Uri\\.parse\\((.+)\\)\\)\\s*;?$");
 
-    // Collections
+     
     private static final Pattern P_LIST_ADD       = Pattern.compile("^([\\w.]+)\\.add\\((.+)\\)\\s*;?$");
     private static final Pattern P_LIST_CLEAR     = Pattern.compile("^([\\w.]+)\\.clear\\(\\)\\s*;?$");
     private static final Pattern P_LIST_REMOVE    = Pattern.compile("^([\\w.]+)\\.remove\\(\\(int\\)\\(?(.+?)\\)?\\)\\s*;?$");
@@ -680,21 +635,21 @@ public final class BlocksConverter {
     private static final Pattern P_MAP_REMOVE     = Pattern.compile("^([\\w.]+)\\.remove\\((.+)\\)\\s*;?$");
     private static final Pattern P_MAP_NEW        = Pattern.compile("^(\\w+)\\s*=\\s*new HashMap<>\\(\\)\\s*;?$");
 
-    // SharedPreferences
+     
     private static final Pattern P_FILE_SET       = Pattern.compile("^([\\w.]+)\\.edit\\(\\)\\.putString\\((.+?),\\s*(.+)\\)\\.commit\\(\\)\\s*;?$");
     private static final Pattern P_FILE_REMOVE    = Pattern.compile("^([\\w.]+)\\.edit\\(\\)\\.remove\\((.+)\\)\\.commit\\(\\)\\s*;?$");
     private static final Pattern P_FILE_OPEN      = Pattern.compile("^(\\w+)\\s*=\\s*getApplicationContext\\(\\)\\.getSharedPreferences\\((.+?),\\s*Activity\\.MODE_PRIVATE\\)\\s*;?$");
 
-    // Calendar
+     
     private static final Pattern P_CAL_NOW        = Pattern.compile("^(\\w+)\\s*=\\s*Calendar\\.getInstance\\(\\)\\s*;?$");
     private static final Pattern P_CAL_ADD        = Pattern.compile("^([\\w.]+)\\.add\\(Calendar\\.(\\w+),\\s*\\(int\\)\\((.+)\\)\\)\\s*;?$");
     private static final Pattern P_CAL_SET        = Pattern.compile("^([\\w.]+)\\.set\\(Calendar\\.(\\w+),\\s*\\(int\\)\\((.+)\\)\\)\\s*;?$");
     private static final Pattern P_CAL_SET_TIME   = Pattern.compile("^([\\w.]+)\\.setTimeInMillis\\(\\(long\\)\\((.+)\\)\\)\\s*;?$");
 
-    // Clipboard
+     
     private static final Pattern P_CLIPBOARD      = Pattern.compile("^\\(\\(ClipboardManager\\).+?CLIPBOARD_SERVICE\\)\\)\\.setPrimaryClip\\(ClipData\\.newPlainText\\(\"clipboard\",\\s*(.+)\\)\\)\\s*;?$");
 
-    // MediaPlayer
+     
     private static final Pattern P_MP_START       = Pattern.compile("^([\\w.]+)\\.start\\(\\)\\s*;?$");
     private static final Pattern P_MP_PAUSE       = Pattern.compile("^([\\w.]+)\\.pause\\(\\)\\s*;?$");
     private static final Pattern P_MP_RESET       = Pattern.compile("^([\\w.]+)\\.reset\\(\\)\\s*;?$");
@@ -702,11 +657,11 @@ public final class BlocksConverter {
     private static final Pattern P_MP_SEEK        = Pattern.compile("^([\\w.]+)\\.seekTo\\(\\(int\\)\\((.+)\\)\\)\\s*;?$");
     private static final Pattern P_MP_LOOP        = Pattern.compile("^([\\w.]+)\\.setLooping\\((.+)\\)\\s*;?$");
 
-    // SeekBar
+     
     private static final Pattern P_SB_PROG        = Pattern.compile("^([\\w.]+)\\.setProgress\\(\\(int\\)(.+?)\\)\\s*;?$");
     private static final Pattern P_SB_MAX         = Pattern.compile("^([\\w.]+)\\.setMax\\(\\(int\\)(.+?)\\)\\s*;?$");
 
-    // WebView
+     
     private static final Pattern P_WV_LOAD        = Pattern.compile("^([\\w.]+)\\.loadUrl\\((.+)\\)\\s*;?$");
     private static final Pattern P_WV_BACK        = Pattern.compile("^([\\w.]+)\\.goBack\\(\\)\\s*;?$");
     private static final Pattern P_WV_FWD         = Pattern.compile("^([\\w.]+)\\.goForward\\(\\)\\s*;?$");
@@ -714,22 +669,22 @@ public final class BlocksConverter {
     private static final Pattern P_WV_CLEAR_CACHE = Pattern.compile("^([\\w.]+)\\.clearCache\\(true\\)\\s*;?$");
     private static final Pattern P_WV_CLEAR_HIST  = Pattern.compile("^([\\w.]+)\\.clearHistory\\(\\)\\s*;?$");
 
-    // Dialog
+     
     private static final Pattern P_DLG_TITLE   = Pattern.compile("^([\\w.]+)\\.setTitle\\((.+)\\)\\s*;?$");
     private static final Pattern P_DLG_MSG     = Pattern.compile("^([\\w.]+)\\.setMessage\\((.+)\\)\\s*;?$");
     private static final Pattern P_DLG_SHOW    = Pattern.compile("^([\\w.]+)\\.create\\(\\)\\.show\\(\\)\\s*;?$");
 
-    // Timer
+     
     private static final Pattern P_TIMER_CANCEL = Pattern.compile("^([\\w.]+)\\.cancel\\(\\)\\s*;?$");
 
-    // Spinner
+     
     private static final Pattern P_SPN_SEL      = Pattern.compile("^([\\w.]+)\\.setSelection\\(\\(int\\)\\((.+)\\)\\)\\s*;?$");
 
-    // ListView smooth scroll
+     
     private static final Pattern P_LIST_SCROLL  = Pattern.compile("^([\\w.]+)\\.smoothScrollToPosition\\(\\(int\\)\\((.+)\\)\\)\\s*;?$");
 
-    // ── View event listeners ─────────────────────────────────────────────────
-    // ── View event listeners (multi-line, consumed via parseListener) ──────
+     
+     
     private static final Pattern P_LISTENER_HEADER = Pattern.compile(
             "^([\\w.]+)\\.(setOnClickListener|setOnLongClickListener|setOnTouchListener)\\(\\s*new\\s+View\\.(?:OnClickListener|OnLongClickListener|OnTouchListener)\\(\\)\\s*\\{\\s*$");
     private static final Pattern P_LISTENER_METHOD_SIG = Pattern.compile(
@@ -737,7 +692,7 @@ public final class BlocksConverter {
     private static final Pattern P_RETURN_TRUE_BOILERPLATE = Pattern.compile("^return\\s+true\\s*;?\\s*$");
     private static final Pattern P_LISTENER_CLOSE = Pattern.compile("^\\}\\)\\s*;?\\s*$");
 
-    // ── Additional view operations ───────────────────────────────────────────
+     
     private static final Pattern P_SET_ELEVATION    = Pattern.compile("^([\\w.]+)\\.setElevation\\((?:\\(float\\))?\\(?(.+?)\\)?\\)\\s*;?$");
     private static final Pattern P_REMOVE_VIEW      = Pattern.compile("^([\\w.]+)\\.removeView\\(([\\w.]+)\\)\\s*;?$");
     private static final Pattern P_REMOVE_ALL_VIEWS = Pattern.compile("^([\\w.]+)\\.removeAllViews\\(\\)\\s*;?$");
@@ -749,19 +704,19 @@ public final class BlocksConverter {
     private static final Pattern P_SET_TYPEFACE     = Pattern.compile("^([\\w.]+)\\.setTypeface\\(Typeface\\.(\\w+),\\s*(\\d+)\\)\\s*;?$");
     private static final Pattern P_SET_TEXT_SIZE    = Pattern.compile("^([\\w.]+)\\.setTextSize\\((?:\\(int\\))?\\(?(.+?)\\)?\\)\\s*;?$");
     private static final Pattern P_PERFORM_CLICK    = Pattern.compile("^([\\w.]+)\\.performClick\\(\\)\\s*;?$");
-    // GradientDrawable variants (DOTALL needed — complex inner class spans lines)
+     
     private static final Pattern P_GRAD_4ARG = Pattern.compile("^([\\w.]+)\\.setBackground\\(new GradientDrawable\\(\\).*?\\.getIns\\(\\(int\\)(.+?),\\s*\\(int\\)(.+?),\\s*(0x[0-9A-Fa-f]+),\\s*(0x[0-9A-Fa-f]+)\\)\\)\\s*;?$", Pattern.DOTALL);
     private static final Pattern P_GRAD_3ARG = Pattern.compile("^([\\w.]+)\\.setBackground\\(new GradientDrawable\\(\\).*?\\.getIns\\(\\(int\\)(.+?),\\s*(0x[0-9A-Fa-f]+),\\s*(0x[0-9A-Fa-f]+)\\)\\)\\s*;?$", Pattern.DOTALL);
     private static final Pattern P_GRAD_2ARG = Pattern.compile("^([\\w.]+)\\.setBackground\\(new GradientDrawable\\(\\).*?\\.getIns\\(\\(int\\)(.+?),\\s*(0x[0-9A-Fa-f]+)\\)\\)\\s*;?$", Pattern.DOTALL);
     private static final Pattern P_GRAD_LINEAR= Pattern.compile("^([\\w.]+)\\.setBackground\\(new GradientDrawable\\(GradientDrawable\\.Orientation\\.\\w+,\\s*new int\\[\\]\\s*\\{(0x[0-9A-Fa-f]+),\\s*(0x[0-9A-Fa-f]+)\\}\\)\\)\\s*;?$");
     private static final Pattern P_COLOR_FILTER = Pattern.compile("^([\\w.]+)\\.getBackground\\(\\)\\.setColorFilter\\((.+?),\\s*PorterDuff\\.Mode\\.(\\w+)\\)\\s*;?$");
 
-    // ── Typed HashMap.put ────────────────────────────────────────────────────
+     
     private static final Pattern P_MAP_PUT_INT  = Pattern.compile("^([\\w.]+)\\.put\\((.+?),\\s*\\(int\\)\\((.+?)\\)\\)\\s*;?$");
     private static final Pattern P_MAP_PUT_DBL  = Pattern.compile("^([\\w.]+)\\.put\\((.+?),\\s*\\(double\\)\\((.+?)\\)\\)\\s*;?$");
     private static final Pattern P_MAP_PUT_BOOL = Pattern.compile("^([\\w.]+)\\.put\\((.+?),\\s*(true|false)\\)\\s*;?$");
 
-    // ── List operations ──────────────────────────────────────────────────────
+     
     private static final Pattern P_LIST_ADD_NUM     = Pattern.compile("^([\\w.]+)\\.add\\(Double\\.valueOf\\((.+?)\\)\\)\\s*;?$");
     private static final Pattern P_LIST_INSERT_INT  = Pattern.compile("^([\\w.]+)\\.add\\(\\(int\\)\\((.+?)\\),\\s*Double\\.valueOf\\((.+?)\\)\\)\\s*;?$");
     private static final Pattern P_LIST_INSERT_STR  = Pattern.compile("^([\\w.]+)\\.add\\(\\(int\\)\\((.+?)\\),\\s*(.+?)\\)\\s*;?$");
@@ -775,50 +730,39 @@ public final class BlocksConverter {
     private static final Pattern P_SORT_LISTMAP     = Pattern.compile("^SketchwareUtil\\.sortListMap\\((\\w+),\\s*(.+?),\\s*(true|false),\\s*(true|false)\\)\\s*;?$");
     private static final Pattern P_LIST_MAP_SET     = Pattern.compile("^([\\w.]+)\\.set\\(\\(int\\)\\((.+?)\\),\\s*(\\w+)\\)\\s*;?$");
 
-    // ── Return blocks (type "f") ──────────────────────────────────────────────
+     
     private static final Pattern P_RETURN_STR  = Pattern.compile("^return\\s*\\(\"(.*)\"\\)\\s*;?$");
     private static final Pattern P_RETURN_BOOL = Pattern.compile("^return\\s*\\((true|false)\\)\\s*;?$");
     private static final Pattern P_RETURN_NUM  = Pattern.compile("^return\\s*\\(([0-9.]+)\\)\\s*;?$");
     private static final Pattern P_RETURN_VAR  = Pattern.compile("^return\\s+(\\w+)\\s*;?$");
 
-    // ── FileUtil ─────────────────────────────────────────────────────────────
+     
     private static final Pattern P_FU_WRITE   = Pattern.compile("^FileUtil\\.writeFile\\((.+?),\\s*(.+?)\\)\\s*;?$");
     private static final Pattern P_FU_COPY    = Pattern.compile("^FileUtil\\.copyFile\\((.+?),\\s*(.+?)\\)\\s*;?$");
     private static final Pattern P_FU_MOVE    = Pattern.compile("^FileUtil\\.moveFile\\((.+?),\\s*(.+?)\\)\\s*;?$");
     private static final Pattern P_FU_DELETE  = Pattern.compile("^FileUtil\\.deleteFile\\((.+?)\\)\\s*;?$");
     private static final Pattern P_FU_MKDIR   = Pattern.compile("^FileUtil\\.makeDir\\((.+?)\\)\\s*;?$");
 
-    // ── Activity / UI ────────────────────────────────────────────────────────
+     
     private static final Pattern P_FINISH_AFFINITY = Pattern.compile("^finishAffinity\\(\\)\\s*;?$");
     private static final Pattern P_SHOW_KEYBOARD   = Pattern.compile("^SketchwareUtil\\.showKeyboard\\(.+\\)\\s*;?$");
     private static final Pattern P_HIDE_KEYBOARD   = Pattern.compile("^SketchwareUtil\\.hideKeyboard\\(.+\\)\\s*;?$");
     private static final Pattern P_LIGHT_STATUS    = Pattern.compile("^getWindow\\(\\)\\.getDecorView\\(\\)\\.setSystemUiVisibility\\(View\\.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR\\)\\s*;?$");
 
-    // ── Intent extras ────────────────────────────────────────────────────────
+     
     private static final Pattern P_INTENT_TYPE        = Pattern.compile("^([\\w.]+)\\.setType\\((.+?)\\)\\s*;?$");
     private static final Pattern P_INTENT_REMOVE_EXTRA= Pattern.compile("^([\\w.]+)\\.removeExtra\\((.+?)\\)\\s*;?$");
     private static final Pattern P_INTENT_FLAGS       = Pattern.compile("^([\\w.]+)\\.setFlags\\(Intent\\.FLAG_ACTIVITY_(\\w+)\\)\\s*;?$");
     private static final Pattern P_START_CHOOSER      = Pattern.compile("^startActivity\\(Intent\\.createChooser\\((\\w+),\\s*(.+?)\\)\\)\\s*;?$");
     private static final Pattern P_LAUNCH_APP         = Pattern.compile("^(\\w+)\\s*=\\s*getPackageManager\\(\\)\\.getLaunchIntentForPackage\\((.+?)\\)\\s*;?$");
 
-    // ── SharedPreferences extra ───────────────────────────────────────────────
+     
     private static final Pattern P_SP_CONTAINS = Pattern.compile("^([\\w.]+)\\.contains\\((.+?)\\)\\.booleanValue\\(\\)\\s*;?$");
 
-    // ── DatePicker / TimePicker ───────────────────────────────────────────────
+     
     private static final Pattern P_TIME_PICKER_SHOW = Pattern.compile("^([\\w.]+)\\.show\\(\\)\\s*;?$");
 
-    /**
-     * Tries to match {@code line} against every loaded custom block's code template.
-     * Returns a BlockBean if matched, null otherwise.
-     *
-     * Custom block code uses String.format, so a template like
-     *   "%2$s.setText(%1$s);"
-     * compiled to regex:
-     *   "^(.+?)\.setText\((.+?)\)(?:;)?$"
-     * where group 1 → spec param index 1 (textview) and group 2 → spec param index 0 (string).
-     *
-     * Captured groups are fed through parseExpr() with the type from the spec.
-     */
+    /** Matches one Java statement against a custom block's code template. */
     private BlockBean tryCustomBlockMatch(String line) {
         for (CustomBlockMatcher matcher : getCustomMatchers()) {
             Matcher m = matcher.pattern.matcher(line);
@@ -827,11 +771,11 @@ public final class BlocksConverter {
             BlockBean bean = new BlockBean(String.valueOf(newId()),
                     matcher.spec, matcher.type, matcher.name);
 
-            // Allocate param slots (one per spec param)
+             
             String[] params = new String[matcher.specParamTypes.length];
             Arrays.fill(params, "");
 
-            // Map each capture group → its spec param slot, then parse with correct type
+             
             for (int g = 0; g < matcher.captureCount; g++) {
                 int specIdx = matcher.groupToSpecIdx[g];
                 if (specIdx < params.length) {
@@ -858,7 +802,7 @@ public final class BlocksConverter {
         private BlockBean recognizeLine(String line) {
         Matcher m;
 
-        // ── Toast ──────────────────────────────────────────────────────────────
+         
         m = P_TOAST1.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "toast %s", "doToast",
@@ -869,14 +813,14 @@ public final class BlocksConverter {
             return stmt(newId(), "toast %s", "doToast",
                     parseExpr(m.group(1).trim(), ExprType.STRING)); }
 
-        // ── Control ────────────────────────────────────────────────────────────
+         
         if (P_FINISH.matcher(line).matches()) { recognizedCount++;
             return new BlockBean(String.valueOf(newId()), "Finish Activity", "f", "finishActivity"); }
 
         if (P_BREAK.matcher(line).matches()) { recognizedCount++;
             return new BlockBean(String.valueOf(newId()), "break", " ", "break"); }
 
-        // ── Increment / decrement ─────────────────────────────────────────────
+         
         m = P_INC.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "int %m.varInt++", "increaseInt", m.group(1)); }
@@ -885,7 +829,7 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "int %m.varInt--", "decreaseInt", m.group(1)); }
 
-        // ── Typed variable declaration ─────────────────────────────────────────
+         
         m = P_ASSIGN_INT.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "set int %m.varInt to %d", "setVarInt",
@@ -911,7 +855,7 @@ public final class BlocksConverter {
             return stmt(newId(), "set boolean %m.varBool to %b", "setVarBoolean",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.BOOLEAN)); }
 
-        // ── View operations ────────────────────────────────────────────────────
+         
         m = P_SET_TEXT.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.textview setText %s", "setText",
@@ -987,7 +931,7 @@ public final class BlocksConverter {
             return stmt(newId(), "setTitle %s", "setTitle",
                     parseExpr(m.group(1).trim(), ExprType.STRING)); }
 
-        // ── Intent ─────────────────────────────────────────────────────────────
+         
         m = P_START_ACT.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "startActivity %m.intent", "startActivity", m.group(1)); }
@@ -1013,7 +957,7 @@ public final class BlocksConverter {
             return stmt(newId(), "%m.intent setData %s", "intentSetData",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.STRING)); }
 
-        // ── Collections ────────────────────────────────────────────────────────
+         
         m = P_MAP_NEW.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.map createNewMap", "mapCreateNew", m.group(1)); }
@@ -1053,7 +997,7 @@ public final class BlocksConverter {
             }
         }
 
-        // ── SharedPreferences ──────────────────────────────────────────────────
+         
         m = P_FILE_OPEN.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.file setFileName %s", "fileSetFileName",
@@ -1070,7 +1014,7 @@ public final class BlocksConverter {
             return stmt(newId(), "%m.file remove key %s", "fileRemoveData",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.STRING)); }
 
-        // ── Calendar ───────────────────────────────────────────────────────────
+         
         m = P_CAL_NOW.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "get now to %m.calendar", "calendarGetNow", m.group(1)); }
@@ -1090,13 +1034,13 @@ public final class BlocksConverter {
             return stmt(newId(), "%m.calendar setTime %d", "calendarSetTime",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
-        // ── Clipboard ──────────────────────────────────────────────────────────
+         
         m = P_CLIPBOARD.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "copy %s to clipboard", "copyToClipboard",
                     parseExpr(m.group(1).trim(), ExprType.STRING)); }
 
-        // ── MediaPlayer ────────────────────────────────────────────────────────
+         
         m = P_MP_SEEK.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.mediaplayer seekTo %d", "mediaplayerSeek",
@@ -1123,7 +1067,7 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.mediaplayer release", "mediaplayerRelease", m.group(1)); }
 
-        // ── SeekBar ────────────────────────────────────────────────────────────
+         
         m = P_SB_PROG.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.seekBar setProgress %d", "seekBarSetProgress",
@@ -1134,7 +1078,7 @@ public final class BlocksConverter {
             return stmt(newId(), "%m.seekBar setMax %d", "seekBarSetMax",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
-        // ── WebView ────────────────────────────────────────────────────────────
+         
         m = P_WV_LOAD.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.webView loadUrl %s", "webViewLoadUrl",
@@ -1160,7 +1104,7 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.webView clearHistory", "webViewClearHistory", m.group(1)); }
 
-        // ── Dialog ─────────────────────────────────────────────────────────────
+         
         m = P_DLG_TITLE.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.dialog setTitle %s", "dialogSetTitle",
@@ -1175,28 +1119,28 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.dialog show", "dialogShow", m.group(1)); }
 
-        // ── Timer ──────────────────────────────────────────────────────────────
+         
         m = P_TIMER_CANCEL.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "cancel timer %m.timer", "timerCancel", m.group(1)); }
 
-        // ── Spinner ────────────────────────────────────────────────────────────
+         
         m = P_SPN_SEL.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.spinner setSelection %d", "spnSetSelection",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
-        // ── ListView ───────────────────────────────────────────────────────────
+         
         m = P_LIST_SCROLL.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.list smoothScrollToPosition %d", "listSmoothScrollTo",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.NUMBER)); }
 
-        // ── Finish Affinity ───────────────────────────────────────────────────
+         
         if (P_FINISH_AFFINITY.matcher(line).matches()) { recognizedCount++;
             return new BlockBean(String.valueOf(newId()), "Finish Affinity", "f", "finishAffinity"); }
 
-        // ── Return blocks (type "f") ───────────────────────────────────────────
+         
         m = P_RETURN_STR.matcher(line);
         if (m.matches()) { recognizedCount++;
             BlockBean rb = new BlockBean(String.valueOf(newId()), "return %s", "f", "returnString");
@@ -1233,7 +1177,7 @@ public final class BlocksConverter {
             }
         }
 
-        // ── Additional view operations ─────────────────────────────────────────
+         
         m = P_SET_ELEVATION.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.view setElevation %d", "setElevation",
@@ -1317,7 +1261,7 @@ public final class BlocksConverter {
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.view performClick", "performClick", viewName(m.group(1))); }
 
-        // ── Typed HashMap.put ─────────────────────────────────────────────────
+         
         m = P_MAP_PUT_INT.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.varMap put key %s value int %d", "hashmapPutNumber",
@@ -1336,7 +1280,7 @@ public final class BlocksConverter {
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.STRING),
                     parseExpr(m.group(3).trim(), ExprType.BOOLEAN)); }
 
-        // ── List operations ───────────────────────────────────────────────────
+         
         m = P_LIST_ADD_NUM.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "add %d to %m.listInt", "addListInt",
@@ -1401,7 +1345,7 @@ public final class BlocksConverter {
                     parseExpr(m.group(3).trim(), ExprType.BOOLEAN),
                     parseExpr(m.group(4).trim(), ExprType.BOOLEAN)); }
 
-        // ── FileUtil ──────────────────────────────────────────────────────────
+         
         m = P_FU_WRITE.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "write String %s to file path %s", "fileutilwrite",
@@ -1430,7 +1374,7 @@ public final class BlocksConverter {
             return stmt(newId(), "make directory path %s", "fileutilmakedir",
                     parseExpr(m.group(1).trim(), ExprType.STRING)); }
 
-        // ── Activity / UI ─────────────────────────────────────────────────────
+         
         if (P_SHOW_KEYBOARD.matcher(line).matches()) { recognizedCount++;
             return new BlockBean(String.valueOf(newId()), "Show keyboard", " ", "showKeyboard"); }
 
@@ -1440,7 +1384,7 @@ public final class BlocksConverter {
         if (P_LIGHT_STATUS.matcher(line).matches()) { recognizedCount++;
             return new BlockBean(String.valueOf(newId()), "LightStatusBar", " ", "LightStatusBar"); }
 
-        // ── Intent extras ─────────────────────────────────────────────────────
+         
         m = P_LAUNCH_APP.matcher(line);
         if (m.matches()) { recognizedCount++;
             return stmt(newId(), "%m.intent set app package %s", "launchApp",
@@ -1466,7 +1410,7 @@ public final class BlocksConverter {
             return stmt(newId(), "StartActivity %m.intent with Chooser %s", "startActivityWithChooser",
                     m.group(1), parseExpr(m.group(2).trim(), ExprType.STRING)); }
 
-        // ── Generic assignment (after typed declarations failed) ────────────────
+         
         m = P_ASSIGN.matcher(line);
         if (m.matches()) {
             String var = m.group(1);
@@ -1484,14 +1428,14 @@ public final class BlocksConverter {
             return stmt(newId(), spec, opCode, var, parseExpr(val, type));
         }
 
-        // ── Custom block match (last chance before addSourceDirectly) ───────────
+         
         // Try runtime-loaded custom blocks. If the line was generated by a custom
         // block's String.format template, it will match here and produce the proper
         // BlockBean instead of being wrapped in addSourceDirectly.
         BlockBean customMatch = tryCustomBlockMatch(line);
         if (customMatch != null) return customMatch;
 
-        // ── Fallback: addSourceDirectly ────────────────────────────────────────
+         
         fallbackCount++;
         return asd(newId(), ensureSemicolon(line));
     }
@@ -1504,8 +1448,12 @@ public final class BlocksConverter {
         if (argumentTypes != null) {
             for (Map.Entry<String, String> entry : argumentTypes.entrySet()) {
                 String token = entry.getValue();
-                variableTypes.put(entry.getKey(), "s".equals(token) ? ExprType.STRING
-                        : "b".equals(token) ? ExprType.BOOLEAN : ExprType.NUMBER);
+                if ("s".equals(token)) variableTypes.put(entry.getKey(), ExprType.STRING);
+                else if ("b".equals(token)) variableTypes.put(entry.getKey(), ExprType.BOOLEAN);
+                else if ("d".equals(token) || "f".equals(token) || "i".equals(token)
+                        || "n".equals(token) || "m.long".equals(token)) {
+                    variableTypes.put(entry.getKey(), ExprType.NUMBER);
+                }
             }
         }
         for (String line : lines) {
@@ -1555,6 +1503,8 @@ public final class BlocksConverter {
             String argType = argumentTypes.get(expr);
             if ("s".equals(argType)) return ExprType.STRING;
             if ("b".equals(argType)) return ExprType.BOOLEAN;
+            if ("d".equals(argType) || "f".equals(argType) || "i".equals(argType)
+                    || "n".equals(argType) || "m.long".equals(argType)) return ExprType.NUMBER;
             ExprType known = variableTypes.get(expr);
             if (known != null) return known;
         }
@@ -1672,29 +1622,29 @@ public final class BlocksConverter {
         return null;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
+     
     // EXPRESSION PARSER  –  converts Java expr to param string or @blockId
-    // ══════════════════════════════════════════════════════════════════════════
+     
 
     private String parseExpr(String expr, ExprType hint) {
         if (expr == null || expr.isBlank()) return "";
         expr = expr.trim();
 
-        // Strip outer parentheses  ( expr )
+         
         if (expr.startsWith("(") && matchingClose(expr, 0) == expr.length() - 1)
             return parseExpr(expr.substring(1, expr.length() - 1), hint);
 
-        // ── Boolean constants ──────────────────────────────────────────────────
+         
         if ("true".equals(expr)) { return exprRef(exprB("true", "b", "true")); }
         if ("false".equals(expr)){ return exprRef(exprB("false", "b", "false")); }
 
-        // ── Logical NOT  !expr ─────────────────────────────────────────────────
+         
         if (expr.startsWith("!")) {
             String inner = parseExpr(expr.substring(1).trim(), ExprType.BOOLEAN);
             return exprRef(exprB1("not %b", "b", "not", inner));
         }
 
-        // ── Binary operators (lowest precedence first) ─────────────────────────
+         
         int op;
 
         op = topLevelOp(expr, "||");
@@ -1835,68 +1785,68 @@ public final class BlocksConverter {
             return exprRef(exprB2("%d % %d", "d", "%", l, r));
         }
 
-        // ── String literals ────────────────────────────────────────────────────
+         
         if (expr.startsWith("\"") && expr.endsWith("\"") && expr.length() >= 2) {
-            // Strip quotes — Fx re-adds them for %s params
+             
             return expr.substring(1, expr.length() - 1);
         }
 
-        // ── Numeric literals ───────────────────────────────────────────────────
+         
         if (expr.matches("-?\\d+(\\.\\d+)?[fFdDlL]?")) return expr;
 
-        // ── Casts: (int)(x), (float)(x), (long)(x) ────────────────────────────
+         
         Matcher castM = Pattern.compile("^\\((?:int|float|double|long)\\)\\(?(.+?)\\)?$").matcher(expr);
         if (castM.matches()) return parseExpr(castM.group(1).trim(), hint);
 
-        // ── Method call expressions ────────────────────────────────────────────
+         
 
-        // x.length()
+         
         Matcher mLen = Pattern.compile("^(.+)\\.length\\(\\)$").matcher(expr);
         if (mLen.matches())
             return exprRef(exprB1("%s.length()", "d", "stringLength",
                     parseExpr(mLen.group(1).trim(), ExprType.STRING)));
 
-        // x.concat(y)
+         
         Matcher mConcat = Pattern.compile("^(.+)\\.concat\\((.+)\\)$").matcher(expr);
         if (mConcat.matches())
             return exprRef(exprB2("%s.concat(%s)", "s", "stringJoin",
                     parseExpr(mConcat.group(1).trim(), ExprType.STRING),
                     parseExpr(mConcat.group(2).trim(), ExprType.STRING)));
 
-        // x.equals(y)
+         
         Matcher mEq = Pattern.compile("^(.+)\\.equals\\((.+)\\)$").matcher(expr);
         if (mEq.matches())
             return exprRef(exprB2("%s equals %s", "b", "stringEquals",
                     parseExpr(mEq.group(1).trim(), ExprType.STRING),
                     parseExpr(mEq.group(2).trim(), ExprType.STRING)));
 
-        // x.contains(y)
+         
         Matcher mCont = Pattern.compile("^(.+)\\.contains\\((.+)\\)$").matcher(expr);
         if (mCont.matches())
             return exprRef(exprB2("%s contains %s", "b", "stringContains",
                     parseExpr(mCont.group(1).trim(), ExprType.STRING),
                     parseExpr(mCont.group(2).trim(), ExprType.STRING)));
 
-        // x.indexOf(y)
+         
         Matcher mIdx = Pattern.compile("^(.+)\\.indexOf\\((.+)\\)$").matcher(expr);
         if (mIdx.matches())
             return exprRef(exprB2("%s indexOf %s", "d", "stringIndex",
                     parseExpr(mIdx.group(2).trim(), ExprType.STRING),
                     parseExpr(mIdx.group(1).trim(), ExprType.STRING)));
 
-        // x.trim()
+         
         Matcher mTrim = Pattern.compile("^(.+)\\.trim\\(\\)$").matcher(expr);
         if (mTrim.matches())
             return exprRef(exprB1("%s.trim()", "s", "trim",
                     parseExpr(mTrim.group(1).trim(), ExprType.STRING)));
 
-        // x.toUpperCase()
+         
         Matcher mUp = Pattern.compile("^(.+)\\.toUpperCase\\(\\)$").matcher(expr);
         if (mUp.matches())
             return exprRef(exprB1("%s.toUpperCase()", "s", "toUpperCase",
                     parseExpr(mUp.group(1).trim(), ExprType.STRING)));
 
-        // x.toLowerCase()
+         
         Matcher mLo = Pattern.compile("^(.+)\\.toLowerCase\\(\\)$").matcher(expr);
         if (mLo.matches())
             return exprRef(exprB1("%s.toLowerCase()", "s", "toLowerCase",
@@ -1908,27 +1858,27 @@ public final class BlocksConverter {
             return exprRef(exprB1("%m.textview getText", "s", "getText",
                     viewName(mGetTxt.group(1))));
 
-        // x.isEnabled()
+         
         Matcher mIsEn = Pattern.compile("^([\\w.]+)\\.isEnabled\\(\\)$").matcher(expr);
         if (mIsEn.matches())
             return exprRef(exprB1("%m.view isEnable", "b", "getEnable", viewName(mIsEn.group(1))));
 
-        // x.isChecked()
+         
         Matcher mIsCk = Pattern.compile("^([\\w.]+)\\.isChecked\\(\\)$").matcher(expr);
         if (mIsCk.matches())
             return exprRef(exprB1("%m.checkBox isChecked", "b", "getChecked", viewName(mIsCk.group(1))));
 
-        // x.getAlpha()
+         
         Matcher mGA = Pattern.compile("^([\\w.]+)\\.getAlpha\\(\\)$").matcher(expr);
         if (mGA.matches())
             return exprRef(exprB1("%m.view getAlpha", "d", "getAlpha", viewName(mGA.group(1))));
 
-        // x.size()
+         
         Matcher mSz = Pattern.compile("^([\\w.]+)\\.size\\(\\)$").matcher(expr);
         if (mSz.matches())
             return exprRef(exprB1("%m.list.length()", "d", "lengthList", mSz.group(1)));
 
-        // x.isEmpty()
+         
         Matcher mIE = Pattern.compile("^([\\w.]+)\\.isEmpty\\(\\)$").matcher(expr);
         if (mIE.matches())
             return exprRef(exprB1("%m.map.isEmpty()", "b", "mapIsEmpty", mIE.group(1)));
@@ -1945,7 +1895,7 @@ public final class BlocksConverter {
             return exprRef(exprB1("%d to string", "s", "toString",
                     parseExpr(mSVL.group(1).trim(), ExprType.NUMBER)));
 
-        // String.valueOf(x)
+         
         Matcher mSV = Pattern.compile("^String\\.valueOf\\((.+)\\)$").matcher(expr);
         if (mSV.matches())
             return exprRef(exprB1("%d to string with decimal", "s", "toStringWithDecimal",
@@ -1955,7 +1905,7 @@ public final class BlocksConverter {
         if ("System.currentTimeMillis()".equals(expr))
             return exprRef(exprB0("current time in ms", "d", "currentTime"));
 
-        // Math.PI / Math.E
+         
         if ("Math.PI".equals(expr)) return exprRef(exprB0("Math.PI", "d", "mathPi"));
         if ("Math.E".equals(expr))  return exprRef(exprB0("Math.E", "d", "mathE"));
 
@@ -2045,7 +1995,7 @@ public final class BlocksConverter {
             return exprRef(exprB1("getBooleanExtra %s", "b", "intentGetBoolean",
                     parseExpr(mIntBoolExtra.group(1).trim(), ExprType.STRING)));
 
-        // ── Ternary: cond ? a : b  →  represented as nested if-like ASD (no native Sketchware ternary block) ──
+         
         int qIdx = topLevelOp(expr, "?");
         if (qIdx >= 0) {
             int cIdx = topLevelOp(expr.substring(qIdx + 1), ":");
@@ -2057,7 +2007,7 @@ public final class BlocksConverter {
             }
         }
 
-        // ── instanceof → boolean ASD (no native block) ─────────────────────────
+         
         if (expr.contains(" instanceof "))
             return exprRef(exprB1("add source directly %s.inputOnly", "b", "asdBoolean", expr));
 
@@ -2112,7 +2062,7 @@ public final class BlocksConverter {
             return exprRef(exprB1("%m.view get" + mViewDim.group(2) + "()", "d",
                     "getView" + mViewDim.group(2), viewName(mViewDim.group(1))));
 
-        // view.getX() / getY()
+         
         Matcher mViewPos = Pattern.compile("^([\\w.]+)\\.get([XY])\\(\\)$").matcher(expr);
         if (mViewPos.matches())
             return exprRef(exprB1("%m.view get" + mViewPos.group(2) + "()", "d",
@@ -2121,29 +2071,44 @@ public final class BlocksConverter {
         // Color.parseColor("#xxxxxx")
         Matcher mColorParse = Pattern.compile("^Color\\.parseColor\\(\"(#[0-9A-Fa-f]+)\"\\)$").matcher(expr);
         if (mColorParse.matches())
-            return mColorParse.group(1); // colour literal — pass through directly
+            return mColorParse.group(1);  
 
-        // x.hashCode()
+         
         Matcher mHash = Pattern.compile("^(.+)\\.hashCode\\(\\)$").matcher(expr);
         if (mHash.matches())
             return exprRef(exprB1("add source directly %s.inputOnly", "d", "asdNumber", expr));
 
-        // ── Simple identifier → getVar ─────────────────────────────────────────
+         
         if (expr.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
             String argumentType = argumentTypes.get(expr);
             ExprType knownType = variableTypes.get(expr);
-            String bType;
-            if (argumentType != null) bType = argumentType;
-            else if (knownType != null) bType = blockTypeFor(knownType);
-            else bType = hint == ExprType.STRING ? "s"
+            String blockType;
+            String typeName = "";
+            if (argumentType != null) {
+                blockType = argumentType;
+                if (argumentType.startsWith("m.")) {
+                    blockType = "m";
+                    typeName = argumentType.substring(2);
+                } else if (argumentType.startsWith("v:")) {
+                    blockType = "v";
+                    typeName = argumentType.substring(2);
+                } else if (argumentType.startsWith("l:")) {
+                    blockType = "l";
+                    typeName = argumentType.substring(2);
+                }
+            } else if (knownType != null) {
+                blockType = blockTypeFor(knownType);
+            } else {
+                blockType = hint == ExprType.STRING ? "s"
                         : hint == ExprType.BOOLEAN ? "b" : "d";
-            BlockBean b = new BlockBean(String.valueOf(newId()), expr, bType,
+            }
+            BlockBean b = new BlockBean(String.valueOf(newId()), expr, blockType, typeName,
                     argumentType != null ? "getArg" : "getVar");
             exprBlocks.add(b);
             return "@" + b.id;
         }
 
-        // ── Fallback: typed addSource expression block ─────────────────────────
+         
         // Never return raw code as literal - always use a typed ASD expression block.
         // This prevents wrong behaviour where Fx wraps a code expression in quotes.
         switch (hint) {
@@ -2159,11 +2124,11 @@ public final class BlocksConverter {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // HELPERS
-    // ══════════════════════════════════════════════════════════════════════════
+     
+     
+     
 
-    /** Create a statement block (type=" ") with given params. */
+     
     private BlockBean stmt(int id, String spec, String opCode, String... params) {
         BlockBean b = new BlockBean(String.valueOf(id), spec, " ", opCode);
         for (String p : params) b.parameters.add(p);
@@ -2177,19 +2142,19 @@ public final class BlocksConverter {
         return b;
     }
 
-    /** Strip 'binding.' prefix from view names for cleaner block display. */
+     
     private String viewName(String raw) {
         return raw.startsWith("binding.") ? raw.substring(8) : raw;
     }
 
-    /** Create expr block with 0 params, add to exprBlocks, return @id. */
+     
     private BlockBean exprB0(String spec, String type, String opCode) {
         BlockBean b = new BlockBean(String.valueOf(newId()), spec, type, opCode);
         exprBlocks.add(b);
         return b;
     }
 
-    /** Create expr block with 1 param. */
+     
     private BlockBean exprB1(String spec, String type, String opCode, String p1) {
         BlockBean b = new BlockBean(String.valueOf(newId()), spec, type, opCode);
         b.parameters.add(p1);
@@ -2197,7 +2162,7 @@ public final class BlocksConverter {
         return b;
     }
 
-    /** Create expr block with 2 params. */
+     
     private BlockBean exprB2(String spec, String type, String opCode, String p1, String p2) {
         BlockBean b = new BlockBean(String.valueOf(newId()), spec, type, opCode);
         b.parameters.add(p1);
@@ -2206,7 +2171,7 @@ public final class BlocksConverter {
         return b;
     }
 
-    /** Shorthand: add bool expr block (already adds to exprBlocks). */
+     
     private BlockBean exprB(String spec, String type, String opCode) {
         return exprB0(spec, type, opCode);
     }
@@ -2214,7 +2179,7 @@ public final class BlocksConverter {
     /** Returns "@id" reference string for a bean (bean is already in exprBlocks). */
     private String exprRef(BlockBean b) { return "@" + b.id; }
 
-    // ── Binary operator scanner ────────────────────────────────────────────────
+     
 
     /**
      * Finds the LAST occurrence of {@code op} at brace depth 0 in {@code expr},
@@ -2294,7 +2259,7 @@ public final class BlocksConverter {
         return -1;
     }
 
-    // ── Brace skip helpers ────────────────────────────────────────────────────
+     
     private void skipOpen(List<String> lines, int[] pos) {
         if (pos[0] < lines.size() && P_OPEN.matcher(lines.get(pos[0])).matches()) pos[0]++;
     }
@@ -2302,7 +2267,7 @@ public final class BlocksConverter {
         if (pos[0] < lines.size() && P_CLOSE.matcher(lines.get(pos[0])).matches()) pos[0]++;
     }
     
-    // ── DFS flatten (parent before children) ──────────────────────────────────
+     
     private void flatten(List<Node> nodes, List<BlockBean> result) {
         for (Node n : nodes) {
             result.add(n.bean);
@@ -2311,7 +2276,7 @@ public final class BlocksConverter {
         }
     }
 
-    // ── Merge Consecutive ASD Blocks ──────────────────────────────────────────
+     
     private void mergeASDBlocks(List<BlockBean> blocks) {
         for (int i = 0; i < blocks.size() - 1; i++) {
             BlockBean current = blocks.get(i);
@@ -2325,7 +2290,7 @@ public final class BlocksConverter {
                 current.parameters.set(0, mergedCode);
                 current.nextBlock = next.nextBlock;
                 blocks.remove(i + 1);
-                i--; // re-check
+                i--;  
             }
         }
     }

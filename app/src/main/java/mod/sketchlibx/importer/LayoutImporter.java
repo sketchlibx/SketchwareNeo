@@ -25,37 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Converts Android Studio layout XML files into Sketchware's
- * "view" and "file" data formats.
- *
- * Key design rules (confirmed from source analysis):
- *  - Gson MUST use excludeFieldsWithoutExposeAnnotation (matches eC's GsonBuilder).
- *  - View section headers: @fileName.xml (uses Sketchware fileName, NOT class name).
- *  - FAB section (@fileName.xml_fab) is ALWAYS written for every screen — confirmed
- *    (via full .swb format analysis, cross-checked against a real decrypted project)
- *    present on 100% of real Sketchware Neo screens, Activity or Custom View, whether
- *    or not that screen actually uses a FAB. It holds one disconnected placeholder
- *    widget (no "parent"/"preId" keys — it is NOT part of the parent/child tree) that
- *    represents Sketchware's own reserved screen-level FAB slot. This is structurally
- *    separate from any real <FloatingActionButton> found while parsing the AS layout
- *    tree, which is still imported normally as an ordinary tree-connected ViewBean.
- *  - Drawer flag set ONLY if a DrawerLayout ViewBean is found in layout.
- *  - File section: @activity for Activities, @customview for custom views.
- *  - theme field in ProjectFileBean is always -1 (THEME_NONE — confirmed deprecated).
- *  - The layout XML's ROOT element (ViewBeanParser.setSkipRoot(true) deliberately
- *    discards it from the ViewBean tree) is NOT part of data/view at all — it lives
- *    in a completely separate top-level file, data/view_root, as one JSON object
- *    keyed by "<fileName>.xml" holding {"attributes": {raw XML attr name→value},
- *    "class_name": "<root XML tag, verbatim>"}. Confirmed directly from a real
- *    decrypted project (e.g. root ConstraintLayout/ScrollView with
- *    android:background="@color/bg_root" etc.) — this is why background colors,
- *    ConstraintLayout roots, and ScrollView/fillViewport were silently lost on
- *    import before this file learned to read the root tag at all.
- *
- * FAB/Drawer detection uses ViewBean.type integers.
- * These are the confirmed Sketchware type values (from ViewBeanFactory):
- *   type 16 = FloatingActionButton
- *   type 21 = DrawerLayout
+ * Converts Android layout XML into Sketchware view and file data.
+ * Each screen gets its required _fab placeholder. Real FAB widgets stay in
+ * the layout tree, and the drawer flag is set only when a DrawerLayout exists.
+ * The root XML tag and attributes are saved separately in data/view_root.
+ * ProjectFileBean uses theme -1; Gson writes only @Expose fields.
  */
 public class LayoutImporter {
 
@@ -69,7 +43,7 @@ public class LayoutImporter {
             .excludeFieldsWithoutExposeAnnotation()
             .create();
 
-    // ── Result holder ─────────────────────────────────────────────────────────
+     
 
     public static class ImportedLayout {
         /** Sketchware fileName (e.g. "main", "my_login"). */
@@ -110,23 +84,15 @@ public class LayoutImporter {
         }
     }
 
-    // ── Options bitmask constants (from ProjectFileBean) ──────────────────────
+     
     private static final int OPTION_TOOLBAR    = 1;
     private static final int OPTION_FULLSCREEN = 2;
     private static final int OPTION_DRAWER     = 4;
     private static final int OPTION_FAB        = 8;
 
-    // ── Public API ────────────────────────────────────────────────────────────
+     
 
-    /**
-     * Processes all layout XML files in the given layout directory.
-     *
-     * @param layoutDir      res/layout folder
-     * @param sources        classified source files (for layout→screen mapping)
-     * @param manifestParser result (for activity-level options like keyboard/orientation)
-     * @param appTheme       application-level theme string (from manifest)
-     * @return list of ImportedLayout, one per successfully parsed layout file
-     */
+    /** Imports layout files and links them to their Activity or Fragment. */
     public List<ImportedLayout> importLayouts(
             File layoutDir,
             List<ClassifiedSource> sources,
@@ -140,23 +106,9 @@ public class LayoutImporter {
             return results;
         }
 
-        // Build layout→ClassifiedSource map for O(1) lookup
-        Map<String, ClassifiedSource> layoutToSource = buildLayoutMap(sources);
-
-        // Build activity name→manifest entry map for keyboard/orientation lookup
-        Map<String, ParsedManifest.ActivityEntry> nameToActivity = new HashMap<>();
-        for (ParsedManifest.ActivityEntry entry : manifest.activities) {
-            nameToActivity.put(entry.simpleClassName, entry);
-        }
-
         File[] xmlFiles = layoutDir.listFiles();
         if (xmlFiles == null) return results;
 
-        // Only convert layouts that actually belong to a classified screen or are
-        // included by one of those layouts. Android projects commonly contain dozens
-        // of unrelated layouts (RecyclerView rows, dialogs, loading placeholders, etc.);
-        // they are not Activities and must not become phantom Sketchware Custom Views.
-        // Build the active include closure in deterministic order.
         Map<String, File> layoutFilesByName = new LinkedHashMap<>();
         for (File xml : xmlFiles) {
             if (xml.isFile() && xml.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) {
@@ -164,7 +116,24 @@ public class LayoutImporter {
                 layoutFilesByName.put(raw, xml);
             }
         }
-        java.util.Set<String> activeLayoutNames = new java.util.LinkedHashSet<>(layoutToSource.keySet());
+        associateManifestActivityLayouts(sources, manifest, layoutFilesByName);
+        Map<String, ClassifiedSource> layoutToSource = buildLayoutMap(sources);
+
+        Map<String, ParsedManifest.ActivityEntry> nameToActivity = new HashMap<>();
+        Map<String, Integer> simpleNameCounts = new HashMap<>();
+        for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+            String qualified = resolveManifestClassName(entry.rawClassName, manifest.packageName);
+            if (!qualified.isEmpty()) nameToActivity.put("q:" + qualified, entry);
+            simpleNameCounts.put(entry.simpleClassName, simpleNameCounts.containsKey(entry.simpleClassName)
+                    ? simpleNameCounts.get(entry.simpleClassName) + 1 : 1);
+        }
+        for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+            if (simpleNameCounts.get(entry.simpleClassName) == 1) {
+                nameToActivity.put("s:" + entry.simpleClassName, entry);
+            }
+        }
+
+        java.util.Set<String> activeLayoutNames = new java.util.LinkedHashSet<>(layoutFilesByName.keySet());
         java.util.regex.Pattern includePattern = java.util.regex.Pattern.compile(
                 "<include\\b[^>]*\\blayout\\s*=\\s*[\"']@layout/([A-Za-z0-9_]+)[\"']",
                 java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL);
@@ -194,18 +163,18 @@ public class LayoutImporter {
             return a.getName().compareToIgnoreCase(b.getName());
         });
 
-        // Tracks every sketchwareFileName claimed so far this run, so an unrelated,
-        // unregistered layout (e.g. a genuinely different "customer.xml" used only via
-        // manual inflate/include, unconnected to any Activity/Fragment) can never silently
-        // collide with an already-registered screen whose fileName was DERIVED from its
-        // class name rather than its own raw layout filename (e.g. CustomerActivity's own
-        // sketchwareFileName can legitimately be "customer" even though its own layout XML
-        // is named something else entirely — a coincidental collision with an unrelated
-        // "customer.xml" elsewhere in res/layout/ is a real, observed failure mode: two
-        // physically different files silently sharing one "@customer.xml" section header
-        // in data/view, and one fileName in data/file, corrupts Sketchware's own
-        // screen registry — confirmed from a real import log where "customer" and "report"
-        // both ended up imported twice under the same fileName with different root layouts).
+        // Avoid assigning one Sketchware screen name to two different layout files.
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
         Map<String, File> claimedFileNames = new HashMap<>();
 
         for (File xml : xmlFiles) {
@@ -213,8 +182,7 @@ public class LayoutImporter {
 
             String rawName = xml.getName().substring(0, xml.getName().length() - 4);
             if (!activeLayoutNames.contains(rawName)) {
-                Log.i(TAG, "Skipped unrelated Android Studio layout (not an Activity screen and not included): " + xml.getName());
-                continue;
+                Log.i(TAG, "Layout has no matching Activity class and will be imported as a Custom View: " + xml.getName());
             }
             ImportedLayout imported = processLayout(
                     xml, rawName, layoutToSource, nameToActivity, appTheme, claimedFileNames);
@@ -222,19 +190,64 @@ public class LayoutImporter {
             if (imported != null) results.add(imported);
         }
 
-        // An Activity may legitimately have no XML layout (or use a layout expression
-        // the lightweight source classifier cannot resolve). Register a blank shell
-        // for every remaining Activity so file/view/logic registries stay consistent.
+        // Register a blank screen when an Activity has no layout or its layout cannot be resolved.
+         
+         
         ensureMissingActivityScreens(results, sources, manifest);
         return results;
+    }
+
+    private void associateManifestActivityLayouts(List<ClassifiedSource> sources,
+                                                  ParsedManifest manifest,
+                                                  Map<String, File> layoutFilesByName) {
+        if (sources == null || layoutFilesByName == null || layoutFilesByName.isEmpty()) return;
+        for (ClassifiedSource source : sources) {
+            if (source == null || source.kind != ClassifiedSource.Kind.ACTIVITY) continue;
+            if (source.associatedLayout != null && layoutFilesByName.containsKey(source.associatedLayout)) continue;
+            String screenName = source.sketchwareFileName;
+            if (screenName == null || screenName.trim().isEmpty()) {
+                screenName = SourceClassifier.classNameToSketchwareFileName(source.simpleClassName);
+            }
+            String activityName = source.simpleClassName == null ? "" : source.simpleClassName;
+            String stripped = activityName.endsWith("Activity")
+                    ? activityName.substring(0, activityName.length() - "Activity".length()) : activityName;
+            String convention = "activity_" + SourceClassifier.classNameToSketchwareFileName(stripped);
+            String[] candidates = new String[]{screenName, convention,
+                    SourceClassifier.classNameToSketchwareFileName(activityName)};
+            for (String candidate : candidates) {
+                if (candidate == null || candidate.isEmpty() || !layoutFilesByName.containsKey(candidate)) continue;
+                source.associatedLayout = candidate;
+                Log.i(TAG, "Associated manifest Activity " + source.simpleClassName + " with layout " + candidate + ".xml");
+                break;
+            }
+        }
+    }
+
+    private String resolveManifestClassName(String rawName, String manifestPackage) {
+        if (rawName == null || rawName.trim().isEmpty()) return "";
+        String name = rawName.trim();
+        if (name.startsWith(".")) return (manifestPackage == null ? "" : manifestPackage) + name;
+        if (name.indexOf('.') < 0) return (manifestPackage == null || manifestPackage.isEmpty() ? "" : manifestPackage + ".") + name;
+        return name;
     }
 
     private void ensureMissingActivityScreens(List<ImportedLayout> layouts,
                                               List<ClassifiedSource> sources,
                                               ParsedManifest manifest) {
         Map<String, ParsedManifest.ActivityEntry> activityEntries = new HashMap<>();
+        Map<String, Integer> activityNameCounts = new HashMap<>();
         if (manifest != null && manifest.activities != null) {
-            for (ParsedManifest.ActivityEntry entry : manifest.activities) activityEntries.put(entry.simpleClassName, entry);
+            for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+                String qualified = resolveManifestClassName(entry.rawClassName, manifest.packageName);
+                if (!qualified.isEmpty()) activityEntries.put("q:" + qualified, entry);
+                Integer count = activityNameCounts.get(entry.simpleClassName);
+                activityNameCounts.put(entry.simpleClassName, count == null ? 1 : count + 1);
+            }
+            for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+                if (activityNameCounts.get(entry.simpleClassName) == 1) {
+                    activityEntries.put("s:" + entry.simpleClassName, entry);
+                }
+            }
         }
         java.util.Set<String> activityNames = new java.util.LinkedHashSet<>();
         java.util.Set<String> allNames = new java.util.LinkedHashSet<>();
@@ -250,8 +263,8 @@ public class LayoutImporter {
             requested = safeFileName(requested);
             if (requested.isEmpty()) requested = "screen";
 
-            // Keep a screen already produced for this exact Activity, but never let a
-            // different Activity with a colliding derived screen name disappear silently.
+            // Keep the existing screen, but do not let another Activity silently reuse its name.
+             
             String owner = null;
             for (ImportedLayout existing : layouts) {
                 if (requested.equals(existing.sketchwareFileName)
@@ -298,7 +311,9 @@ public class LayoutImporter {
                 source.sketchwareFileName = renamed;
                 requested = renamed;
             }
-            ParsedManifest.ActivityEntry entry = activityEntries.get(source.simpleClassName);
+            ParsedManifest.ActivityEntry entry = activityEntries.get("q:" + (source.packageName == null || source.packageName.isEmpty()
+                    ? source.simpleClassName : source.packageName + "." + source.simpleClassName));
+            if (entry == null) entry = activityEntries.get("s:" + source.simpleClassName);
             int keyboard = entry == null ? 0 : entry.sketchwareKeyboard();
             int orientation = entry == null ? 0 : entry.sketchwareOrientation();
             layouts.add(blankActivity(requested, keyboard, orientation));
@@ -308,8 +323,8 @@ public class LayoutImporter {
             Log.i(TAG, "Added blank screen shell for Activity " + source.simpleClassName + " → " + requested);
         }
 
-        // Sketchware's project workflow expects a registered main Activity. Do not let
-        // buildFileData invent one without the matching @main.xml view section.
+        // The main Activity must have a matching @main.xml view section.
+         
         if (!activityNames.contains("main")) {
             if (allNames.contains("main")) {
                 for (int i = 0; i < layouts.size(); i++) {
@@ -358,17 +373,22 @@ public class LayoutImporter {
         return candidate;
     }
 
-    /**
-     * Creates valid blank activity shells when the user explicitly disables XML
-     * layout conversion. Activity metadata and launcher routing remain available,
-     * while no XML widget is guessed or imported.
-     */
+    /** Creates blank Activity screens when layout conversion is disabled. */
     public List<ImportedLayout> createEmptyScreens(List<ClassifiedSource> sources,
                                                    ParsedManifest manifest) {
         List<ImportedLayout> result = new ArrayList<>();
         Map<String, ParsedManifest.ActivityEntry> entries = new HashMap<>();
+        Map<String, Integer> entryCounts = new HashMap<>();
         if (manifest != null && manifest.activities != null) {
-            for (ParsedManifest.ActivityEntry entry : manifest.activities) entries.put(entry.simpleClassName, entry);
+            for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+                String qualified = resolveManifestClassName(entry.rawClassName, manifest.packageName);
+                if (!qualified.isEmpty()) entries.put("q:" + qualified, entry);
+                Integer count = entryCounts.get(entry.simpleClassName);
+                entryCounts.put(entry.simpleClassName, count == null ? 1 : count + 1);
+            }
+            for (ParsedManifest.ActivityEntry entry : manifest.activities) {
+                if (entryCounts.get(entry.simpleClassName) == 1) entries.put("s:" + entry.simpleClassName, entry);
+            }
         }
         java.util.Set<String> names = new java.util.LinkedHashSet<>();
         if (sources != null) {
@@ -387,7 +407,9 @@ public class LayoutImporter {
                 }
                 names.add(name);
                 source.sketchwareFileName = name;
-                ParsedManifest.ActivityEntry entry = entries.get(source.simpleClassName);
+                ParsedManifest.ActivityEntry entry = entries.get("q:" + (source.packageName == null || source.packageName.isEmpty()
+                        ? source.simpleClassName : source.packageName + "." + source.simpleClassName));
+                if (entry == null) entry = entries.get("s:" + source.simpleClassName);
                 int keyboard = entry == null ? 0 : entry.sketchwareKeyboard();
                 int orientation = entry == null ? 0 : entry.sketchwareOrientation();
                 StringBuilder view = new StringBuilder();
@@ -414,7 +436,7 @@ public class LayoutImporter {
         return clean.toLowerCase(java.util.Locale.ROOT);
     }
 
-    // ── Single layout processing ──────────────────────────────────────────────
+     
 
     private ImportedLayout processLayout(
             File xml,
@@ -424,36 +446,41 @@ public class LayoutImporter {
             String appTheme,
             Map<String, File> claimedFileNames) {
 
-        // Find which source class uses this layout
+         
         ClassifiedSource source = layoutToSource.get(rawLayoutName);
         boolean isRegistered = (source != null && source.isSketchwareScreen());
 
-        // If not mapped to any source, treat as custom view
+         
         String sketchwareFileName;
         int fileType;
         int keyboardSetting = 0;
         int orientation     = 0;
 
+        ParsedManifest.ActivityEntry activityEntry = null;
+        if (source != null && source.kind == ClassifiedSource.Kind.ACTIVITY) {
+            String qualifiedClass = source.packageName == null || source.packageName.isEmpty()
+                    ? source.simpleClassName : source.packageName + "." + source.simpleClassName;
+            activityEntry = nameToActivity.get("q:" + qualifiedClass);
+            if (activityEntry == null) activityEntry = nameToActivity.get("s:" + source.simpleClassName);
+        }
+
         if (isRegistered) {
             sketchwareFileName = source.sketchwareFileName;
             fileType           = source.sketchwareFileType;
-
-            // Look up per-activity manifest settings
-            ParsedManifest.ActivityEntry actEntry = nameToActivity.get(source.simpleClassName);
-            if (actEntry != null) {
-                keyboardSetting = actEntry.sketchwareKeyboard();
-                orientation     = actEntry.sketchwareOrientation();
+            if (activityEntry != null) {
+                keyboardSetting = activityEntry.sketchwareKeyboard();
+                orientation     = activityEntry.sketchwareOrientation();
             }
         } else {
-            // Unmapped layout → register as custom view using layout name as fileName
+             
             sketchwareFileName = rawLayoutName;
-            fileType           = ProjectFileBean.PROJECT_FILE_TYPE_CUSTOM_VIEW; // 1
+            fileType           = ProjectFileBean.PROJECT_FILE_TYPE_CUSTOM_VIEW;  
         }
 
-        // ── Collision guard ─────────────────────────────────────────────────────
-        // Registered names normally remain authoritative. If two registered source
-        // classes nevertheless resolve to the same Sketchware screen name, rename the
-        // later one and mutate the ClassifiedSource too, so data/file, data/view and
+         
+        // Rename colliding screen names across file, view and logic data.
+         
+         
         // data/logic all use the same unique name. Orphan layouts are suffixed as well.
         if (claimedFileNames.containsKey(sketchwareFileName)) {
             if (isRegistered) {
@@ -480,10 +507,10 @@ public class LayoutImporter {
         }
         claimedFileNames.put(sketchwareFileName, xml);
 
-        // ── Read root tag (name + attributes) BEFORE the ViewBean parse discards it ──
+         
         RootInfo rootInfo = extractRootInfo(xml);
 
-        // ── Parse XML → ViewBeans ─────────────────────────────────────────────
+         
         ArrayList<ViewBean> beans;
         try {
             ViewBeanParser parser = new ViewBeanParser(xml);
@@ -494,7 +521,7 @@ public class LayoutImporter {
             beans = new ArrayList<>();
         }
 
-        // ── Detect FAB and DrawerLayout from parsed beans ─────────────────────
+         
         boolean hasFab    = false;
         boolean hasDrawer = false;
         for (ViewBean bean : beans) {
@@ -502,31 +529,27 @@ public class LayoutImporter {
             if (bean.type == VIEW_TYPE_DRAWER)  hasDrawer = true;
         }
 
-        // ── Compute options bitmask ───────────────────────────────────────────
+         
         int options = 0;
-        String effectiveTheme = (source != null
-                && source.kind == ClassifiedSource.Kind.ACTIVITY
-                && nameToActivity.containsKey(source.simpleClassName)
-                && !nameToActivity.get(source.simpleClassName).theme.isEmpty())
-                ? nameToActivity.get(source.simpleClassName).theme
-                : appTheme;
+        String effectiveTheme = activityEntry != null && activityEntry.theme != null
+                && !activityEntry.theme.isEmpty() ? activityEntry.theme : appTheme;
 
         if (isNoActionBarTheme(effectiveTheme))  options |= OPTION_TOOLBAR;
         if (isFullscreenTheme(effectiveTheme))   options |= OPTION_FULLSCREEN;
         if (hasDrawer)                            options |= OPTION_DRAWER;
         if (hasFab)                              options |= OPTION_FAB;
 
-        // ── Build view section string ─────────────────────────────────────────
+         
         StringBuilder viewSection = new StringBuilder();
         viewSection.append("@").append(sketchwareFileName).append(".xml\n");
         for (ViewBean bean : beans) {
             viewSection.append(GSON.toJson(bean)).append("\n");
         }
 
-        // FAB section: ALWAYS written (confirmed structural requirement — see class
-        // javadoc). Any real FAB widget found in the AS layout tree stays exactly
-        // where the parser placed it in `beans` above; this is Sketchware's separate,
-        // always-present, reserved screen-level FAB placeholder, not that widget.
+        // Keep the required _fab placeholder separate from real FAB widgets in the layout.
+         
+         
+         
         viewSection.append("@").append(sketchwareFileName).append(".xml_fab\n");
         viewSection.append(buildDefaultFabPlaceholderJson()).append("\n");
 
@@ -543,7 +566,7 @@ public class LayoutImporter {
         return importedLayout;
     }
 
-    // ── Root tag extraction ───────────────────────────────────────────────────
+     
 
     private static class RootInfo {
         final String className;
@@ -554,17 +577,13 @@ public class LayoutImporter {
         }
     }
 
-    /**
-     * Reads only the root element's tag name and attributes, verbatim, before
-     * ViewBeanParser (with setSkipRoot(true)) discards it from the ViewBean tree.
-     * This is what data/view_root needs — see class javadoc.
-     */
+    /** Reads the root tag and attributes before ViewBeanParser skips the root element. */
     private RootInfo extractRootInfo(File xml) {
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            // Android layouts are untrusted input during import. Harden the parser
-            // without making otherwise-readable layouts fail on parser implementations
-            // that do not support every optional security feature.
+            // Harden XML parsing without rejecting layouts when an optional security feature is unavailable.
+             
+             
             try { factory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true); } catch (Exception ignored) { }
             try { factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true); } catch (Exception ignored) { }
             try { factory.setFeature("http://xml.org/sax/features/external-general-entities", false); } catch (Exception ignored) { }
@@ -584,7 +603,9 @@ public class LayoutImporter {
             NamedNodeMap attrs = root.getAttributes();
             for (int i = 0; i < attrs.getLength(); i++) {
                 Node n = attrs.item(i);
-                attrMap.put(n.getNodeName(), n.getNodeValue());
+                String attributeName = n.getNodeName();
+                if ("xmlns".equals(attributeName) || attributeName.startsWith("xmlns:")) continue;
+                attrMap.put(attributeName, n.getNodeValue());
             }
             return new RootInfo(className, attrMap);
         } catch (Exception e) {
@@ -594,12 +615,7 @@ public class LayoutImporter {
         }
     }
 
-    /**
-     * Builds the complete data/view_root JSON object: one entry per screen,
-     * keyed by "<fileName>.xml", each holding {"attributes": {...}, "class_name": "..."}.
-     * Screens whose root tag could not be read are omitted (Sketchware falls back
-     * to its own default root container for those, same as before this fix existed).
-     */
+    /** Writes each screen's root class and raw XML attributes to data/view_root. */
     public String buildViewRootData(List<ImportedLayout> layouts) {
         StringBuilder sb = new StringBuilder("{");
         boolean first = true;
@@ -641,17 +657,17 @@ public class LayoutImporter {
         return out.append("\"").toString();
     }
 
-    // ── Helper: build layout name → ClassifiedSource map ─────────────────────
+     
 
     private Map<String, ClassifiedSource> buildLayoutMap(List<ClassifiedSource> sources) {
         Map<String, ClassifiedSource> map = new HashMap<>();
         for (ClassifiedSource cs : sources) {
-            // Only Activities, Fragments, and genuine custom-view classes may own a
-            // Sketchware layout section. Utility classes, adapters, services and model
-            // classes often reference R.layout.row/dialog_* for inflation; those references
-            // must not cause those layouts to become accidental Custom View screens.
+            // Only Activities, Fragments and custom views can own layout sections.
+             
+             
+             
             if (cs.isSketchwareScreen() && cs.associatedLayout != null && !cs.associatedLayout.isEmpty()) {
-                // Only register the first match for a given layout name.
+                // Keep the first source match for each layout name.
                 if (!map.containsKey(cs.associatedLayout)) {
                     map.put(cs.associatedLayout, cs);
                 } else {
@@ -664,7 +680,7 @@ public class LayoutImporter {
         return map;
     }
 
-    // ── Theme string inspection ───────────────────────────────────────────────
+     
 
     private boolean isNoActionBarTheme(String theme) {
         if (theme == null) return false;
@@ -678,20 +694,9 @@ public class LayoutImporter {
         return t.contains("fullscreen") || t.contains("notitlebar");
     }
 
-    // ── Assemble final "file" data string ─────────────────────────────────────
+     
 
-    /**
-     * Builds the complete "file" data string from a list of imported layouts.
-     * Format (confirmed from ProjectFileBean + file data analysis):
-     *
-     *   @activity
-     *   {ProjectFileBean JSON for activity 1}
-     *   {ProjectFileBean JSON for activity 2}
-     *   @customview
-     *   {ProjectFileBean JSON for custom view 1}
-     *
-     * Always ensures at least one "main" activity exists (Sketchware requirement).
-     */
+    /** Builds the @activity and @customview sections in Sketchware's file data. */
     public String buildFileData(List<ImportedLayout> layouts) {
         StringBuilder activities  = new StringBuilder();
         StringBuilder customViews = new StringBuilder();
@@ -708,7 +713,7 @@ public class LayoutImporter {
             }
         }
 
-        // Sketchware requires at least one activity named "main"
+        // Sketchware requires a main Activity.
         if (!hasMain) {
             activities.append(buildDefaultMainActivity()).append("\n");
         }
@@ -717,7 +722,7 @@ public class LayoutImporter {
              + "@customview\n" + customViews.toString();
     }
 
-    /** Builds the complete "view" data string from all imported layouts. */
+     
     public String buildViewData(List<ImportedLayout> layouts) {
         StringBuilder sb = new StringBuilder();
         for (ImportedLayout layout : layouts) {
@@ -726,16 +731,9 @@ public class LayoutImporter {
         return sb.toString();
     }
 
-    // ── JSON builders ─────────────────────────────────────────────────────────
+     
 
-    /**
-     * Builds a ProjectFileBean JSON line for the file data section.
-     * Fields are written manually to guarantee field order and prevent
-     * including non-@Expose fields from ProjectFileBean.
-     *
-     * Confirmed fields (from ProjectFileBean @Expose analysis):
-     *   fileName, fileType, keyboardSetting, options, orientation, theme
-     */
+    /** Writes ProjectFileBean fields in the order expected by Sketchware. */
     private String buildProjectFileBeanJson(ImportedLayout layout) {
         return "{\"fileName\":\"" + layout.sketchwareFileName + "\","
              + "\"fileType\":"     + layout.fileType          + ","
@@ -745,17 +743,7 @@ public class LayoutImporter {
              + "\"theme\":-1}";    // always -1 (THEME_NONE — confirmed deprecated)
     }
 
-    /**
-     * The disconnected placeholder widget written into every screen's mandatory
-     * "_fab" section. Hand-written (not Gson-serialized from the real ViewBean
-     * class) specifically so "parent" and "preId" can be omitted entirely, matching
-     * the exact shape confirmed from a real decrypted project's data/view section —
-     * Gson would otherwise always emit those keys (e.g. as "") even when unused,
-     * which does not match the confirmed real-sample structure.
-     *
-     * Field values below are the full confirmed ViewBean field set with sensible
-     * FAB-appropriate defaults (bottom-end gravity, 16dp margins, wrap_content).
-     */
+    /** Writes the required disconnected FAB placeholder without parent/preId fields. */
     private String buildDefaultFabPlaceholderJson() {
         return "{"
              + "\"id\":\"_fab\","

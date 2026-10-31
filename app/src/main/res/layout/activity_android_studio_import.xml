@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorSurface">
@@ -15,23 +14,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?attr/colorSurface"
-            app:elevation="0dp"
-            app:liftOnScroll="true">
+            app:elevation="0dp">
 
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="?attr/actionBarSize"
+                android:background="?attr/colorSurface"
                 app:navigationIcon="@drawable/ic_mtrl_arrow_back"
-                app:navigationIconTint="?attr/colorOnSurface"
                 app:title="Import Android Studio Project"
-                app:titleTextAppearance="?attr/textAppearanceTitleMedium"
                 app:titleTextColor="?attr/colorOnSurface" />
-
-            <com.google.android.material.divider.MaterialDivider
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:dividerColor="?attr/colorOutlineVariant" />
         </com.google.android.material.appbar.AppBarLayout>
 
         <androidx.core.widget.NestedScrollView
@@ -46,157 +38,202 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="20dp">
+                android:paddingHorizontal="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="24dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="22dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ANDROID STUDIO  →  NEO"
+                            android:textAllCaps="true"
+                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:text="Bring your project across"
+                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textSize="25sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:lineSpacingExtra="2dp"
+                            android:text="Inspect screens, resources and dependencies before creating a native Sketchware Neo project. Unsupported source is preserved for recovery."
+                            android:textColor="?attr/colorOnPrimaryContainer"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Choose Project Source"
-                    android:textAppearance="?attr/textAppearanceTitleSmall"
-                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginTop="26dp"
+                    android:text="1  ·  Choose a source"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:layout_marginBottom="12dp"
-                    android:text="Choose an extracted project folder, a ZIP archive, or clone a repository."
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Use a local project folder, a ZIP archive, or a Git repository."
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
 
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/card_folder"
-                        android:layout_width="0dp"
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/card_folder"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_import_action_icon"
+                            android:clipToOutline="true"
+                            android:padding="10dp"
+                            android:src="@drawable/ic_import_folder"
+                            app:tint="?attr/colorOnSecondaryContainer" />
 
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="14dp">
-
-                            <com.google.android.material.card.MaterialCardView
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                                app:cardCornerRadius="12dp"
-                                app:cardElevation="0dp">
-
-                                <ImageView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="match_parent"
-                                    android:padding="9dp"
-                                    android:src="@drawable/ic_import_folder"
-                                    app:tint="?attr/colorPrimary" />
-                            </com.google.android.material.card.MaterialCardView>
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:singleLine="true"
-                                android:text="Project Folder"
-                                android:textAppearance="?attr/textAppearanceTitleSmall"
+                                android:text="Project folder"
                                 android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:singleLine="true"
-                                android:text="Browse directory"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
+                                android:layout_marginTop="3dp"
+                                android:text="Read an existing project directory"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="13sp" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
 
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/card_zip"
-                        android:layout_width="0dp"
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mtrl_chevron_right_24"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/card_zip"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                    app:cardCornerRadius="18dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="0dp"
-                        app:strokeColor="?attr/colorOutlineVariant"
-                        app:strokeWidth="1dp">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <ImageView
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:background="@drawable/bg_import_action_icon"
+                            android:clipToOutline="true"
+                            android:padding="10dp"
+                            android:src="@drawable/ic_import_zip"
+                            app:tint="?attr/colorOnSecondaryContainer" />
 
                         <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:gravity="center"
-                            android:orientation="vertical"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="14dp">
-
-                            <com.google.android.material.card.MaterialCardView
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                                app:cardCornerRadius="12dp"
-                                app:cardElevation="0dp">
-
-                                <ImageView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="match_parent"
-                                    android:padding="9dp"
-                                    android:src="@drawable/ic_import_zip"
-                                    app:tint="?attr/colorPrimary" />
-                            </com.google.android.material.card.MaterialCardView>
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:singleLine="true"
-                                android:text="ZIP Archive"
-                                android:textAppearance="?attr/textAppearanceTitleSmall"
+                                android:text="ZIP archive"
                                 android:textColor="?attr/colorOnSurface"
+                                android:textSize="16sp"
                                 android:textStyle="bold" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:singleLine="true"
-                                android:text="Inspect .zip project"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
+                                android:layout_marginTop="3dp"
+                                android:text="Inspect a compressed project backup"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="13sp" />
                         </LinearLayout>
-                    </com.google.android.material.card.MaterialCardView>
-                </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mtrl_chevron_right_24"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_git"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="2dp"
                     app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                    app:cardCornerRadius="16dp"
+                    app:cardCornerRadius="18dp"
                     app:cardElevation="0dp"
                     app:strokeColor="?attr/colorOutlineVariant"
                     app:strokeWidth="1dp">
@@ -215,54 +252,46 @@
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="14dp"
-                            android:paddingVertical="12dp">
+                            android:padding="16dp">
 
-                            <com.google.android.material.card.MaterialCardView
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                                app:cardCornerRadius="12dp"
-                                app:cardElevation="0dp">
-
-                                <ImageView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="match_parent"
-                                    android:padding="9dp"
-                                    android:src="@drawable/ic_import_github"
-                                    app:tint="?attr/colorPrimary" />
-                            </com.google.android.material.card.MaterialCardView>
+                            <ImageView
+                                android:layout_width="44dp"
+                                android:layout_height="44dp"
+                                android:background="@drawable/bg_import_action_icon"
+                                android:clipToOutline="true"
+                                android:padding="10dp"
+                                android:src="@drawable/ic_github"
+                                app:tint="?attr/colorPrimary" />
 
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="12dp"
-                                android:layout_marginEnd="8dp"
+                                android:layout_marginStart="14dp"
                                 android:layout_weight="1"
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:text="Clone Git Repository"
-                                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                                    android:text="Clone from Git"
                                     android:textColor="?attr/colorOnSurface"
+                                    android:textSize="16sp"
                                     android:textStyle="bold" />
 
                                 <TextView
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
-                                    android:text="Clone and inspect an HTTPS repository"
-                                    android:textAppearance="?attr/textAppearanceBodySmall"
-                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                                    android:layout_marginTop="3dp"
+                                    android:text="HTTPS repository · optional branch or tag"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="13sp" />
                             </LinearLayout>
 
                             <ImageView
                                 android:id="@+id/git_expand_icon"
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:src="@drawable/selector_ic_expand_more_24"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_arrow_drop_down_24px"
                                 app:tint="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
@@ -271,118 +300,128 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="vertical"
-                            android:paddingHorizontal="14dp"
-                            android:paddingBottom="14dp"
-                            android:visibility="gone"
-                            tools:visibility="visible">
+                            android:paddingHorizontal="16dp"
+                            android:paddingBottom="16dp"
+                            android:visibility="gone">
 
                             <com.google.android.material.divider.MaterialDivider
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginBottom="12dp"
+                                android:layout_marginBottom="16dp"
                                 app:dividerColor="?attr/colorOutlineVariant" />
 
                             <com.google.android.material.textfield.TextInputLayout
                                 android:id="@+id/git_url_layout"
-                                style="?attr/textInputStyle"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:hint="Repository URL"
-                                app:endIconMode="clear_text">
+                                android:hint="Repository HTTPS URL"
+                                app:boxCornerRadiusBottomEnd="24dp"
+                                app:boxCornerRadiusBottomStart="24dp"
+                                app:boxCornerRadiusTopEnd="24dp"
+                                app:boxCornerRadiusTopStart="24dp">
 
                                 <com.google.android.material.textfield.TextInputEditText
                                     android:id="@+id/git_url"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:inputType="textUri"
-                                    android:paddingVertical="12dp"
-                                    android:singleLine="true"
-                                    android:textSize="13sp" />
+                                    android:maxLines="1"
+                                    android:paddingVertical="16dp"
+                                    android:singleLine="true" />
                             </com.google.android.material.textfield.TextInputLayout>
 
                             <LinearLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="10dp"
-                                android:baselineAligned="false"
+                                android:layout_marginTop="8dp"
                                 android:orientation="horizontal">
 
                                 <com.google.android.material.textfield.TextInputLayout
                                     android:id="@+id/git_branch_layout"
-                                    style="?attr/textInputStyle"
+                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
                                     android:layout_marginEnd="6dp"
                                     android:layout_weight="1"
-                                    android:hint="Branch (optional)">
+                                    android:hint="Branch"
+                                    app:boxCornerRadiusBottomEnd="24dp"
+                                    app:boxCornerRadiusBottomStart="24dp"
+                                    app:boxCornerRadiusTopEnd="24dp"
+                                    app:boxCornerRadiusTopStart="24dp">
 
                                     <com.google.android.material.textfield.TextInputEditText
                                         android:id="@+id/git_branch"
                                         android:layout_width="match_parent"
                                         android:layout_height="wrap_content"
                                         android:inputType="text"
-                                        android:paddingVertical="12dp"
-                                        android:singleLine="true"
-                                        android:textSize="13sp" />
+                                        android:maxLines="1"
+                                        android:paddingVertical="16dp"
+                                        android:singleLine="true" />
                                 </com.google.android.material.textfield.TextInputLayout>
 
                                 <com.google.android.material.textfield.TextInputLayout
                                     android:id="@+id/git_tag_layout"
-                                    style="?attr/textInputStyle"
+                                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                                     android:layout_width="0dp"
                                     android:layout_height="wrap_content"
                                     android:layout_marginStart="6dp"
                                     android:layout_weight="1"
-                                    android:hint="Tag (optional)">
+                                    android:hint="Tag"
+                                    app:boxCornerRadiusBottomEnd="24dp"
+                                    app:boxCornerRadiusBottomStart="24dp"
+                                    app:boxCornerRadiusTopEnd="24dp"
+                                    app:boxCornerRadiusTopStart="24dp">
 
                                     <com.google.android.material.textfield.TextInputEditText
                                         android:id="@+id/git_tag"
                                         android:layout_width="match_parent"
                                         android:layout_height="wrap_content"
                                         android:inputType="text"
-                                        android:paddingVertical="12dp"
-                                        android:singleLine="true"
-                                        android:textSize="13sp" />
+                                        android:maxLines="1"
+                                        android:paddingVertical="16dp"
+                                        android:singleLine="true" />
                                 </com.google.android.material.textfield.TextInputLayout>
                             </LinearLayout>
 
                             <com.google.android.material.textfield.TextInputLayout
                                 android:id="@+id/git_token_layout"
-                                style="?attr/textInputStyle"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="10dp"
+                                android:layout_marginTop="8dp"
                                 android:hint="Access token (optional)"
-                                app:endIconMode="password_toggle">
+                                app:endIconMode="password_toggle"
+                                app:boxCornerRadiusBottomEnd="24dp"
+                                app:boxCornerRadiusBottomStart="24dp"
+                                app:boxCornerRadiusTopEnd="24dp"
+                                app:boxCornerRadiusTopStart="24dp">
 
                                 <com.google.android.material.textfield.TextInputEditText
                                     android:id="@+id/git_token"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:inputType="textPassword"
-                                    android:paddingVertical="12dp"
-                                    android:singleLine="true"
-                                    android:textSize="13sp" />
+                                    android:maxLines="1"
+                                    android:paddingVertical="16dp"
+                                    android:singleLine="true" />
                             </com.google.android.material.textfield.TextInputLayout>
 
                             <TextView
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="6dp"
-                                android:text="Token is used only for this clone and is not saved. Use a read-only token when possible."
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
+                                android:text="Tokens are used only for this clone and are not saved in project settings."
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="12sp" />
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/clone_button"
-                                style="@style/Widget.Material3.Button.TonalButton"
                                 android:layout_width="match_parent"
-                                android:layout_height="44dp"
-                                android:layout_marginTop="12dp"
-                                android:insetTop="0dp"
-                                android:insetBottom="0dp"
-                                android:text="Clone and Inspect"
-                                app:icon="@drawable/ic_mtrl_download"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="14dp"
+                                android:text="Clone and inspect"
+                                app:icon="@drawable/ic_github"
                                 app:iconGravity="textStart" />
                         </LinearLayout>
                     </LinearLayout>
@@ -391,16 +430,13 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/project_item_shape_alone"
+                    android:layout_marginTop="18dp"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
+                    android:orientation="horizontal">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
                         android:src="@drawable/ic_mtrl_info"
                         app:tint="?attr/colorPrimary" />
 
@@ -410,50 +446,148 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
                         android:layout_weight="1"
-                        android:text="No project selected yet"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
+                        android:text="No project selected yet. Choose a source to begin inspection."
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/details_card"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="20dp"
                     android:visibility="gone"
                     app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-                    app:cardCornerRadius="16dp"
+                    app:cardCornerRadius="22dp"
                     app:cardElevation="0dp"
                     app:strokeColor="?attr/colorOutlineVariant"
-                    app:strokeWidth="1dp"
-                    tools:visibility="visible">
+                    app:strokeWidth="1dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:padding="14dp">
+                        android:padding="18dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="2  ·  Inspection report"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/project_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="Android project"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/project_meta"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:lineSpacingExtra="3dp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/component_chips"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            app:chipSpacingHorizontal="6dp"
+                            app:chipSpacingVertical="4dp" />
+
+                        <com.google.android.material.divider.MaterialDivider
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            app:dividerColor="?attr/colorOutlineVariant" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Detected dependencies"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/dependency_text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:lineSpacingExtra="3dp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/warning_text"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:lineSpacingExtra="3dp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="26dp"
+                    android:text="3  ·  Conversion settings"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Choose which parts should be converted. Original source files are retained for reference."
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="?attr/colorOutlineVariant"
+                    app:strokeWidth="1dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="16dp">
 
                         <LinearLayout
+                            android:id="@+id/row_java_to_blocks"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:gravity="center_vertical"
+                            android:minHeight="68dp"
                             android:orientation="horizontal">
 
-                            <com.google.android.material.card.MaterialCardView
-                                android:layout_width="42dp"
-                                android:layout_height="42dp"
-                                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                                app:cardCornerRadius="12dp"
-                                app:cardElevation="0dp">
-
-                                <ImageView
-                                    android:layout_width="match_parent"
-                                    android:layout_height="match_parent"
-                                    android:padding="9dp"
-                                    android:src="@drawable/ic_import_android"
-                                    app:tint="?attr/colorPrimary" />
-                            </com.google.android.material.card.MaterialCardView>
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_import_action_icon"
+                                android:clipToOutline="true"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_mtrl_code"
+                                app:tint="?attr/colorOnSecondaryContainer" />
 
                             <LinearLayout
                                 android:layout_width="0dp"
@@ -463,358 +597,229 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/project_name"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:text="Imported Project"
-                                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                                    android:text="Convert Java to blocks"
                                     android:textColor="?attr/colorOnSurface"
+                                    android:textSize="14sp"
                                     android:textStyle="bold" />
 
                                 <TextView
-                                    android:id="@+id/project_meta"
-                                    android:layout_width="wrap_content"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="2dp"
-                                    android:text="Package, SDK levels and components appear here"
-                                    android:textAppearance="?attr/textAppearanceBodySmall"
-                                    android:textColor="?attr/colorOnSurfaceVariant" />
+                                    android:text="Supported statements become editable logic; unsupported code is preserved."
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="12sp" />
                             </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/java_to_blocks"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true" />
                         </LinearLayout>
 
                         <com.google.android.material.divider.MaterialDivider
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginVertical="12dp"
                             app:dividerColor="?attr/colorOutlineVariant" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Detected Components"
-                            android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textStyle="bold" />
-
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/component_chips"
+                        <LinearLayout
+                            android:id="@+id/row_methods_to_more_blocks"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            app:chipSpacingHorizontal="6dp"
-                            app:chipSpacingVertical="4dp"
-                            app:singleLine="false" />
+                            android:gravity="center_vertical"
+                            android:minHeight="68dp"
+                            android:orientation="horizontal">
 
-                        <com.google.android.material.card.MaterialCardView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-                            app:cardCornerRadius="12dp"
-                            app:cardElevation="0dp">
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_import_action_icon"
+                                android:clipToOutline="true"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_mtrl_view_module"
+                                app:tint="?attr/colorOnSecondaryContainer" />
 
-                            <TextView
-                                android:id="@+id/dependency_text"
-                                android:layout_width="match_parent"
+                            <LinearLayout
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:padding="12dp"
-                                android:text="Dependencies found will be listed here."
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant" />
-                        </com.google.android.material.card.MaterialCardView>
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/warning_text"
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Extract helper methods"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Create More Blocks for compatible custom methods."
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/methods_to_more_blocks"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="false" />
+                        </LinearLayout>
+
+                        <com.google.android.material.divider.MaterialDivider
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorError"
-                            tools:text="Preflight warnings appear here" />
+                            app:dividerColor="?attr/colorOutlineVariant" />
+
+                        <LinearLayout
+                            android:id="@+id/row_xml_to_views"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:minHeight="68dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_import_action_icon"
+                                android:clipToOutline="true"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_mtrl_view_constraint"
+                                app:tint="?attr/colorOnSecondaryContainer" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Convert XML layouts to views"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Map supported widgets into Neo's native view structure."
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/xml_to_views"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true" />
+                        </LinearLayout>
+
+                        <com.google.android.material.divider.MaterialDivider
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:dividerColor="?attr/colorOutlineVariant" />
+
+                        <LinearLayout
+                            android:id="@+id/row_gradle_dependencies"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:minHeight="68dp"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:background="@drawable/bg_import_action_icon"
+                                android:clipToOutline="true"
+                                android:padding="8dp"
+                                android:src="@drawable/ic_mtrl_deployed_code"
+                                app:tint="?attr/colorOnSecondaryContainer" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:text="Import detected dependencies"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:text="Store supported library coordinates and preserve original Gradle files."
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/gradle_dependencies"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true" />
+                        </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:layout_marginBottom="8dp"
-                    android:text="Conversion Settings"
-                    android:textAppearance="?attr/textAppearanceTitleSmall"
-                    android:textColor="?attr/colorPrimary"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:id="@+id/row_java_to_blocks"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/project_item_shape_top"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:src="@drawable/ic_mtrl_code"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Convert Java to Blocks"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Translate recognized Java statements to native blocks."
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/java_to_blocks"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/row_xml_to_views"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/project_item_shape_middle"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:src="@drawable/ic_mtrl_design"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Convert XML Layouts to Visual Views"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Map supported XML widgets to Sketchware views."
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/xml_to_views"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/row_methods_to_more_blocks"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/project_item_shape_middle"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:src="@drawable/ic_mtrl_moreblock"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Extract Custom Methods as MoreBlocks"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Create MoreBlocks for compatible void helper methods."
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/methods_to_more_blocks"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/row_gradle_dependencies"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/project_item_shape_bottom"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:src="@drawable/ic_mtrl_plugin"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Import Gradle Dependencies"
-                            android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Preserve supported Maven dependencies in Custom Gradle."
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/gradle_dependencies"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true" />
-                </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorSurfaceContainerLow"
-            android:orientation="vertical">
-
-            <com.google.android.material.divider.MaterialDivider
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:dividerColor="?attr/colorOutlineVariant" />
+            android:background="?attr/colorSurface"
+            android:elevation="4dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="16dp">
 
             <com.google.android.material.progressindicator.LinearProgressIndicator
                 android:id="@+id/progress"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:indeterminate="true"
+                android:layout_height="3dp"
                 android:visibility="gone"
-                app:trackThickness="3dp" />
+                app:indicatorColor="?attr/colorPrimary"
+                app:trackColor="?attr/colorSurfaceContainerHighest" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/status_text"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="14dp">
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="10dp"
+                android:text="Select a project to enable import."
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="10dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.progressindicator.CircularProgressIndicator
-                        android:id="@+id/spinner"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:indeterminate="true"
-                        android:visibility="gone"
-                        app:indicatorSize="18dp"
-                        app:trackThickness="2dp" />
-
-                    <TextView
-                        android:id="@+id/status_text"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Select a project to inspect it before importing."
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/import_button"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:enabled="false"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Import Project to Sketchware Neo"
-                    app:icon="@drawable/ic_mtrl_download"
-                    app:iconGravity="textStart" />
-            </LinearLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/import_button"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:enabled="false"
+                android:text="Import into Sketchware Neo"
+                app:cornerRadius="18dp"
+                app:icon="@drawable/ic_mtrl_import"
+                app:iconGravity="textStart" />
         </LinearLayout>
     </LinearLayout>
 
@@ -822,7 +827,7 @@
         android:id="@+id/loading_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#66000000"
+        android:background="#99000000"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
@@ -831,37 +836,55 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:layout_marginHorizontal="36dp"
-            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="6dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:layout_marginHorizontal="28dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingHorizontal="24dp"
-                android:paddingVertical="22dp">
+                android:padding="24dp">
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
-                    android:layout_width="wrap_content"
+                    android:id="@+id/spinner"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:visibility="gone"
+                    app:indicatorColor="?attr/colorPrimary"
+                    app:trackColor="?attr/colorSurfaceContainerHighest" />
+
+                <TextView
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:indeterminate="true"
-                    app:indicatorSize="38dp"
-                    app:trackThickness="3dp" />
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="Working on your project"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/loading_overlay_text"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="8dp"
                     android:gravity="center"
-                    android:text="Please wait…"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurface" />
+                    android:lineSpacingExtra="3dp"
+                    android:text="Inspecting project files…"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/cancel_operation"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="Cancel operation"
+                    android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </FrameLayout>

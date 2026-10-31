@@ -60,6 +60,7 @@ public final class R8Service extends Service {
     private static final int NOTIFICATION_ID = 8241;
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final Object runStateLock = new Object();
     private volatile Thread workerThread;
 
     @Override
@@ -90,9 +91,11 @@ public final class R8Service extends Service {
             return START_NOT_STICKY;
         }
 
-        if (!running.compareAndSet(false, true)) {
-            publishResult(requestId, false, "R8 is already running for another build. Wait for it to finish.");
-            return START_NOT_STICKY;
+        synchronized (runStateLock) {
+            if (!running.compareAndSet(false, true)) {
+                publishResult(requestId, false, "R8 is already running for another build. Wait for it to finish.");
+                return START_NOT_STICKY;
+            }
         }
 
         workerThread = new Thread(() -> {
@@ -110,17 +113,19 @@ public final class R8Service extends Service {
                 error = summarizeFailure(failure);
             } finally {
                 try {
-                    publishResult(requestId, success, error);
-                } catch (RuntimeException broadcastFailure) {
-                    Log.e(TAG, "Could not publish R8 completion result", broadcastFailure);
-                }
-                try {
                     stopForeground(true);
                 } catch (RuntimeException foregroundFailure) {
                     Log.w(TAG, "Could not remove R8 foreground notification", foregroundFailure);
                 }
-                running.set(false);
-                stopSelf();
+                synchronized (runStateLock) {
+                    running.set(false);
+                    try {
+                        publishResult(requestId, success, error);
+                    } catch (RuntimeException broadcastFailure) {
+                        Log.e(TAG, "Could not publish R8 completion result", broadcastFailure);
+                    }
+                    stopSelf(startId);
+                }
             }
         }, "Sketchware-R8-Compiler");
         workerThread.start();

@@ -84,6 +84,16 @@ public final class AndroidStudioProjectInspector {
 
             ParsedManifest manifest = new ManifestParser(srcMain).parse();
             ParsedGradle gradle = new GradleParser().parse(app);
+            if (manifest.appName == null || manifest.appName.trim().isEmpty()
+                    || manifest.appName.startsWith("@") || "Imported App".equals(manifest.appName.trim())) {
+                if (gradle.appName != null && !gradle.appName.trim().isEmpty() && !gradle.appName.startsWith("@")) {
+                    report.projectName = gradle.appName.trim();
+                } else {
+                    report.projectName = humanizeProjectName(displayName == null ? zipFile.getName() : displayName);
+                }
+            } else {
+                report.projectName = manifest.appName.trim();
+            }
             String gradleApplicationId = gradle.applicationId;
             if (gradleApplicationId == null || gradleApplicationId.trim().isEmpty()
                     || "com.imported.project".equals(gradleApplicationId.trim())) {
@@ -148,6 +158,7 @@ public final class AndroidStudioProjectInspector {
         try (ZipInputStream in = new ZipInputStream(new BufferedInputStream(new FileInputStream(zip)))) {
             ZipEntry entry;
             while ((entry = in.getNextEntry()) != null) {
+                checkInspectionCancelled();
                 if (++entries > MAX_ENTRIES) throw new IOException("ZIP contains too many entries (limit " + MAX_ENTRIES + ").");
                 String name = entry.getName();
                 if (name == null || name.trim().isEmpty() || name.startsWith("/") || name.startsWith("\\") || name.matches("^[A-Za-z]:.*")) {
@@ -168,6 +179,7 @@ public final class AndroidStudioProjectInspector {
                     try (FileOutputStream fos = new FileOutputStream(out)) {
                         int len;
                         while ((len = in.read(buffer)) != -1) {
+                            checkInspectionCancelled();
                             total += len;
                             if (total > MAX_UNCOMPRESSED_BYTES) throw new IOException("ZIP expands beyond the 1 GB inspection limit.");
                             fos.write(buffer, 0, len);
@@ -188,6 +200,19 @@ public final class AndroidStudioProjectInspector {
         if (s == null || s.trim().isEmpty()) return "Android Studio Project";
         return s.replaceAll("(?i)\\.zip$", "").trim();
     }
+    private static String humanizeProjectName(String value) {
+        String clean = value == null ? "" : value.trim().replaceAll("(?i)\\.zip$", "").replaceAll("(?i)\\.git$", "");
+        clean = clean.replaceAll("[_-]+", " ").replaceAll("\\s+", " ").trim();
+        if (clean.isEmpty()) return "Imported App";
+        StringBuilder result = new StringBuilder(clean.length());
+        boolean capitalize = true;
+        for (int i = 0; i < clean.length(); i++) {
+            char c = clean.charAt(i);
+            result.append(capitalize ? Character.toUpperCase(c) : c);
+            capitalize = Character.isWhitespace(c);
+        }
+        return result.toString();
+    }
     private static String firstNonEmpty(String... values) {
         if (values != null) for (String s : values) if (s != null && !s.trim().isEmpty()) return s.trim();
         return "com.imported.project";
@@ -203,6 +228,7 @@ public final class AndroidStudioProjectInspector {
         if (dir == null || !dir.isDirectory()) return 0;
         int n = 0; File[] list = dir.listFiles(); if (list == null) return 0;
         for (File f : list) {
+            checkInspectionCancelled();
             if (f.isDirectory()) n += countMatching(f, regex);
             else if (f.getName().endsWith(".java") || f.getName().endsWith(".kt")) {
                 try { if (new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).matches(regex)) n++; } catch (Exception ignored) {}
@@ -212,7 +238,7 @@ public final class AndroidStudioProjectInspector {
     private static int countSourceFiles(File dir) {
         if (dir == null || !dir.isDirectory()) return 0;
         int n = 0; File[] list = dir.listFiles(); if (list == null) return 0;
-        for (File f : list) if (f.isDirectory()) n += countSourceFiles(f); else if (f.getName().endsWith(".java") || f.getName().endsWith(".kt")) n++;
+        for (File f : list) { checkInspectionCancelled(); if (f.isDirectory()) n += countSourceFiles(f); else if (f.getName().endsWith(".java") || f.getName().endsWith(".kt")) n++; }
         return n;
     }
     private static int countFilesWithExtension(File dir, String ext, boolean directOnly) { return countFilesWithExtension(dir, ext, directOnly, (String[]) null); }
@@ -220,6 +246,7 @@ public final class AndroidStudioProjectInspector {
         if (dir == null || !dir.isDirectory()) return 0;
         int n = 0; File[] list = dir.listFiles(); if (list == null) return 0;
         for (File f : list) {
+            checkInspectionCancelled();
             if (f.isDirectory()) {
                 boolean include = directoryPrefixes == null;
                 if (directoryPrefixes != null) for (String prefix : directoryPrefixes) if (f.getName().startsWith(prefix)) include = true;
@@ -231,11 +258,14 @@ public final class AndroidStudioProjectInspector {
     private static int countDrawerLayouts(File layoutDir) {
         if (layoutDir == null || !layoutDir.isDirectory()) return 0;
         int n = 0; File[] files = layoutDir.listFiles(); if (files == null) return 0;
-        for (File f : files) if (f.isFile() && f.getName().endsWith(".xml")) {
+        for (File f : files) { checkInspectionCancelled(); if (f.isFile() && f.getName().endsWith(".xml")) {
             try { String xml = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
                 if (xml.contains("DrawerLayout") || xml.contains("androidx.drawerlayout")) n++;
             } catch (Exception ignored) {}
-        } return n;
+        } } return n;
+    }
+    private static void checkInspectionCancelled() {
+        if (Thread.currentThread().isInterrupted()) throw new java.io.UncheckedIOException(new IOException("Project inspection was cancelled."));
     }
     private static void deleteRecursively(File file) {
         if (file == null || !file.exists()) return;
