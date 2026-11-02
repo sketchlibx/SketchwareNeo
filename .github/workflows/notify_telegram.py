@@ -1,54 +1,83 @@
+import html
 import os
 import subprocess
+import sys
+
 import requests
-import re
+
 
 def get_git_commit_info():
-    commit_author = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%an']).decode('utf-8')
-    commit_message = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%s']).decode('utf-8')
-    commit_hash = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%H']).decode('utf-8')
-    commit_hash_short = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%h']).decode('utf-8')
+    commit_author = subprocess.check_output(
+        ["git", "log", "-1", "--pretty=format:%an"], text=True
+    )
+    commit_message = subprocess.check_output(
+        ["git", "log", "-1", "--pretty=format:%s"], text=True
+    )
+    commit_hash = subprocess.check_output(
+        ["git", "log", "-1", "--pretty=format:%H"], text=True
+    )
+    commit_hash_short = subprocess.check_output(
+        ["git", "log", "-1", "--pretty=format:%h"], text=True
+    )
     return commit_author, commit_message, commit_hash, commit_hash_short
 
-def escape_markdown_v2(text):
-    escape_chars = r'_~`#+-=|{}.!'
-    return re.sub(r'([%s])' % re.escape(escape_chars), r'\\\1', text)
 
-def escape_parentheses(text):
-    return re.sub(r'([()])', r'\\\1', text)
+def build_telegram_message(commit_author, commit_message, commit_hash, commit_hash_short):
+    safe_author = html.escape(commit_author, quote=False)
+    safe_commit_message = html.escape(commit_message, quote=False)
 
-def main():
-    bot_token = os.environ['BOT_TOKEN']
-    chat_id = os.environ['CHAT_ID']
-    topic_id = os.environ.get('TOPIC_ID')
-
-    commit_author, commit_message, commit_hash, commit_hash_short = get_git_commit_info()
-
-    message = (
-        f"A new [commit](https://github.com/sketchlibx/SketchwareNeo/commit/{commit_hash}) has been merged to the repository by *{commit_author}*.\n\n"
-        f"*What has changed:*\n>{escape_parentheses(commit_message)}\n\n"
-        f"I'm currently building two APK variants and will send both here if the build is successful:\n"
-        f"- Android 8.0+ (API 26+)\n"
-        f"- Android 13+ (API 33+)\n\n#{commit_hash_short}"
+    return (
+        f'A new <a href="https://github.com/sketchlibx/SketchwareNeo/commit/{commit_hash}">commit</a> '
+        f'has been merged to the repository by <b>{safe_author}</b>.\n\n'
+        f'<b>What has changed:</b>\n'
+        f'<blockquote>{safe_commit_message}</blockquote>\n\n'
+        "I'm currently building two APK variants and will send both here if the build is successful:\n"
+        "- Android 8.0+ (API 26+)\n"
+        "- Android 13+ (API 33+)\n\n"
+        f"#{commit_hash_short}"
     )
 
-    escaped_message = escape_markdown_v2(message)
+
+def main():
+    bot_token = os.environ["BOT_TOKEN"]
+    chat_id = os.environ["CHAT_ID"]
+    topic_id = os.environ.get("TOPIC_ID")
+
+    commit_author, commit_message, commit_hash, commit_hash_short = get_git_commit_info()
+    message = build_telegram_message(
+        commit_author, commit_message, commit_hash, commit_hash_short
+    )
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
-        "text": escaped_message,
-        "parse_mode": "markdownv2",
-        "disable_web_page_preview": True
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
     }
     if topic_id:
-        payload["message_thread_id"] = topic_id
+        payload["message_thread_id"] = int(topic_id) if topic_id.isdigit() else topic_id
 
-    response = requests.post(url, json=payload)
-    if response.status_code != 200:
-        print(f"Failed to send message: {response.status_code} {response.text}")
-    else:
-        print("Message sent successfully.")
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+    except requests.RequestException as error:
+        print(f"Failed to send message: {error}")
+        return 1
+
+    try:
+        result = response.json()
+    except ValueError:
+        print(f"Failed to send message: Telegram returned HTTP {response.status_code} with an invalid JSON response.")
+        return 1
+
+    if response.status_code != 200 or not result.get("ok"):
+        description = result.get("description", response.text or "Unknown Telegram API error")
+        print(f"Failed to send message: HTTP {response.status_code}: {description}")
+        return 1
+
+    print("Message sent successfully.")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

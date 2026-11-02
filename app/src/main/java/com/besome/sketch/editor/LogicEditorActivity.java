@@ -2373,7 +2373,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 : (eventName == null ? "Event" : eventName);
         currentChip.setText("CURRENT  ·  " + currentEventLabel);
         list.setLayoutManager(new LinearLayoutManager(this));
-        list.setHasFixedSize(true);
         list.setNestedScrollingEnabled(true);
         DefaultItemAnimator listAnimator = new DefaultItemAnimator();
         listAnimator.setAddDuration(140);
