@@ -11,6 +11,7 @@ public class ViewLogicEditor extends LogicEditorScrollView {
     private final BlockPane blockPane;
     private final int[] posArea = new int[2];
     private boolean isFirst = true;
+    private Runnable editorScrollChangedListener;
 
     public ViewLogicEditor(Context context) {
         this(context, null);
@@ -27,6 +28,9 @@ public class ViewLogicEditor extends LogicEditorScrollView {
     public ViewLogicEditor(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         blockPane = new BlockPane(context);
+        setBackground(new BlockGridDrawable(context));
+        setClipToPadding(false);
+        setClipChildren(false);
         blockPane.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
         addView(blockPane);
@@ -34,6 +38,16 @@ public class ViewLogicEditor extends LogicEditorScrollView {
 
     public BlockPane getBlockPane() {
         return blockPane;
+    }
+
+    public void setOnEditorScrollChangedListener(Runnable listener) {
+        editorScrollChangedListener = listener;
+    }
+
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+        super.onScrollChanged(l, t, oldl, oldt);
+        if (editorScrollChangedListener != null) post(editorScrollChangedListener);
     }
 
     @Override
@@ -45,6 +59,7 @@ public class ViewLogicEditor extends LogicEditorScrollView {
             blockPane.b();
             isFirst = false;
         }
+        if (editorScrollChangedListener != null) post(editorScrollChangedListener);
     }
 
     public boolean hitTest(float x, float y) {

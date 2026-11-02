@@ -1,10 +1,14 @@
 package com.besome.sketch.editor.view;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 
 public class LogicEditorScrollView extends FrameLayout {
@@ -15,6 +19,7 @@ public class LogicEditorScrollView extends FrameLayout {
     private boolean scrollEnabled = true;
     private float lastPosX = -1;
     private float lastPosY = -1;
+    private ValueAnimator scrollAnimator;
 
     public LogicEditorScrollView(Context context) {
         this(context, null);
@@ -91,6 +96,7 @@ public class LogicEditorScrollView extends FrameLayout {
         float x = event.getX();
         float y = event.getY();
         if (action == MotionEvent.ACTION_DOWN) {
+            cancelSmoothScroll();
             lastPosX = x;
             lastPosY = y;
         } else if (action == MotionEvent.ACTION_UP) {
@@ -132,6 +138,65 @@ public class LogicEditorScrollView extends FrameLayout {
             }
         }
         return true;
+    }
+
+    /**
+     * Smoothly scrolls the block canvas by a relative offset, clamped to the
+     * actual child bounds. This view extends FrameLayout (not ScrollView), so
+     * scrolling is animated with ValueAnimator and applied through scrollTo().
+     */
+    public void smoothScrollBy(int dx, int dy) {
+        if (!scrollEnabled || getChildCount() == 0) {
+            return;
+        }
+
+        View child = getChildAt(0);
+        int maxX = Math.max(0, child.getRight() - getWidth() + getPaddingRight());
+        int maxY = Math.max(0, child.getBottom() - getHeight() + getPaddingBottom());
+        int startX = getScrollX();
+        int startY = getScrollY();
+        int targetX = Math.max(0, Math.min(maxX, startX + dx));
+        int targetY = Math.max(0, Math.min(maxY, startY + dy));
+
+        cancelSmoothScroll();
+        if (startX == targetX && startY == targetY) {
+            return;
+        }
+
+        final ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(220L);
+        animator.setInterpolator(new DecelerateInterpolator());
+        animator.addUpdateListener(valueAnimator -> {
+            float fraction = valueAnimator.getAnimatedFraction();
+            int x = startX + Math.round((targetX - startX) * fraction);
+            int y = startY + Math.round((targetY - startY) * fraction);
+            scrollTo(x, y);
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (scrollAnimator == animator) {
+                    scrollTo(targetX, targetY);
+                    scrollAnimator = null;
+                }
+            }
+        });
+        scrollAnimator = animator;
+        animator.start();
+    }
+
+    private void cancelSmoothScroll() {
+        ValueAnimator running = scrollAnimator;
+        scrollAnimator = null;
+        if (running != null) {
+            running.cancel();
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        cancelSmoothScroll();
+        super.onDetachedFromWindow();
     }
 
     private boolean isPossibleScroll() {

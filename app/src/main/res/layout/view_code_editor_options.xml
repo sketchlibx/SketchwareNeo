@@ -21,9 +21,10 @@
         android:textStyle="bold" />
 
     <GridLayout
+        android:id="@+id/options_grid"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:columnCount="4"
+        android:columnCount="3"
         android:paddingHorizontal="12dp">
 
         <LinearLayout

@@ -93,6 +93,15 @@
                                 android:textAppearance="?attr/textAppearanceLabelSmall"
                                 android:textColor="?attr/colorOnSurface"
                                 tools:text="main" />
+                            <ImageButton
+                                android:id="@+id/btn_switch_branch"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:layout_marginStart="2dp"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:contentDescription="Switch branch"
+                                android:src="@drawable/ic_mtrl_chevron_down"
+                                app:tint="?attr/colorOnSurfaceVariant" />
 
                             <TextView
                                 android:id="@+id/tv_repo_status"
@@ -104,6 +113,16 @@
                                 tools:text="1 Untracked" />
                         </LinearLayout>
                     </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/btn_expand_sheet"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Expand to full screen"
+                        android:src="@drawable/ic_mtrl_fullscreen"
+                        app:tint="?attr/colorOnSurfaceVariant" />
 
                     <ImageButton
                         android:id="@+id/btn_hero_settings"

@@ -1,12 +1,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item
-        android:id="@+id/menu_logic_showsource"
-        android:icon="@drawable/ic_mtrl_code"
-        android:orderInCategory="100"
-        android:title="Show Source Code"
-        app:showAsAction="always" />
+
 
     <item
         android:id="@+id/menu_logic_undo"
@@ -22,11 +17,12 @@
         android:title="Redo"
         app:showAsAction="always" />
 
-    <item
-        android:id="@+id/menu_block_helper"
-        android:icon="@drawable/ic_mtrl_bookmark"
-        android:orderInCategory="100"
-        android:title="Blocks collection"
-        app:showAsAction="always" />
 
+
+    <item
+        android:id="@+id/menu_logic_showsource"
+        android:icon="@drawable/ic_mtrl_more_vertical"
+        android:orderInCategory="200"
+        android:title="More options"
+        app:showAsAction="always" />
 </menu>

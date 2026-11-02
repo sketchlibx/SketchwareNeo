@@ -20,6 +20,16 @@
         android:textAppearance="?attr/textAppearanceHeadlineSmall"
         android:textStyle="bold" />
 
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="16dp"
+        android:text="Configure optional build features and review project resources."
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
+
     <ScrollView
         android:id="@+id/preference_scroller"
         android:layout_width="match_parent"
@@ -39,7 +49,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Compiler &amp; Injection"
+                android:text="Build options"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary" />
 
@@ -57,12 +67,6 @@
                     android:orientation="vertical">
 
                     
-
-                    <com.google.android.material.divider.MaterialDivider
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="20dp"
-                        app:dividerColor="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:id="@+id/row_custom_java"
@@ -106,14 +110,6 @@
                             android:minWidth="0dp"
                             android:minHeight="0dp" />
                     </LinearLayout>
-
-                    <com.google.android.material.divider.MaterialDivider
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="20dp"
-                        app:dividerColor="?attr/colorOutlineVariant" />
-
-                    
 
                     <com.google.android.material.divider.MaterialDivider
                         android:layout_width="match_parent"
@@ -171,7 +167,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:layout_marginBottom="8dp"
-                android:text="Advanced Tools"
+                android:text="Project diagnostics"
                 android:textAppearance="?attr/textAppearanceLabelLarge"
                 android:textColor="?attr/colorPrimary" />
 
@@ -181,8 +177,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:text="Resource Usage Tracker" />
-
-            
 
             <LinearLayout
                 android:layout_width="match_parent"

@@ -17,12 +17,29 @@ android {
         //noinspection ExpiredTargetSdkVersion since we don't target getting Sketchware Neo on Google Play.
         targetSdk = 28
         minSdk = 26
-        versionCode = 161
-        versionName = "v7.0.1"
+        versionCode = 162
+        versionName = "v7.0.2"
 
         buildConfigField("String", "GIT_HASH", "\"${gitCommitHash}\"")
 
         buildConfigField("String", "SKETCHUB_API_KEY", "\"${System.getenv("SKETCHUB_API_KEY")}\"")
+    }
+
+
+    // Publish one APK for Android 8.0+ and a smaller compatibility range for Android 13+.
+    // Both flavors keep the existing targetSdk to avoid silently changing storage/permission behavior.
+    flavorDimensions += "minimumApi"
+    productFlavors {
+        api26 {
+            dimension "minimumApi"
+            minSdk = 26
+            versionNameSuffix = "-api26"
+        }
+        api33 {
+            dimension "minimumApi"
+            minSdk = 26
+            versionNameSuffix = "-api33"
+        }
     }
 
     buildTypes {
@@ -75,6 +92,7 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+        aidl = false
     }
 
     configurations.implementation {
@@ -127,6 +145,8 @@ dependencies {
     implementation libs.filepicker
 
     implementation libs.libsu
+    implementation libs.shizuku.api
+    implementation libs.shizuku.provider
     implementation libs.insetter
 
     implementation(libs.javaparser.symbol.solver) {

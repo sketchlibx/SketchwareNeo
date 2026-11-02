@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import a.a.a.DA;
@@ -53,6 +54,7 @@ public class ProjectsFragment extends DA {
     private final List<HashMap<String, Object>> projectsList = new ArrayList<>();
     private MyprojectsBinding binding;
     private ProjectsAdapter projectsAdapter;
+    private final AtomicInteger refreshGeneration = new AtomicInteger();
     
     private SearchView projectsSearchView;
     
@@ -135,8 +137,11 @@ public class ProjectsFragment extends DA {
 
     @Override
     public void onDestroyView() {
+        refreshGeneration.incrementAndGet();
+        if (projectsAdapter != null) projectsAdapter.release();
+        projectsAdapter = null;
         super.onDestroyView();
-        binding = null; 
+        binding = null;
     }
 
     @Override
@@ -171,8 +176,6 @@ public class ProjectsFragment extends DA {
             btnRestore.setOnClickListener(v -> new BackupRestoreManager(getActivity(), this).restore());
         }
 
-        refreshProjectsList(); 
-        
         if (binding.titleContainer != null) {
             UI.addSystemWindowInsetToPadding(binding.titleContainer, true, false, true, false);
         }
@@ -235,63 +238,119 @@ public class ProjectsFragment extends DA {
     }
 
     public void refreshProjectsList() {
-        if (!isAdded()) return;
+        Activity host = getActivity();
+        if (!isAdded() || binding == null || host == null || preference == null) return;
 
         if (!c()) {
-            if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
-            ((MainActivity) requireActivity()).s(); 
+            if (binding.swipeRefresh != null) binding.swipeRefresh.setRefreshing(false);
+            if (host instanceof MainActivity) ((MainActivity) host).s();
             return;
         }
 
+        final int generation = refreshGeneration.incrementAndGet();
         executorService.execute(() -> {
-            List<HashMap<String, Object>> loadedProjects = lC.a();
-            loadedProjects.sort(new ProjectComparator(preference.d("sortBy"), preference.a("pinnedProject", "-1")));
+            List<HashMap<String, Object>> loadedProjects = new ArrayList<>();
+            RuntimeException loadError = null;
+            try {
+                loadedProjects = lC.a();
+                loadedProjects.sort(new ProjectComparator(
+                        preference.d("sortBy"), preference.a("pinnedProject", "-1")));
+            } catch (RuntimeException error) {
+                loadError = error;
+            }
 
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null) return;
-                
-                if (binding.swipeRefresh.isRefreshing()) binding.swipeRefresh.setRefreshing(false);
-                
-                boolean isEmpty = loadedProjects.isEmpty();
-                
-                if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
-                
-                if (binding.emptyContainer != null) binding.emptyContainer.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
-                if (binding.myprojects != null) binding.myprojects.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+            final List<HashMap<String, Object>> result = loadedProjects;
+            final RuntimeException error = loadError;
+            host.runOnUiThread(() -> {
+                if (generation != refreshGeneration.get() || binding == null || !isAdded()) return;
+                if (error != null) {
+                    android.util.Log.e("ProjectsFragment", "Could not refresh projects", error);
+                    if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
+                    if (binding.swipeRefresh != null) binding.swipeRefresh.setRefreshing(false);
+                    return;
+                }
 
                 projectsList.clear();
-                projectsList.addAll(loadedProjects);
-                
-                projectsAdapter.updateData(projectsList); 
+                projectsList.addAll(result);
+                if (projectsAdapter == null) {
+                    if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
+                    if (binding.swipeRefresh != null) binding.swipeRefresh.setRefreshing(false);
+                    return;
+                }
+                projectsAdapter.updateData(projectsList, () -> {
+                    if (binding == null || !isAdded() || generation != refreshGeneration.get()) return;
+                    boolean isEmpty = result.isEmpty();
+                    if (binding.emptyContainer != null) binding.emptyContainer.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+                    if (binding.myprojects != null) {
+                        binding.myprojects.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+                    }
+                    if (isEmpty) {
+                        if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
+                        if (binding.swipeRefresh != null) binding.swipeRefresh.setRefreshing(false);
+                    } else if (binding.myprojects != null) {
+                        androidx.recyclerview.widget.RecyclerView projectList = binding.myprojects;
+                        projectList.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+                            @Override
+                            public boolean onPreDraw() {
+                                if (projectList.getViewTreeObserver().isAlive()) {
+                                    projectList.getViewTreeObserver().removeOnPreDrawListener(this);
+                                }
+                                if (binding == null || !isAdded() || generation != refreshGeneration.get()) return true;
+                                if (binding.loadingContainer != null) binding.loadingContainer.setVisibility(View.GONE);
+                                if (binding.swipeRefresh != null) binding.swipeRefresh.setRefreshing(false);
+                                return true;
+                            }
+                        });
+                    }
+                });
             });
         });
     }
 
     private void addProject(String sc_id) {
-        executorService.execute(() -> {
-            HashMap<String, Object> newProject = lC.b(sc_id);
-            if (newProject != null) {
-                requireActivity().runOnUiThread(() -> {
-                    if (binding == null) return;
+        Activity host = getActivity();
+        if (host == null || sc_id == null || sc_id.isEmpty()) return;
+        try {
+            executorService.execute(() -> {
+                HashMap<String, Object> newProject = lC.b(sc_id);
+                if (newProject == null) return;
+                host.runOnUiThread(() -> {
+                    if (binding == null || projectsAdapter == null || !isAdded()) return;
+                    boolean alreadyExists = projectsList.stream().anyMatch(project ->
+                            sc_id.equals(String.valueOf(project.get("sc_id"))));
+                    if (alreadyExists) {
+                        updateProject(sc_id);
+                        return;
+                    }
                     binding.emptyContainer.setVisibility(View.GONE);
                     binding.myprojects.setVisibility(View.VISIBLE);
                     projectsList.add(0, newProject);
                     projectsAdapter.updateData(projectsList);
                 });
-            }
-        });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            refreshProjectsList();
+        }
     }
 
     private void updateProject(String sc_id) {
+        Activity host = getActivity();
+        if (host == null) return;
         executorService.execute(() -> {
             HashMap<String, Object> updatedProject = lC.b(sc_id);
-            if (updatedProject != null) {
-                int index = IntStream.range(0, projectsList.size()).filter(i -> projectsList.get(i).get("sc_id").equals(sc_id)).findFirst().orElse(-1);
+            if (updatedProject == null) return;
+            host.runOnUiThread(() -> {
+                if (binding == null || projectsAdapter == null || !isAdded()) return;
+                int index = IntStream.range(0, projectsList.size())
+                        .filter(i -> sc_id.equals(String.valueOf(projectsList.get(i).get("sc_id"))))
+                        .findFirst().orElse(-1);
                 if (index != -1) {
                     projectsList.set(index, updatedProject);
-                    requireActivity().runOnUiThread(() -> projectsAdapter.updateData(projectsList));
+                    projectsAdapter.updateData(projectsList);
+                } else {
+                    refreshProjectsList();
                 }
-            }
+            });
         });
     }
 
@@ -327,4 +386,10 @@ public class ProjectsFragment extends DA {
         dialog.setNegativeButton("Cancel", null);
         dialog.show();
     }
+    @Override
+    public void onDestroy() {
+        executorService.shutdownNow();
+        super.onDestroy();
+    }
+
 }

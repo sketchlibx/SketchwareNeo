@@ -10,6 +10,8 @@ import a.a.a.Lx;
 import mod.hey.studios.util.Helper;
 import pro.sketchware.databinding.ActivityCodeViewerBinding;
 import pro.sketchware.utility.EditorUtils;
+import mod.hey.studios.code.SrcCodeEditor;
+import mod.jbk.code.CodeEditorLanguages;
 import pro.sketchware.utility.UI;
 
 public class CodeViewerActivity extends BaseAppCompatActivity {
@@ -36,20 +38,24 @@ public class CodeViewerActivity extends BaseAppCompatActivity {
 
         binding.editor.setTypefaceText(EditorUtils.getTypeface(this));
         binding.editor.setTextSize(14);
-        binding.editor.setText(Lx.j(code, false));
         binding.editor.setEditable(false);
         binding.editor.setWordwrap(false);
         loadColorScheme(scheme);
+        binding.editor.setText(Lx.j(code == null ? "" : code, false));
 
         UI.addSystemWindowInsetToPadding(binding.appBarLayout, true, true, true, false);
         UI.addSystemWindowInsetToMargin(binding.editor, true, false, true, true);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (binding != null) loadColorScheme(getIntent().getStringExtra("scheme"));
+    }
+
     private void loadColorScheme(String scheme) {
-        if (scheme.equals(SCHEME_XML)) {
-            EditorUtils.loadXmlConfig(binding.editor);
-        } else {
-            EditorUtils.loadJavaConfig(binding.editor);
-        }
+        String fileName = SCHEME_XML.equals(scheme) ? "Preview.xml" : "Preview.java";
+        SrcCodeEditor.applyLanguageSpec(this, binding.editor, CodeEditorLanguages.resolveLanguageSpec(fileName));
+        binding.editor.setHighlightCurrentLine(true);
     }
 }

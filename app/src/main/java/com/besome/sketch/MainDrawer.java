@@ -15,6 +15,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.bumptech.glide.Glide;
+
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -46,6 +48,7 @@ public class MainDrawer extends NavigationView {
     private static final int DEF_STYLE_RES = R.style.Widget_SketchwarePro_NavigationView_Main;
     private TextView profileName;
     private TextView profileEmail;
+    private ImageView profileAvatar;
 
     public MainDrawer(@NonNull Context context) {
         this(context, null);
@@ -93,15 +96,13 @@ public class MainDrawer extends NavigationView {
 
         profileName = headerView.findViewById(R.id.profile_name);
         profileEmail = headerView.findViewById(R.id.profile_email);
+        profileAvatar = headerView.findViewById(R.id.profile_avatar);
         ImageView profileExpand = headerView.findViewById(R.id.profile_expand);
-        
-        if (profileExpand != null) {
-            profileExpand.setOnClickListener(v -> {
-                Intent intent = new Intent(unwrap(getContext()), CloudBackupManagerActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                unwrap(getContext()).startActivity(intent);
-            });
-        }
+        View.OnClickListener openAccount = v -> openAccountSettings();
+        if (profileExpand != null) profileExpand.setOnClickListener(openAccount);
+        if (profileAvatar != null) profileAvatar.setOnClickListener(openAccount);
+        if (profileName != null) profileName.setOnClickListener(openAccount);
+        if (profileEmail != null) profileEmail.setOnClickListener(openAccount);
 
         View btnClose = headerView.findViewById(R.id.btn_close_drawer);
         if (btnClose != null) {
@@ -127,19 +128,62 @@ public class MainDrawer extends NavigationView {
 
     public void refreshProfile() {
         if (profileName == null || profileEmail == null) return;
+        GoogleSignInAccount account = null;
         try {
-            GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(getContext());
-            if (account != null) {
-                profileName.setText(account.getDisplayName() != null ? account.getDisplayName() : "Developer");
-                profileEmail.setText(account.getEmail());
-            } else {
-                profileName.setText("Username");
-                profileEmail.setText("sketchwareneo");
-            }
-        } catch (Exception e) {
-            profileName.setText("Username");
-            profileEmail.setText("sketchwareneo");
+            account = GoogleSignIn.getLastSignedInAccount(getContext());
+        } catch (Exception ignored) {
         }
+
+        if (account == null) {
+            profileName.setText("Sign in");
+            profileEmail.setText("Connect Google Drive for cloud backup");
+            if (profileAvatar != null) {
+                Glide.with(profileAvatar).clear(profileAvatar);
+                profileAvatar.setPadding(SketchwareUtil.dpToPx(10), SketchwareUtil.dpToPx(10),
+                        SketchwareUtil.dpToPx(10), SketchwareUtil.dpToPx(10));
+                profileAvatar.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                profileAvatar.setBackgroundTintList(ColorStateList.valueOf(
+                        ThemeUtils.getColor(getContext(), R.attr.colorPrimaryContainer)));
+                profileAvatar.setImageResource(R.drawable.ic_user);
+                profileAvatar.setImageTintList(ColorStateList.valueOf(
+                        ThemeUtils.getColor(getContext(), R.attr.colorOnPrimaryContainer)));
+            }
+            return;
+        }
+
+        String displayName = account.getDisplayName();
+        String email = account.getEmail();
+        profileName.setText(displayName == null || displayName.trim().isEmpty() ? "Google Account" : displayName);
+        profileEmail.setText(email == null || email.trim().isEmpty() ? "Google Drive connected" : email);
+
+        if (profileAvatar != null) {
+            Uri photoUri = account.getPhotoUrl();
+            if (photoUri != null) {
+                profileAvatar.setPadding(0, 0, 0, 0);
+                profileAvatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                profileAvatar.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+                profileAvatar.setImageTintList(null);
+                Glide.with(profileAvatar).load(photoUri).circleCrop()
+                        .placeholder(R.drawable.ic_user).error(R.drawable.ic_user).into(profileAvatar);
+            } else {
+                Glide.with(profileAvatar).clear(profileAvatar);
+                profileAvatar.setPadding(SketchwareUtil.dpToPx(10), SketchwareUtil.dpToPx(10),
+                        SketchwareUtil.dpToPx(10), SketchwareUtil.dpToPx(10));
+                profileAvatar.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                profileAvatar.setBackgroundTintList(ColorStateList.valueOf(
+                        ThemeUtils.getColor(getContext(), R.attr.colorPrimaryContainer)));
+                profileAvatar.setImageResource(R.drawable.ic_user);
+                profileAvatar.setImageTintList(ColorStateList.valueOf(
+                        ThemeUtils.getColor(getContext(), R.attr.colorOnPrimaryContainer)));
+            }
+        }
+    }
+
+    private void openAccountSettings() {
+        Activity activity = unwrap(getContext());
+        Intent intent = new Intent(activity, CloudBackupManagerActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        activity.startActivity(intent);
     }
 
     private void initializeSocialLinks(@IdRes int id) {

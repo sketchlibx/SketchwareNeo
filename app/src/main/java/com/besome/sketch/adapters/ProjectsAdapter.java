@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
@@ -27,6 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import a.a.a.DB;
 import a.a.a.lC;
@@ -48,6 +54,11 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
     private List<HashMap<String, Object>> shownProjects = new ArrayList<>();
     private List<HashMap<String, Object>> allProjects = new ArrayList<>();
     private String currentQuery = "";
+    private final ExecutorService diffExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicInteger diffGeneration = new AtomicInteger();
+    private Runnable pendingApplyCallback;
+    private volatile boolean released;
 
     public ProjectsAdapter(ProjectsFragment projectsFragment, List<HashMap<String, Object>> allProjects) {
         this.projectsFragment = projectsFragment;
@@ -57,53 +68,90 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
     }
 
     public void updateData(List<HashMap<String, Object>> newProjects) {
-        this.allProjects = new ArrayList<>(newProjects);
+        updateData(newProjects, null);
+    }
+
+    public void updateData(List<HashMap<String, Object>> newProjects, Runnable onApplied) {
+        if (released) return;
+        allProjects = copyProjects(newProjects);
+        if (onApplied != null) pendingApplyCallback = onApplied;
         filterData(currentQuery);
     }
 
     public void filterData(String query) {
-        this.currentQuery = query == null ? "" : query;
-        List<HashMap<String, Object>> newProjects;
-        if (!currentQuery.isEmpty()) {
-            newProjects = new ArrayList<>();
-            for (HashMap<String, Object> project : allProjects) {
-                if (matchesQuery(project, currentQuery)) {
-                    newProjects.add(project);
+        if (released) return;
+        currentQuery = query == null ? "" : query;
+        final int generation = diffGeneration.incrementAndGet();
+        final List<HashMap<String, Object>> oldProjects = copyProjects(shownProjects);
+        final List<HashMap<String, Object>> sourceProjects = copyProjects(allProjects);
+        final String filter = currentQuery;
+
+        try {
+            diffExecutor.execute(() -> {
+                List<HashMap<String, Object>> newProjects = new ArrayList<>();
+                if (filter.isEmpty()) {
+                    newProjects.addAll(sourceProjects);
+                } else {
+                    for (HashMap<String, Object> project : sourceProjects) {
+                        if (matchesQuery(project, filter)) newProjects.add(project);
+                    }
                 }
+                DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override
+                public int getOldListSize() { return oldProjects.size(); }
+
+                @Override
+                public int getNewListSize() { return newProjects.size(); }
+
+                @Override
+                public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                    String oldScId = yB.c(oldProjects.get(oldItemPosition), "sc_id");
+                    String newScId = yB.c(newProjects.get(newItemPosition), "sc_id");
+                    return oldScId.equalsIgnoreCase(newScId);
+                }
+
+                @Override
+                public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                    HashMap<String, Object> oldMap = oldProjects.get(oldItemPosition);
+                    HashMap<String, Object> newMap = newProjects.get(newItemPosition);
+                    for (String key : Arrays.asList("my_app_name", "my_ws_name", "sc_ver_name", "sc_ver_code", "my_sc_pkg_name")) {
+                        if (!yB.c(oldMap, key).equals(yB.c(newMap, key))) return false;
+                    }
+                    return yB.a(oldMap, "custom_icon") == yB.a(newMap, "custom_icon");
+                }
+            }, true);
+                mainHandler.post(() -> {
+                    if (released || generation != diffGeneration.get()) return;
+                    shownProjects = newProjects;
+                    result.dispatchUpdatesTo(this);
+                    Runnable callback = pendingApplyCallback;
+                    pendingApplyCallback = null;
+                    if (callback != null) callback.run();
+                });
+            });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            if (!released) {
+                shownProjects = copyProjects(allProjects);
+                notifyDataSetChanged();
+                Runnable callback = pendingApplyCallback;
+                pendingApplyCallback = null;
+                if (callback != null) mainHandler.post(callback);
             }
-        } else {
-            newProjects = new ArrayList<>(allProjects);
         }
+    }
 
-        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
-            @Override
-            public int getOldListSize() { return shownProjects.size(); }
+    private List<HashMap<String, Object>> copyProjects(List<HashMap<String, Object>> source) {
+        List<HashMap<String, Object>> copy = new ArrayList<>(source.size());
+        for (HashMap<String, Object> project : source) copy.add(new HashMap<>(project));
+        return copy;
+    }
 
-            @Override
-            public int getNewListSize() { return newProjects.size(); }
-
-            @Override
-            public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
-                String oldScId = yB.c(shownProjects.get(oldItemPosition), "sc_id");
-                String newScId = yB.c(newProjects.get(newItemPosition), "sc_id");
-                return oldScId.equalsIgnoreCase(newScId);
-            }
-
-            @Override
-            public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-                HashMap<String, Object> oldMap = shownProjects.get(oldItemPosition);
-                HashMap<String, Object> newMap = newProjects.get(newItemPosition);
-                for (String key : Arrays.asList("my_app_name", "my_ws_name", "sc_ver_name", "sc_ver_code", "my_sc_pkg_name")) {
-                    if (!yB.c(oldMap, key).equals(yB.c(newMap, key))) return false;
-                }
-                boolean oldCustomIcon = yB.a(oldMap, "custom_icon");
-                boolean newCustomIcon = yB.a(newMap, "custom_icon");
-                return oldCustomIcon == newCustomIcon;
-            }
-        }, true);
-        
-        shownProjects = newProjects;
-        result.dispatchUpdatesTo(this);
+    public void release() {
+        released = true;
+        diffGeneration.incrementAndGet();
+        diffExecutor.shutdownNow();
+        pendingApplyCallback = null;
+        mainHandler.removeCallbacksAndMessages(null);
     }
 
     @Override
@@ -112,9 +160,9 @@ public class ProjectsAdapter extends RecyclerView.Adapter<ProjectsAdapter.Projec
     }
 
     private boolean matchesQuery(HashMap<String, Object> projectMap, String searchQuery) {
-        searchQuery = searchQuery.toLowerCase();
+        searchQuery = searchQuery.toLowerCase(Locale.ROOT);
         for (String key : Arrays.asList("sc_id", "my_ws_name", "my_app_name", "my_sc_pkg_name")) {
-            if (yB.c(projectMap, key).toLowerCase().contains(searchQuery)) {
+            if (yB.c(projectMap, key).toLowerCase(Locale.ROOT).contains(searchQuery)) {
                 return true;
             }
         }

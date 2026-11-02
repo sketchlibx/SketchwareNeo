@@ -12,6 +12,7 @@ coilSvg = "2.0.0"
 markwon = "4.6.2"
 coreSplashscreen = "1.0.1"
 libsu = "5.0.4"
+shizuku = "13.1.5"
 dependencyresolver = "05ec26af0b"
 ecj = "3.32.0"
 exifinterface = "1.4.2"
@@ -85,6 +86,8 @@ insetter = { module = "dev.chrisbanes.insetter:insetter", version.ref = "insette
 
 javaparser-symbol-solver = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "javaparserSymbolSolver" }
 libsu = { module = "com.github.topjohnwu.libsu:core", version.ref = "libsu" }
+shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 dependencyresolver = { module = "com.github.Cosmic-Ide:DependencyResolver", version.ref = "dependencyresolver" }
 filepicker = { module = "com.github.sketchlibx:filepicker", version.ref = "filepicker" }
 

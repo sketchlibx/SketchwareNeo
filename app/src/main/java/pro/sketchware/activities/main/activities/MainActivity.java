@@ -77,6 +77,7 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     private ProjectsStoreFragment projectsStoreFragment;
     private TemplatesFragment templatesFragment;
     private Fragment activeFragment;
+    private boolean onboardingLaunchHandled;
     @IdRes
     private int currentNavItemId = R.id.item_projects;
 
@@ -278,7 +279,6 @@ public class MainActivity extends BasePermissionAppCompatActivity {
             Fragment current = getFragmentForNavId(currentNavItemId);
             if (current instanceof ProjectsFragment) {
                 navigateToProjectsFragment();
-                if (projectsFragment != null) projectsFragment.refreshProjectsList();
             } else if (current instanceof ProjectsStoreFragment) {
                 navigateToSketchubFragment();
             } else if (current instanceof TemplatesFragment) {
@@ -369,7 +369,13 @@ public class MainActivity extends BasePermissionAppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        
+
+        if (!onboardingLaunchHandled && isStoragePermissionGranted()
+                && !getSharedPreferences("onboarding", MODE_PRIVATE).getBoolean("completed", false)) {
+            onboardingLaunchHandled = true;
+            startActivity(new Intent(this, OnboardingActivity.class));
+        }
+
         if (binding.leftDrawer != null) {
             ((MainDrawer) binding.leftDrawer).refreshProfile();
         }

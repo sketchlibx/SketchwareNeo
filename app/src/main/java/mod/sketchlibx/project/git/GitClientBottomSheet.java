@@ -137,6 +137,8 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     private RepoStatusSummary lastStatusSummary = new RepoStatusSummary();
 
     private AlertDialog progressDialog;
+    private BottomSheetBehavior<FrameLayout> sheetBehavior;
+    private boolean sheetExpanded;
 
     private final ExecutorService gitExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -170,10 +172,29 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 ViewGroup.LayoutParams layoutParams = bottomSheet.getLayoutParams();
                 layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
                 bottomSheet.setLayoutParams(layoutParams);
-                
-                BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
-                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                behavior.setSkipCollapsed(true);
+
+                sheetBehavior = BottomSheetBehavior.from(bottomSheet);
+                sheetBehavior.setFitToContents(false);
+                sheetBehavior.setHalfExpandedRatio(0.68f);
+                sheetBehavior.setSkipCollapsed(false);
+                sheetBehavior.setHideable(false);
+                sheetBehavior.setDraggableOnNestedScroll(false);
+                sheetBehavior.setState(BottomSheetBehavior.STATE_HALF_EXPANDED);
+                sheetBehavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+                    @Override
+                    public void onStateChanged(@NonNull View bottomSheetView, int newState) {
+                        if (newState == BottomSheetBehavior.STATE_COLLAPSED && isAdded()) {
+                            sheetBehavior.setState(BottomSheetBehavior.STATE_HALF_EXPANDED);
+                            return;
+                        }
+                        sheetExpanded = newState == BottomSheetBehavior.STATE_EXPANDED;
+                        updateSheetExpandButton();
+                    }
+
+                    @Override
+                    public void onSlide(@NonNull View bottomSheetView, float slideOffset) {
+                    }
+                });
             }
         });
         return dialog;
@@ -196,6 +217,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         viewPager = view.findViewById(R.id.view_pager);
         tabLayout = view.findViewById(R.id.tab_layout);
         viewPager.setAdapter(new GitPagerAdapter(requireContext()));
+        androidx.core.view.ViewCompat.setNestedScrollingEnabled(viewPager, true);
         viewPager.setOffscreenPageLimit(Math.max(1, tabTitles.length - 1));
         tabLayout.setupWithViewPager(viewPager);
 
@@ -210,10 +232,26 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         view.findViewById(R.id.btn_action_refresh).setOnClickListener(v -> refreshSourceThenAll());
         view.findViewById(R.id.btn_action_info).setOnClickListener(v -> showProjectInfoDialog());
 
-        View btnClose = view.findViewById(R.id.btn_hero_settings);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dismiss());
+        View btnSettings = view.findViewById(R.id.btn_hero_settings);
+        if (btnSettings != null) btnSettings.setOnClickListener(v -> viewPager.setCurrentItem(4, true));
+
+        View btnExpand = view.findViewById(R.id.btn_expand_sheet);
+        if (btnExpand != null) {
+            btnExpand.setOnClickListener(v -> {
+                if (sheetBehavior == null) return;
+                sheetExpanded = !sheetExpanded;
+                sheetBehavior.setState(sheetExpanded
+                        ? BottomSheetBehavior.STATE_EXPANDED
+                        : BottomSheetBehavior.STATE_HALF_EXPANDED);
+                updateSheetExpandButton();
+            });
+            updateSheetExpandButton();
         }
+
+        View branchPicker = view.findViewById(R.id.btn_switch_branch);
+        if (branchPicker != null) branchPicker.setOnClickListener(v -> showBranchPicker());
+        View branchLabel = view.findViewById(R.id.tv_hero_branch);
+        if (branchLabel != null) branchLabel.setOnClickListener(v -> showBranchPicker());
 
         if (git == null) {
             SketchwareUtil.toastError("Git repository not found for this project.");
@@ -221,6 +259,43 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             refreshAll();
             checkAutoFetch();
         }
+    }
+
+    private void updateSheetExpandButton() {
+        if (rootView == null) return;
+        View expandButton = rootView.findViewById(R.id.btn_expand_sheet);
+        if (expandButton instanceof android.widget.ImageButton) {
+            ((android.widget.ImageButton) expandButton).setImageResource(
+                    sheetExpanded ? R.drawable.ic_mtrl_fullscreen_exit : R.drawable.ic_mtrl_fullscreen);
+            expandButton.setContentDescription(sheetExpanded ? "Restore sheet size" : "Expand to full screen");
+        }
+    }
+
+    private void showBranchPicker() {
+        if (!isAdded() || lastBranchList.isEmpty()) {
+            SketchwareUtil.toast("No branches found");
+            return;
+        }
+        List<Ref> branches = new ArrayList<>(lastBranchList);
+        String[] labels = new String[branches.size()];
+        int checked = -1;
+        String current = lastStatusSummary.currentBranch;
+        for (int i = 0; i < branches.size(); i++) {
+            Ref branch = branches.get(i);
+            String fullName = branch.getName();
+            labels[i] = fullName.replace("refs/heads/", "").replace("refs/remotes/", "");
+            if (fullName.equals(Constants.R_HEADS + current)
+                    || labels[i].equals(current)) checked = i;
+        }
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Switch branch")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    Ref selected = branches.get(which);
+                    dialog.dismiss();
+                    if (!selected.getName().equals(Constants.R_HEADS + current)) checkoutBranch(selected);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void checkAutoFetch() {
@@ -546,6 +621,19 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
+    private void setupHistoryTab(View view) {
+        historyTabView = view;
+        RecyclerView recyclerView = view.findViewById(R.id.rv_history);
+        if (recyclerView == null) return;
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        androidx.core.view.ViewCompat.setNestedScrollingEnabled(recyclerView, true);
+        recyclerView.setVerticalScrollBarEnabled(true);
+        recyclerView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        historyAdapter = new HistoryAdapter(this::showCommitDetailsDialog);
+        recyclerView.setAdapter(historyAdapter);
+        applyHistory(lastCommitList);
+    }
+
     private List<Ref> computeBranchList() throws Exception {
         return git.branchList().setListMode(ListBranchCommand.ListMode.ALL).call();
     }
@@ -758,6 +846,29 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         changesTabView = view;
         RecyclerView rvChanges = view.findViewById(R.id.rv_changes);
         rvChanges.setLayoutManager(new LinearLayoutManager(requireContext()));
+        androidx.core.view.ViewCompat.setNestedScrollingEnabled(rvChanges, true);
+        rvChanges.setVerticalScrollBarEnabled(true);
+        rvChanges.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+
+        View commitPanel = view.findViewById(R.id.bottom_commit_panel);
+        rvChanges.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            private boolean hidden;
+
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (dy > 6 && !hidden) {
+                    hidden = true;
+                    commitPanel.animate().translationY(commitPanel.getHeight()).alpha(0f)
+                            .setDuration(160).withEndAction(() -> commitPanel.setVisibility(View.GONE)).start();
+                } else if (dy < -6 && hidden) {
+                    hidden = false;
+                    commitPanel.setVisibility(View.VISIBLE);
+                    commitPanel.setAlpha(0f);
+                    commitPanel.setTranslationY(commitPanel.getHeight());
+                    commitPanel.animate().translationY(0f).alpha(1f).setDuration(180).start();
+                }
+            }
+        });
 
         changesAdapter = new ChangesAdapter(new ChangesAdapter.ChangeActionCallback() {
             @Override public void onStageToggle(ChangesAdapter.GitFile file) { toggleStage(file); }
@@ -772,6 +883,10 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
         view.findViewById(R.id.btn_commit).setOnClickListener(v -> commitAndPush(etCommit.getText() != null ? etCommit.getText().toString() : "", false));
         view.findViewById(R.id.btn_commit_push).setOnClickListener(v -> commitAndPush(etCommit.getText() != null ? etCommit.getText().toString() : "", true));
+        View commitBranch = view.findViewById(R.id.tv_commit_branch);
+        if (commitBranch != null) commitBranch.setOnClickListener(v -> showBranchPicker());
+        View commitBranchArrow = view.findViewById(R.id.btn_commit_branch);
+        if (commitBranchArrow != null) commitBranchArrow.setOnClickListener(v -> showBranchPicker());
 
         view.findViewById(R.id.btn_stage_all).setOnClickListener(v -> runGitTask("Staging changes...", true, () -> {
             List<ChangesAdapter.GitFile> selected = changesAdapter.getSelectedFiles();
@@ -891,6 +1006,8 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
                 tv.setText(formatDiffForDisplay(diffText));
                 tv.setTypeface(android.graphics.Typeface.MONOSPACE);
                 tv.setTextSize(12f);
+                tv.setLineSpacing(SketchwareUtil.dpToPx(2), 1.02f);
+                tv.setIncludeFontPadding(false);
                 tv.setTextIsSelectable(true);
                 int pad = SketchwareUtil.dpToPx(16);
                 tv.setPadding(pad, pad, pad, pad);
@@ -907,35 +1024,71 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
     }
 
     private CharSequence formatDiffForDisplay(String diffText) {
-        android.text.SpannableStringBuilder styled = new android.text.SpannableStringBuilder(diffText == null ? "" : diffText);
-        int added = ThemeUtils.getColor(requireContext(), R.attr.colorPrimary);
-        int removed = ThemeUtils.getColor(requireContext(), R.attr.colorError);
-        int meta = ThemeUtils.getColor(requireContext(), R.attr.colorOnSurfaceVariant);
+        String source = diffText == null ? "" : diffText;
+        android.text.SpannableStringBuilder styled = new android.text.SpannableStringBuilder(source);
+        android.content.Context context = requireContext();
+        int added = ThemeUtils.getColor(context, R.attr.colorPrimary);
+        int removed = ThemeUtils.getColor(context, R.attr.colorError);
+        int meta = ThemeUtils.getColor(context, R.attr.colorOnSurfaceVariant);
+        int title = ThemeUtils.getColor(context, R.attr.colorOnSurface);
+        int addedBg = androidx.core.graphics.ColorUtils.setAlphaComponent(added, 24);
+        int removedBg = androidx.core.graphics.ColorUtils.setAlphaComponent(removed, 24);
+        int metaBg = androidx.core.graphics.ColorUtils.setAlphaComponent(meta, 18);
         int start = 0;
-        while (start < styled.length()) {
-            int end = android.text.TextUtils.indexOf(styled, '\n', start);
-            if (end < 0) end = styled.length();
+        int changeGroupStart = -1;
+        int changeGroupEnd = -1;
+        char changeGroupType = 0;
+        while (start < source.length()) {
+            int end = source.indexOf('\n', start);
+            if (end < 0) end = source.length();
             if (end > start) {
-                char first = styled.charAt(start);
-                int color = first == '+' && !styled.toString().startsWith("+++", start) ? added
-                        : first == '-' && !styled.toString().startsWith("---", start) ? removed
-                        : first == '@' || styled.toString().startsWith("diff --", start) || styled.toString().startsWith("index ", start) ? meta : 0;
-                if (color != 0) styled.setSpan(new android.text.style.ForegroundColorSpan(color), start, end,
-                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                String line = source.substring(start, end);
+                char first = line.charAt(0);
+                char lineType = first == '+' && !line.startsWith("+++") ? '+'
+                        : first == '-' && !line.startsWith("---") ? '-' : 0;
+                if (lineType != changeGroupType) {
+                    applyDiffChangeGroup(styled, changeGroupStart, changeGroupEnd, changeGroupType, added, removed);
+                    changeGroupStart = lineType == 0 ? -1 : start;
+                    changeGroupType = lineType;
+                }
+                if (lineType != 0) changeGroupEnd = end;
+
+                if (line.startsWith("diff --") || line.startsWith("--- ") || line.startsWith("+++ ")) {
+                    styled.setSpan(new android.text.style.ForegroundColorSpan(title), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    styled.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else if (lineType == '+') {
+                    styled.setSpan(new android.text.style.ForegroundColorSpan(added), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    styled.setSpan(new android.text.style.BackgroundColorSpan(addedBg), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else if (lineType == '-') {
+                    styled.setSpan(new android.text.style.ForegroundColorSpan(removed), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    styled.setSpan(new android.text.style.BackgroundColorSpan(removedBg), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else if (first == '@' || line.startsWith("index ")) {
+                    styled.setSpan(new android.text.style.ForegroundColorSpan(meta), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    styled.setSpan(new android.text.style.BackgroundColorSpan(metaBg), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    styled.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
             }
             start = end + 1;
         }
+        applyDiffChangeGroup(styled, changeGroupStart, changeGroupEnd, changeGroupType, added, removed);
         return styled;
     }
 
-    private void setupHistoryTab(View view) {
-        historyTabView = view;
-        RecyclerView rvHistory = view.findViewById(R.id.rv_history);
-        rvHistory.setHasFixedSize(true);
-        rvHistory.setLayoutManager(new LinearLayoutManager(requireContext()));
-        historyAdapter = new HistoryAdapter(this::showCommitDetailsDialog);
-        rvHistory.setAdapter(historyAdapter);
-        if (!lastCommitList.isEmpty()) applyHistory(lastCommitList);
+    private void applyDiffChangeGroup(android.text.SpannableStringBuilder text, int start, int end,
+                                      char type, int added, int removed) {
+        if (start < 0 || end <= start) return;
+        int color = type == '+' ? added : removed;
+        text.setSpan(new android.text.style.QuoteSpan(color), start, end,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
     private void showCommitDetailsDialog(RevCommit commit) {
@@ -1025,6 +1178,9 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private void setupBranchesTab(View view) {
         RecyclerView rvBranches = view.findViewById(R.id.rv_branches);
+        androidx.core.view.ViewCompat.setNestedScrollingEnabled(rvBranches, true);
+        rvBranches.setVerticalScrollBarEnabled(true);
+        rvBranches.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         rvBranches.setLayoutManager(new LinearLayoutManager(requireContext()));
         branchAdapter = new GitBranchAdapter(new GitBranchAdapter.BranchActionCallback() {
             @Override public void onCheckout(Ref ref) { checkoutBranch(ref); }
@@ -1133,6 +1289,9 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
 
     private void setupRemotesTab(View view) {
         RecyclerView rvRemotes = view.findViewById(R.id.rv_remotes);
+        androidx.core.view.ViewCompat.setNestedScrollingEnabled(rvRemotes, true);
+        rvRemotes.setVerticalScrollBarEnabled(true);
+        rvRemotes.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         rvRemotes.setLayoutManager(new LinearLayoutManager(requireContext()));
         remoteAdapter = new GitRemoteAdapter(new GitRemoteAdapter.RemoteActionCallback() {
             @Override public void onEdit(RemoteConfig remote) { editRemoteDialog(remote); }
@@ -1296,6 +1455,7 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
         View scroll = view.findViewById(R.id.git_settings_scroll);
         if (scroll instanceof androidx.core.widget.NestedScrollView) {
             ((androidx.core.widget.NestedScrollView) scroll).setFillViewport(true);
+            androidx.core.view.ViewCompat.setNestedScrollingEnabled(scroll, true);
         }
         SharedPreferences prefs = requireActivity().getSharedPreferences("git_config", Context.MODE_PRIVATE);
 
@@ -1400,6 +1560,13 @@ public class GitClientBottomSheet extends BottomSheetDialogFragment {
             watcher.onTextChanged(et.getText(), 0, 0, 0);
         });
         dialog.show();
+    }
+
+    @Override
+    public void onDestroy() {
+        if (sheetBehavior != null) sheetBehavior = null;
+        gitExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     private class GitPagerAdapter extends PagerAdapter {

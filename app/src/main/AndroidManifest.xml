@@ -65,6 +65,13 @@
             android:theme="@style/Theme.SketchwarePro" />
 
         <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
             android:exported="false"
@@ -120,6 +127,10 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard"
             android:windowSoftInputMode="stateHidden"
             android:theme="@style/Theme.SketchwarePro.SmallToolbar" />
+        <activity
+            android:name="pro.sketchware.activities.main.activities.OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SketchwarePro" />
         <activity
             android:name="pro.sketchware.activities.main.activities.MainActivity"
             android:configChanges="orientation|screenSize"
@@ -287,6 +298,15 @@
         <activity
             android:name="mod.hey.studios.activity.managers.nativelib.ManageNativelibsActivity"
             android:configChanges="orientation|screenSize" />
+        <activity
+            android:name="mod.hey.studios.shizuku.ShizukuAccessActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SketchwarePro" />
+         <activity
+            android:name="mod.hey.studios.code.settings.CodeHighlightingSettingsActivity"
+            android:exported="false"
+            android:label="Code Highlighting"
+            android:theme="@style/Theme.SketchwarePro" />"
         <activity
             android:name="mod.hey.studios.code.SrcCodeEditor"
             android:configChanges="orientation|screenSize" />

@@ -35,6 +35,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.work.WorkManager;
 
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
+import com.bumptech.glide.Glide;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -83,6 +84,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     private ViewFlipper viewFlipper;
     private MaterialToolbar topAppBar;
 
+    private ImageView imageAccountPhoto;
     private TextView textAccountInitial;
     private TextView textAccountName;
     private TextView textAccountEmail;
@@ -136,8 +138,23 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
         viewFlipper = findViewById(R.id.viewFlipper);
         topAppBar = findViewById(R.id.topAppBar);
+        topAppBar.setTitle("");
+        topAppBar.setSubtitle("");
         topAppBar.setNavigationOnClickListener(v -> handleBack());
+        topAppBar.inflateMenu(R.menu.cloud_backup_menu);
+        topAppBar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.menu_backup_disclaimer) {
+                showDisclaimerDialog(null);
+                return true;
+            }
+            if (item.getItemId() == R.id.menu_backup_account && currentAccount != null) {
+                showAccountDialog();
+                return true;
+            }
+            return false;
+        });
 
+        imageAccountPhoto = findViewById(R.id.imageAccountPhoto);
         textAccountInitial = findViewById(R.id.textAccountInitial);
         textAccountName = findViewById(R.id.textAccountName);
         textAccountEmail = findViewById(R.id.textAccountEmail);
@@ -165,8 +182,8 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     private void handleBack() {
         if (viewFlipper.getDisplayedChild() != 0) {
             viewFlipper.setDisplayedChild(0);
-            topAppBar.setTitle("Cloud Backup");
-            topAppBar.setSubtitle("Keep your projects safe in Google Drive");
+            topAppBar.setTitle("");
+            topAppBar.setSubtitle("");
             refreshDashboardData();
         } else {
             finish();
@@ -186,11 +203,13 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+        // Glide is lifecycle-aware and clears Activity requests automatically.
+        // Calling Glide.with(Activity) from onDestroy can throw after the Activity is marked destroyed.
         if (cloudManager != null) {
             cloudManager.shutdown();
             cloudManager = null;
         }
+        super.onDestroy();
     }
 
     private void checkDisclaimer() {
@@ -201,6 +220,7 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
     }
 
     private void onAccountUpdated(GoogleSignInAccount account) {
+        if (isFinishing() || isDestroyed()) return;
         boolean sameAccount = account != null && currentAccount != null
                 && account.getEmail() != null
                 && account.getEmail().equals(currentAccount.getEmail())
@@ -208,6 +228,14 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
         currentAccount = account;
 
         if (account == null) {
+            if (topAppBar != null && topAppBar.getMenu().findItem(R.id.menu_backup_account) != null) {
+                topAppBar.getMenu().findItem(R.id.menu_backup_account).setVisible(false);
+            }
+            if (imageAccountPhoto != null) {
+                Glide.with(imageAccountPhoto).clear(imageAccountPhoto);
+                imageAccountPhoto.setVisibility(View.GONE);
+            }
+            textAccountInitial.setVisibility(View.VISIBLE);
             textAccountInitial.setText("G");
             textAccountName.setText("Not signed in");
             textAccountEmail.setText("Tap to sign in with Google");
@@ -219,12 +247,26 @@ public class CloudBackupManagerActivity extends BaseAppCompatActivity {
             return;
         }
 
+        if (topAppBar != null && topAppBar.getMenu().findItem(R.id.menu_backup_account) != null) {
+            topAppBar.getMenu().findItem(R.id.menu_backup_account).setVisible(true);
+        }
         String email = account.getEmail() != null ? account.getEmail() : "";
         String displayName = account.getDisplayName();
         if (displayName == null || displayName.trim().isEmpty()) {
             displayName = email.contains("@") ? email.substring(0, email.indexOf('@')) : "Google Account";
         }
         textAccountInitial.setText(displayName.substring(0, 1).toUpperCase(Locale.ROOT));
+        Uri photoUri = account.getPhotoUrl();
+        if (imageAccountPhoto != null && photoUri != null) {
+            imageAccountPhoto.setVisibility(View.VISIBLE);
+            textAccountInitial.setVisibility(View.GONE);
+            Glide.with(imageAccountPhoto).load(photoUri).circleCrop()
+                    .placeholder(R.drawable.ic_user).error(R.drawable.ic_user).into(imageAccountPhoto);
+        } else if (imageAccountPhoto != null) {
+            Glide.with(imageAccountPhoto).clear(imageAccountPhoto);
+            imageAccountPhoto.setVisibility(View.GONE);
+            textAccountInitial.setVisibility(View.VISIBLE);
+        }
         textAccountName.setText(displayName);
         textAccountEmail.setText(email);
         textConnectionStatus.setText("Connected");

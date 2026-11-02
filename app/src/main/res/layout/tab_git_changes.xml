@@ -244,6 +244,9 @@
                     android:id="@+id/tv_commit_branch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:maxWidth="108dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
                     android:drawablePadding="6dp"
                     android:text="main"
                     android:textAppearance="?attr/textAppearanceLabelMedium"
@@ -251,11 +254,14 @@
                     app:drawableStartCompat="@drawable/ic_mtrl_branches"
                     app:drawableTint="?attr/colorOnSurfaceVariant" />
                 
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="4dp"
-                    android:src="@drawable/selector_ic_expand_more_24"
+                <ImageButton
+                    android:id="@+id/btn_commit_branch"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Switch branch"
+                    android:src="@drawable/ic_mtrl_chevron_down"
                     app:tint="?attr/colorOnSurfaceVariant" />
 
                 <Space
@@ -266,20 +272,31 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_commit"
                     style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="40dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="6dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="Commit"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     app:icon="@drawable/ic_mtrl_save" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_commit_push"
                     style="@style/Widget.Material3.Button"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="40dp"
+                    android:layout_weight="1.15"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="6dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     android:text="Commit &amp; Push"
-                    android:textSize="12sp"
+                    android:textSize="11sp"
                     app:icon="@drawable/ic_mtrl_upload" />
             </LinearLayout>
         </LinearLayout>

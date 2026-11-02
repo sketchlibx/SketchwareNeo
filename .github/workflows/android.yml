@@ -5,7 +5,7 @@ on:
     types: [published]
   push:
     paths:
-      - '.github/workflows/android.yml'
+      - '.github/workflows/**'
       - 'app/**'
       - 'gradle/**'
       - 'build.gradle'
@@ -34,25 +34,27 @@ jobs:
           python-version: '3.x'
 
       - name: Install Dependencies
-        run: |
-          pip install requests
+        run: pip install requests
 
       - name: Send a message to Telegram
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
-        run: |
-          python ./.github/workflows/notify_telegram.py
+        run: python ./.github/workflows/notify_telegram.py
         continue-on-error: true
 
   build:
-    name: Build APKs
+    name: Build API 26 and API 33 APKs
     runs-on: ${{ vars.IS_USING_HOSTED_RUNNERS == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     outputs:
       short_sha: ${{ steps.set_sha.outputs.short_sha }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: set_sha
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -61,49 +63,71 @@ jobs:
           distribution: temurin
 
       - name: Create google-services.json
-        run: echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build Release APK
+      - name: Build API 26 and API 33 release APKs
         env:
           SKETCHUB_API_KEY: ${{ secrets.SKETCHUB_API_KEY }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew --no-daemon clean assembleApi26Release assembleApi33Release
 
-      - name: Set short SHA
-        id: set_sha
-        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-
-      - name: Rename APK with commit hash
+      - name: Stage and verify both APKs
+        shell: bash
         run: |
-          mv app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/app-release-${{ steps.set_sha.outputs.short_sha }}.apk
+          set -euo pipefail
+          API26_DIR="app/build/outputs/apk/api26/release"
+          API33_DIR="app/build/outputs/apk/api33/release"
+          API26_SOURCE="$(find "$API26_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          API33_SOURCE="$(find "$API33_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)"
 
-      - name: Upload Release APK (Actions Tab Artifact)
+          if [[ -z "$API26_SOURCE" || ! -s "$API26_SOURCE" ]]; then
+            echo "API 26 release APK was not produced in $API26_DIR" >&2
+            exit 1
+          fi
+          if [[ -z "$API33_SOURCE" || ! -s "$API33_SOURCE" ]]; then
+            echo "API 33 release APK was not produced in $API33_DIR" >&2
+            exit 1
+          fi
+
+          mkdir -p dist
+          cp "$API26_SOURCE" "dist/SketchwareNeo-Android8-API26-${{ steps.set_sha.outputs.short_sha }}.apk"
+          cp "$API33_SOURCE" "dist/SketchwareNeo-Android13-API33-${{ steps.set_sha.outputs.short_sha }}.apk"
+          sha256sum dist/*.apk
+          test "$(find dist -maxdepth 1 -type f -name '*.apk' | wc -l)" -eq 2
+
+      - name: Upload both release APKs as Actions artifacts
         uses: actions/upload-artifact@v4
         with:
           name: apk-release-${{ steps.set_sha.outputs.short_sha }}
-          path: app/build/outputs/apk/release/app-release-${{ steps.set_sha.outputs.short_sha }}.apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Upload APK to GitHub Release
+      - name: Upload both APKs to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/app-release-${{ steps.set_sha.outputs.short_sha }}.apk
+          files: |
+            dist/SketchwareNeo-Android8-API26-${{ steps.set_sha.outputs.short_sha }}.apk
+            dist/SketchwareNeo-Android13-API33-${{ steps.set_sha.outputs.short_sha }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   aggregateAndSend:
-    name: Send APKs to Telegram
+    name: Send both APKs to Telegram
     runs-on: ${{ vars.IS_USING_HOSTED_RUNNERS == 'true' && 'self-hosted' || 'ubuntu-latest' }}
     needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Artifacts
+      - name: Download both APKs
         uses: actions/download-artifact@v4
         with:
           name: apk-release-${{ needs.build.outputs.short_sha }}
@@ -115,31 +139,18 @@ jobs:
           python-version: '3.x'
 
       - name: Install Dependencies
-        run: |
-          pip install telethon
+        run: pip install telethon
 
-      - name: Get Git Commit Info
-        run: |
-          echo "COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')" >> $GITHUB_ENV
-          echo "COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')" >> $GITHUB_ENV
-
-      - name: Restore Telegram session cache
-        uses: actions/cache@v4
-        id: telegram_session_cache
-        with:
-          path: bot_session.session
-          key: telegram-session-${{ runner.os }}-bot_session
-
-      - name: Send APKs to Telegram
+      - name: Send both APKs to Telegram
         env:
           API_ID: ${{ secrets.TELEGRAM_API_ID }}
           API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
-          APK_PATH: ./downloaded-artifact/app-release-${{ needs.build.outputs.short_sha }}.apk
-        run: |
-          python ./.github/workflows/deploy_artifacts.py
+          APK_PATH_API26: ./downloaded-artifact/SketchwareNeo-Android8-API26-${{ needs.build.outputs.short_sha }}.apk
+          APK_PATH_API33: ./downloaded-artifact/SketchwareNeo-Android13-API33-${{ needs.build.outputs.short_sha }}.apk
+        run: python ./.github/workflows/deploy_artifacts.py
         continue-on-error: true
 
   updateAppData:
@@ -156,8 +167,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install Dependencies
-        run: |
-          pip install requests
+        run: pip install requests
 
       - name: Run Update App Script
         run: python .github/workflows/update_app_data.py

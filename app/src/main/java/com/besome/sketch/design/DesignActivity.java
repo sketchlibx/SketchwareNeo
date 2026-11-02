@@ -243,6 +243,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     });
     
     private BuildTask currentBuildTask;
+    private static volatile BuildTask activeBuildTask;
     private final BroadcastReceiver buildCancelReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -285,6 +286,24 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             File projectFileActual = new File(projectFilePath);
             if (projectFileActual.exists()) {
                 projectFileActual.setLastModified(System.currentTimeMillis());
+            }
+        }
+    }
+
+    private void recoverInterruptedBuildState() {
+        BuildTask active = activeBuildTask;
+        if (active != null && active.running) return;
+
+        r.a("P1I10", Boolean.FALSE);
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            android.app.NotificationManager manager =
+                    (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                for (android.service.notification.StatusBarNotification notification : manager.getActiveNotifications()) {
+                    if (BuildTask.CHANNEL_ID.equals(notification.getNotification().getChannelId())) {
+                        manager.cancel(notification.getId());
+                    }
+                }
             }
         }
     }
@@ -414,49 +433,94 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     }
 
     private void installBuiltApk() {
-        if (!ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_ROOT_AUTO_INSTALL_PROJECTS)) {
-            requestPackageInstallerInstall();
-        } else {
-            File apkUri = new File(q.finalToInstallApkPath);
-            long length = apkUri.length();
-            Shell.getShell(shell -> {
-                if (shell.isRoot()) {
-                    List<String> stdout = new LinkedList<>();
-                    List<String> stderr = new LinkedList<>();
-
-                    Shell.cmd("cat " + apkUri + " | pm install -S " + length).to(stdout, stderr).submit(result -> {
-                        if (result.isSuccess()) {
-                            SketchwareUtil.toast("Package installed successfully!");
-                            if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING)) {
-                                Intent launcher = getPackageManager().getLaunchIntentForPackage(q.packageName);
-                                if (launcher != null) {
-                                    startActivity(launcher);
-                                } else {
-                                    SketchwareUtil.toastError("Couldn't launch project, either not installed or not with launcher activity.");
-                                }
-                            }
-                        } else {
-                            String sharedErrorMessage = "Failed to install package, result code: " + result.getCode() + ". ";
-                            SketchwareUtil.toastError(sharedErrorMessage + "Logs are available in /Internal storage/.sketchware/debug.txt", Toast.LENGTH_LONG);
-                            LogUtil.e("DesignActivity", sharedErrorMessage + "stdout: " + stdout + ", stderr: " + stderr);
-                        }
-                    });
-                } else {
-                    SketchwareUtil.toastError("No root access granted. Continuing using default package install prompt.");
-                    requestPackageInstallerInstall();
-                }
-            });
+        boolean rootInstallEnabled = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_ROOT_AUTO_INSTALL_PROJECTS);
+        boolean shizukuInstallEnabled = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_SHIZUKU_AUTO_INSTALL);
+        File apkFile = new File(q.finalToInstallApkPath);
+        if (!apkFile.isFile() || apkFile.length() <= 0L) {
+            runOnUiThread(() -> SketchwareUtil.toastError("Build completed, but the signed APK could not be found."));
+            return;
         }
+
+        if (!rootInstallEnabled) {
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (shizukuInstallEnabled) installUsingShizuku();
+                else requestPackageInstallerInstall();
+            });
+            return;
+        }
+
+        long length = apkFile.length();
+        String quotedApkPath = "'" + apkFile.getAbsolutePath().replace("'", "'\\''") + "'";
+        Shell.getShell(shell -> {
+            if (shell.isRoot()) {
+                List<String> stdout = new LinkedList<>();
+                List<String> stderr = new LinkedList<>();
+                Shell.cmd("cat " + quotedApkPath + " | pm install -r -S " + length)
+                        .to(stdout, stderr).submit(result -> runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            if (result.isSuccess()) {
+                                SketchwareUtil.toast("Package installed successfully!");
+                                if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING)) {
+                                    Intent launcher = getPackageManager().getLaunchIntentForPackage(q.packageName);
+                                    if (launcher != null) startActivity(launcher);
+                                    else SketchwareUtil.toastError("Couldn't launch project: no launcher activity was found.");
+                                }
+                            } else if (shizukuInstallEnabled && mod.hey.studios.shizuku.ShizukuActions.hasPermission()) {
+                                LogUtil.w("DesignActivity", "Root install failed; trying Shizuku. stdout: " + stdout + ", stderr: " + stderr);
+                                installUsingShizuku();
+                            } else {
+                                String sharedErrorMessage = "Failed to install package, result code: " + result.getCode() + ". ";
+                                LogUtil.e("DesignActivity", sharedErrorMessage + "stdout: " + stdout + ", stderr: " + stderr);
+                                SketchwareUtil.toastError(sharedErrorMessage + "Opening Android installer.", Toast.LENGTH_LONG);
+                                requestPackageInstallerInstall();
+                            }
+                        }));
+            } else {
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (shizukuInstallEnabled) installUsingShizuku();
+                    else {
+                        SketchwareUtil.toastError("No root access granted. Continuing with Android package installer.");
+                        requestPackageInstallerInstall();
+                    }
+                });
+            }
+        });
+    }
+
+    private void installUsingShizuku() {
+        File apk = new File(q.finalToInstallApkPath);
+        boolean launchAfterInstall = ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_SHIZUKU_AUTO_OPEN);
+        mod.hey.studios.shizuku.ShizukuActions.installApkAndMaybeLaunch(
+                this, apk, q.packageName, launchAfterInstall, (success, message) -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (success) {
+                        SketchwareUtil.toast("Shizuku: " + message);
+                    } else {
+                        SketchwareUtil.toastError("Shizuku install failed: " + message + ". Opening package installer.");
+                        requestPackageInstallerInstall();
+                    }
+                });
     }
 
     private void requestPackageInstallerInstall() {
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        Uri apkUri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", new File(q.finalToInstallApkPath));
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-        startActivity(intent);
+        if (isFinishing() || isDestroyed()) return;
+        try {
+            File apk = new File(q.finalToInstallApkPath);
+            if (!apk.isFile() || apk.length() <= 0L) {
+                SketchwareUtil.toastError("The APK is missing or empty.");
+                return;
+            }
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            Uri apkUri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", apk);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            startActivity(intent);
+        } catch (Exception error) {
+            LogUtil.e("DesignActivity", "Could not open package installer", error);
+            SketchwareUtil.toastError("Could not open Android package installer: " + error.getMessage());
+        }
     }
 
     @Override
@@ -511,6 +575,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
         r = new DB(getApplicationContext(), "P1");
         t = new DB(getApplicationContext(), "P12");
+        recoverInterruptedBuildState();
         
         TerminalSessionManager.releaseAllExcept(this, sc_id);
         TerminalBuildBridge.register(sc_id, terminalBuildHost);
@@ -638,32 +703,14 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                     componentTabAdapter.unselectAll();
                 }
                 
-                boolean isCustomJavaEnabled = new ProjectSettings(sc_id).getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false").equals("true");
+                updateSourceMenuVisibility(position);
 
                 if (position == 0) {
-                    bottomMenu.findItem(7).setVisible(true); 
-                    bottomMenu.findItem(9).setVisible(false); 
                     if (viewTabAdapter != null) {
                         viewTabAdapter.showHidePropertyView(true);
                         xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_screen);
                     }
-                } else if (position == 1) {
-                    bottomMenu.findItem(7).setVisible(false); 
-                    bottomMenu.findItem(9).setVisible(isCustomJavaEnabled); 
-                    if (viewTabAdapter != null) {
-                        xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
-                        viewTabAdapter.showHidePropertyView(false);
-                    }
-                } else if (position == 2) {
-                    bottomMenu.findItem(7).setVisible(false);
-                    bottomMenu.findItem(9).setVisible(isCustomJavaEnabled); 
-                    if (viewTabAdapter != null) {
-                        xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
-                        viewTabAdapter.showHidePropertyView(false);
-                    }
                 } else {
-                    bottomMenu.findItem(7).setVisible(false);
-                    bottomMenu.findItem(9).setVisible(false);
                     if (viewTabAdapter != null) {
                         xmlLayoutOrientation.setImageResource(R.drawable.ic_mtrl_code);
                         viewTabAdapter.showHidePropertyView(false);
@@ -674,6 +721,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 invalidateOptionsMenu();
             }
         });
+        updateSourceMenuVisibility(viewPager.getCurrentItem());
         viewPager.getAdapter().notifyDataSetChanged();
         ((TabLayout) findViewById(R.id.tab_layout)).setupWithViewPager(viewPager);
 
@@ -740,16 +788,20 @@ private void checkAndInitGit() {
     }
 
     
-    public void refreshAdvancedSettingsUI() {
+    private void updateSourceMenuVisibility(int position) {
         if (bottomMenu == null) return;
-        boolean isCustomJavaEnabled = new ProjectSettings(sc_id)
+        boolean customJavaEnabled = new ProjectSettings(sc_id)
                 .getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false")
                 .equals("true");
-        handler.post(() -> {
-            boolean shouldShow = (currentTabNumber == 1 || currentTabNumber == 2)
-                    && isCustomJavaEnabled;
-            bottomMenu.findItem(9).setVisible(shouldShow);
-        });
+        boolean codeTab = position != 0;
+        bottomMenu.findItem(7).setVisible(position == 0);
+        bottomMenu.findItem(5).setVisible(codeTab && !customJavaEnabled);
+        bottomMenu.findItem(9).setVisible(codeTab && customJavaEnabled);
+    }
+
+    public void refreshAdvancedSettingsUI() {
+        if (bottomMenu == null) return;
+        handler.post(() -> updateSourceMenuVisibility(currentTabNumber));
         invalidateOptionsMenu();
     }
 
@@ -1133,6 +1185,7 @@ private void checkAndInitGit() {
         private final int notificationId = NEXT_NOTIFICATION_ID.incrementAndGet();
         private final String buildToken = Integer.toString(notificationId) + "-" + Long.toString(System.nanoTime());
         private final String buildScId;
+        private final Context appContext;
         private final MaterialButton btnRun;
         private final MaterialButton btnOptions;
         private final LinearLayout progressContainer;
@@ -1153,6 +1206,7 @@ private void checkAndInitGit() {
         public BuildTask(DesignActivity activity, TerminalBuildBridge.Listener terminalListener) {
             super(activity);
             buildScId = DesignActivity.sc_id;
+            appContext = activity.getApplicationContext();
             notificationManager = (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
             btnRun = activity.btnRun;
             btnOptions = activity.btnOptions;
@@ -1199,6 +1253,7 @@ private void checkAndInitGit() {
 
         public void execute() {
             running = true;
+            activeBuildTask = this;
             onPreExecute();
             executorService.execute(this::doInBackground);
         }
@@ -1208,7 +1263,7 @@ private void checkAndInitGit() {
             if (activity == null) return;
             activity.runOnUiThread(() -> {
                 updateRunButton(true);
-                activity.r.a("P1I10", true);
+                activity.r.a("P1I10", Boolean.TRUE);
                 activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 maybeShowNotification();
             });
@@ -1386,11 +1441,13 @@ private void checkAndInitGit() {
                 if (canceledAtEnd) reportTerminalCanceled();
                 else if (unfinishedAtEnd) reportTerminalFailure("The build stopped before it finished.");
                 executorService.shutdown();
+                new DB(appContext, "P1").a("P1I10", Boolean.FALSE);
                 DesignActivity currentActivity = getActivity();
                 if (currentActivity != null) currentActivity.runOnUiThread(this::onPostExecute);
                 else {
                     running = false;
-                    if (notificationManager != null) notificationManager.cancel(notificationId);
+                    if (activeBuildTask == this) activeBuildTask = null;
+                    cancelBuildNotifications();
                 }
             }
         }
@@ -1427,6 +1484,8 @@ private void checkAndInitGit() {
             DesignActivity activity = getActivity();
             if (activity == null) {
                 running = false;
+                if (activeBuildTask == this) activeBuildTask = null;
+                cancelBuildNotifications();
                 return;
             }
             Runnable cleanup = () -> {
@@ -1438,6 +1497,8 @@ private void checkAndInitGit() {
                     }
                 } finally {
                     running = false;
+                    if (activeBuildTask == this) activeBuildTask = null;
+                    cancelBuildNotifications();
                 }
             };
             if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) cleanup.run();
@@ -1459,6 +1520,18 @@ private void checkAndInitGit() {
                     progressText.setText("Cancellation requested. Waiting for the active compiler step to finish…");
                 }
             });
+        }
+
+        private void cancelBuildNotifications() {
+            if (notificationManager == null) return;
+            notificationManager.cancel(notificationId);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                for (android.service.notification.StatusBarNotification notification : notificationManager.getActiveNotifications()) {
+                    if (CHANNEL_ID.equals(notification.getNotification().getChannelId())) {
+                        notificationManager.cancel(notification.getId());
+                    }
+                }
+            }
         }
 
         private void maybeShowNotification() {

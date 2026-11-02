@@ -11,23 +11,33 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.GridLayout;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -45,35 +55,14 @@ import com.besome.sketch.beans.HistoryViewBean;
 import com.besome.sketch.beans.ProjectFileBean;
 import com.besome.sketch.beans.ProjectLibraryBean;
 import com.besome.sketch.beans.ViewBean;
+import com.besome.sketch.design.DesignActivity;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-
-import a.a.a.ProjectBuilder;
-import a.a.a.cC;
-import a.a.a.jC;
-import a.a.a.Lx;
 import io.github.rosemoe.sora.event.SelectionChangeEvent;
 import io.github.rosemoe.sora.text.Content;
 import io.github.rosemoe.sora.text.ContentListener;
@@ -82,13 +71,44 @@ import io.github.rosemoe.sora.widget.EditorSearcher;
 import io.github.rosemoe.sora.widget.component.EditorAutoCompletion;
 import io.github.rosemoe.sora.widget.component.Magnifier;
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import mod.hey.studios.project.ProjectSettings;
 import mod.hey.studios.code.SrcCodeEditor;
+import mod.hey.studios.code.settings.CodeHighlightingSettingsActivity;
 import mod.hey.studios.ide.diagnostics.Diagnostic;
 import mod.hey.studios.ide.diagnostics.DiagnosticsAdapter;
 import mod.hey.studios.ide.diagnostics.GradleLogParser;
 import mod.hey.studios.util.Helper;
-import mod.jbk.code.CodeEditorLanguages;
+import mod.jbk.code.CodeEditorColorSchemes;
 import mod.jbk.code.CodeEditorLanguages.LanguageSpec;
+import mod.jbk.code.CodeEditorLanguages;
+
+import neo.sketchware.ai.AiResponseCallback;
+import neo.sketchware.ai.LayoutGenTask;
+
 import pro.sketchware.R;
 import pro.sketchware.activities.appcompat.ManageAppCompatActivity;
 import pro.sketchware.activities.preview.LayoutPreviewActivity;
@@ -98,13 +118,20 @@ import pro.sketchware.databinding.ViewCodeEditorOptionsBinding;
 import pro.sketchware.managers.inject.InjectRootLayoutManager;
 import pro.sketchware.tools.ViewBeanParser;
 import pro.sketchware.utility.EditorUtils;
+import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
 import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.UI;
 import pro.sketchware.utility.relativelayout.CircularDependencyDetector;
 
+import a.a.a.Lx;
+import a.a.a.ProjectBuilder;
+import a.a.a.cC;
+import a.a.a.jC;
+
 @SuppressWarnings({"deprecation", "removal"})
+
 public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private ViewCodeEditorBinding binding;
     private CodeEditor editor;
@@ -112,6 +139,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private SharedPreferences prefs;
     private String sc_id;
     private String filename;
+    private int selectedLanguageId = -1;
     private String content;
     private String beforeContent;
     private boolean isEdited = false;
@@ -226,7 +254,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         setupDiagnosticsPanel();
         setupProjectExplorer();
 
-        if (filename != null && filename.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) {
+        if (filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml")) {
             triggerRealtimeDiagnostics();
         }
 
@@ -239,7 +267,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
         if (binding.appBarLayout != null) UI.addSystemWindowInsetToPadding(binding.appBarLayout, true, true, true, false);
         UI.addSystemWindowInsetToMargin(editor, true, false, true, false);
-        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         if (binding.editorContentRoot != null) {
             ViewCompat.setOnApplyWindowInsetsListener(binding.editorContentRoot, (view, windowInsets) -> {
                 int imeBottom = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
@@ -274,8 +302,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private void applySyntaxHighlighting() {
-        if (filename == null) return;
-        LanguageSpec spec = CodeEditorLanguages.resolveLanguageSpec(filename);
+        if (filename == null || editor == null) return;
+        LanguageSpec spec = selectedLanguageId >= 0
+                ? LanguageSpec.fromId(selectedLanguageId)
+                : CodeEditorLanguages.resolveLanguageSpec(filename);
+        selectedLanguageId = spec.id;
         SrcCodeEditor.applyLanguageSpec(this, editor, spec);
         SrcCodeEditor.languageId = spec.id;
         if (binding.tvLanguage != null) binding.tvLanguage.setText(spec.label);
@@ -285,6 +316,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private void showLanguageSelector() {
         SrcCodeEditor.showSwitchLanguageDialog(this, editor, (dialog, which) -> {
             SrcCodeEditor.selectLanguage(this, editor, which);
+            selectedLanguageId = which;
             LanguageSpec selectedLanguage = LanguageSpec.fromId(which);
             if (binding.tvLanguage != null) binding.tvLanguage.setText(selectedLanguage.label);
             syncStatusBarColor();
@@ -494,8 +526,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             a.a.a.jq buildConfig = new a.a.a.jq();
             a.a.a.Ox xmlGenerator = new a.a.a.Ox(buildConfig, bean);
             xmlGenerator.setExcludeAppCompat(true);
-            ArrayList<com.besome.sketch.beans.ViewBean> viewBeans = jC.a(sc_id).d(bean.getXmlName());
-            com.besome.sketch.beans.ViewBean viewFab = jC.a(sc_id).h(bean.getXmlName());
+            ArrayList<ViewBean> viewBeans = jC.a(sc_id).d(bean.getXmlName());
+            ViewBean viewFab = jC.a(sc_id).h(bean.getXmlName());
             xmlGenerator.a(a.a.a.eC.a(viewBeans), viewFab);
             
             content = xmlGenerator.b();
@@ -666,7 +698,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 case "spinner": return "<Spinner\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\" />";
                 case "lv": return "<ListView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
                 case "gv": return "<GridView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
-                case "rv": return "<androidx.recyclerview.widget.RecyclerView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
+                case "rv": return "<RecyclerView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"match_parent\" />";
                 case "card": return "<androidx.cardview.widget.CardView\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"wrap_content\">\n\n    |\n\n</androidx.cardview.widget.CardView>";
                 case "space": return "<Space\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"16dp\" />";
                 case "view": return "<View\n    android:layout_width=\"match_parent\"\n    android:layout_height=\"1dp\"\n    android:background=\"#DDDDDD\" />";
@@ -729,8 +761,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private boolean isCustomJavaEnabled() {
-        return new mod.hey.studios.project.ProjectSettings(sc_id)
-                .getValue(mod.hey.studios.project.ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false")
+        return new ProjectSettings(sc_id)
+                .getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_JAVA, "false")
                 .equals("true");
     }
 
@@ -749,8 +781,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 if (bean == null) continue;
                 String javaName;
                 try { javaName = bean.getJavaName(); } catch (Exception ignored) { javaName = null; }
-                if (TextUtils.isEmpty(javaName) || !javaName.toLowerCase(java.util.Locale.ROOT).endsWith(".java")) continue;
-                String normalized = javaName.toLowerCase(java.util.Locale.ROOT);
+                if (TextUtils.isEmpty(javaName) || !javaName.toLowerCase(Locale.ROOT).endsWith(".java")) continue;
+                String normalized = javaName.toLowerCase(Locale.ROOT);
                 if (javaNames.add(normalized)) {
                     javaNode.children.add(new ExplorerNode(javaName, new File(customJavaDir, javaName), null, bean,
                             false, 5, false));
@@ -769,29 +801,29 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             String xmlName;
             try { xmlName = bean.getXmlName(); } catch (Exception ignored) { xmlName = null; }
             if (TextUtils.isEmpty(xmlName) || !xmlName.endsWith(".xml")) continue;
-            String normalized = xmlName.toLowerCase(java.util.Locale.ROOT);
+            String normalized = xmlName.toLowerCase(Locale.ROOT);
             if (layoutNames.add(normalized)) {
                 layout.children.add(new ExplorerNode(xmlName, null, bean, null, false, 6, false));
             }
         }
-        File layoutFolder = new File(new pro.sketchware.utility.FilePathUtil().getPathResource(sc_id), "layout");
+        File layoutFolder = new File(new FilePathUtil().getPathResource(sc_id), "layout");
         addRealFiles(layout, layoutFolder, 6, layoutNames, false, 5);
-        layout.children.sort(Comparator.comparing(node -> node.name.toLowerCase(java.util.Locale.ROOT)));
+        layout.children.sort(Comparator.comparing(node -> node.name.toLowerCase(Locale.ROOT)));
 
-        File resourceDir = new File(new pro.sketchware.utility.FilePathUtil().getPathResource(sc_id));
+        File resourceDir = new File(new FilePathUtil().getPathResource(sc_id));
         addResourceDirectories(res, resourceDir, 5);
 
         String customManifestPath = FileUtil.getExternalStorageDir() + "/.sketchware/data/" + sc_id + "/custom_manifest.xml";
-        if (new mod.hey.studios.project.ProjectSettings(sc_id)
-                .getValue(mod.hey.studios.project.ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, "false").equals("true")) {
+        if (new ProjectSettings(sc_id)
+                .getValue(ProjectSettings.SETTING_ENABLE_CUSTOM_MANIFEST, "false").equals("true")) {
             File manifest = new File(customManifestPath);
             if (manifest.isFile()) main.children.add(new ExplorerNode("AndroidManifest.xml", manifest, null, null, false, 4, false));
         }
 
-        File customGradle = new File(new pro.sketchware.utility.FilePathUtil().getPathCustomGradle(sc_id), "app_build.gradle");
+        File customGradle = new File(new FilePathUtil().getPathCustomGradle(sc_id), "app_build.gradle");
         if (customGradle.isFile()) root.children.add(new ExplorerNode("app_build.gradle", customGradle, null, null, false, 1, false));
 
-        root.children.sort(Comparator.comparing(node -> node.name.equals("app") ? "" : node.name.toLowerCase(java.util.Locale.ROOT)));
+        root.children.sort(Comparator.comparing(node -> node.name.equals("app") ? "" : node.name.toLowerCase(Locale.ROOT)));
         return root;
     }
 
@@ -836,10 +868,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             if (child == null || child.getName().startsWith(".")) continue;
             if (child.isDirectory()) {
                 if (!"layout".equalsIgnoreCase(child.getName())) dirs.add(child);
-            } else if (isTextFile(child) && (isCustomJavaEnabled() || !child.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".java"))) files.add(child);
+            } else if (isTextFile(child) && (isCustomJavaEnabled() || !child.getName().toLowerCase(Locale.ROOT).endsWith(".java"))) files.add(child);
         }
-        dirs.sort(Comparator.comparing(file -> file.getName().toLowerCase(java.util.Locale.ROOT)));
-        files.sort(Comparator.comparing(file -> file.getName().toLowerCase(java.util.Locale.ROOT)));
+        dirs.sort(Comparator.comparing(file -> file.getName().toLowerCase(Locale.ROOT)));
+        files.sort(Comparator.comparing(file -> file.getName().toLowerCase(Locale.ROOT)));
         for (File dir : dirs) {
             ExplorerNode folder = new ExplorerNode(dir.getName(), dir, null, null, true, depth, false);
             parent.children.add(folder);
@@ -868,16 +900,16 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 continue;
             }
             if (!isTextFile(file)) continue;
-            if (!isCustomJavaEnabled() && file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".java")) continue;
-            if (javaOnly && !file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".java")) continue;
-            String normalized = file.getName().toLowerCase(java.util.Locale.ROOT);
+            if (!isCustomJavaEnabled() && file.getName().toLowerCase(Locale.ROOT).endsWith(".java")) continue;
+            if (javaOnly && !file.getName().toLowerCase(Locale.ROOT).endsWith(".java")) continue;
+            String normalized = file.getName().toLowerCase(Locale.ROOT);
             if (alreadyAdded != null && !alreadyAdded.add(normalized)) continue;
             parent.children.add(new ExplorerNode(file.getName(), file, null, null, false, depth, false));
         }
     }
 
     private boolean isTextFile(File file) {
-        String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+        String name = file.getName().toLowerCase(Locale.ROOT);
         return name.endsWith(".xml") || name.endsWith(".java") || name.endsWith(".kt")
                 || name.endsWith(".json") || name.endsWith(".txt") || name.endsWith(".gradle")
                 || name.endsWith(".properties") || name.endsWith(".pro") || name.endsWith(".md")
@@ -953,7 +985,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 String source = new a.a.a.yq(getApplicationContext(), sc_id)
                         .getFileSrc(javaName, jC.b(sc_id), jC.a(sc_id), jC.c(sc_id));
                 if (TextUtils.isEmpty(source)) {
-                    File generated = new File(new pro.sketchware.utility.FilePathUtil().getPathJava(sc_id), javaName);
+                    File generated = new File(new FilePathUtil().getPathJava(sc_id), javaName);
                     if (generated.isFile()) source = FileUtil.readFile(generated.getAbsolutePath());
                 }
                 if (TextUtils.isEmpty(source)) throw new IOException("Generated source is empty.");
@@ -985,7 +1017,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             SketchwareUtil.toastError("File cannot be opened.");
             return;
         }
-        if (file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".java") && !isCustomJavaEnabled()) {
+        if (file.getName().toLowerCase(Locale.ROOT).endsWith(".java") && !isCustomJavaEnabled()) {
             SketchwareUtil.toastError("Custom Java is disabled. Enable it in Advanced Settings first.");
             return;
         }
@@ -1061,6 +1093,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         try { editor.getText().removeContentListener(editorContentListener); } catch (Exception ignored) { }
         activeTab = target;
         filename = target.title;
+        selectedLanguageId = -1;
         projectFile = target.layoutBean;
         content = target.workingContent;
         beforeContent = target.savedContent;
@@ -1082,7 +1115,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         diagGeneration.incrementAndGet();
         liveDiagnostics.clear();
         refreshDiagnostics(false);
-        if (filename != null && filename.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) {
+        if (filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml")) {
             triggerRealtimeDiagnostics();
         }
         updateFindResults();
@@ -1154,7 +1187,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
 
         void setQuery(String value) {
-            query = value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+            query = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
             rebuild();
         }
 
@@ -1176,7 +1209,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
 
         private void addMatches(ExplorerNode node) {
-            if (node.name.toLowerCase(java.util.Locale.ROOT).contains(query)) visibleNodes.add(node);
+            if (node.name.toLowerCase(Locale.ROOT).contains(query)) visibleNodes.add(node);
             for (ExplorerNode child : node.children) addMatches(child);
         }
 
@@ -1221,7 +1254,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             boolean selected = isActiveNode(node);
             int iconTint = ThemeUtils.getColor(ViewCodeEditorActivity.this,
                     selected ? R.attr.colorOnSecondaryContainer : node.directory ? R.attr.colorPrimary : R.attr.colorOnSurfaceVariant);
-            String lowerName = node.name.toLowerCase(java.util.Locale.ROOT);
+            String lowerName = node.name.toLowerCase(Locale.ROOT);
             if (node.directory) row.explorerItemIcon.setImageResource(node.expanded ? R.drawable.ic_mtrl_folder_open : R.drawable.ic_mtrl_folder);
             else if (lowerName.endsWith(".java")) row.explorerItemIcon.setImageResource(R.drawable.ic_mtrl_java);
             else if (lowerName.endsWith(".gradle")) row.explorerItemIcon.setImageResource(R.drawable.ic_mtrl_gradle);
@@ -1231,7 +1264,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             row.explorerItemName.setTextColor(ThemeUtils.getColor(ViewCodeEditorActivity.this,
                     selected ? R.attr.colorOnSecondaryContainer : R.attr.colorOnSurface));
             if (selected) {
-                android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable();
+                GradientDrawable background = new GradientDrawable();
                 background.setColor(ThemeUtils.getColor(ViewCodeEditorActivity.this, R.attr.colorSecondaryContainer));
                 background.setCornerRadius(dp(10f));
                 row.explorerItemRoot.setBackground(background);
@@ -1260,7 +1293,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
     }
 
-    private final java.util.concurrent.atomic.AtomicInteger diagGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
+    private final AtomicInteger diagGeneration = new AtomicInteger(0);
 
     private void triggerRealtimeDiagnostics() {
         if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
@@ -1268,7 +1301,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         diagRunnable = () -> {
             final String text = editor.getText().toString();
             final String diagFile = filename;
-            if (diagFile != null && diagFile.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) {
+            if (diagFile != null && diagFile.toLowerCase(Locale.ROOT).endsWith(".xml")) {
                 new Thread(() -> {
                     List<Diagnostic> diags = new ArrayList<>();
                     try {
@@ -1311,8 +1344,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private List<Diagnostic> mergedDiagnostics() {
-        java.util.LinkedHashMap<String, Diagnostic> unique = new java.util.LinkedHashMap<>();
-        for (List<Diagnostic> source : java.util.Arrays.asList(liveDiagnostics, buildDiagnostics)) {
+        LinkedHashMap<String, Diagnostic> unique = new LinkedHashMap<>();
+        for (List<Diagnostic> source : Arrays.asList(liveDiagnostics, buildDiagnostics)) {
             for (Diagnostic diagnostic : source) {
                 unique.putIfAbsent(diagnostic.severity + "|" + diagnostic.fileName + "|" + diagnostic.line + "|"
                         + diagnostic.column + "|" + diagnostic.message, diagnostic);
@@ -1415,7 +1448,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private String extractQuoted(String text, int occurrence) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([^\"]+)\"").matcher(text);
+        Matcher m = Pattern.compile("\"([^\"]+)\"").matcher(text);
         int count = 0;
         while (m.find()) {
             if (count == occurrence) return m.group(1);
@@ -1435,7 +1468,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         editor.setHighlightCurrentLine(true);
         editor.setLineSpacing(2f, 1.1f);
 
-        editor.getColorScheme().setColor(EditorColorScheme.MATCHED_TEXT_BACKGROUND, 0x66FFEB3B);
+        editor.getColorScheme().setColor(EditorColorScheme.MATCHED_TEXT_BACKGROUND,
+                CodeEditorColorSchemes.getSearchHighlightColor(this));
 
         editorContentListener = new ContentListener() {
             @Override public void beforeReplace(Content content) { }
@@ -1545,9 +1579,9 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         };
         binding.findEdit.addTextChangedListener(searchWatcher);
         binding.findEdit.setOnEditorActionListener((view, actionId, event) -> {
-            boolean enterPressed = event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER
-                    && event.getAction() == android.view.KeyEvent.ACTION_DOWN;
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH || enterPressed) {
+            boolean enterPressed = event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN;
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || enterPressed) {
                 moveToSearchMatch(true);
                 return true;
             }
@@ -1585,15 +1619,15 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private void showKeyboard(View view) {
         view.post(() -> {
-            android.view.inputmethod.InputMethodManager manager =
-                    (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (manager != null) manager.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            InputMethodManager manager =
+                    (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (manager != null) manager.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
         });
     }
 
     private void hideKeyboard(View view) {
-        android.view.inputmethod.InputMethodManager manager =
-                (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager manager =
+                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (manager != null && view != null) manager.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
 
@@ -1779,7 +1813,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             editor.setSelection(pos.line, pos.column);
             updateMenuState();
             updateFindResults();
-            if (filename != null && filename.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) triggerRealtimeDiagnostics();
+            if (filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml")) triggerRealtimeDiagnostics();
         } catch (Exception error) {
             SketchwareUtil.toastError("Could not replace match: " + error.getMessage());
         }
@@ -1815,7 +1849,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             }
             updateMenuState();
             updateFindResults();
-            if (filename != null && filename.toLowerCase(java.util.Locale.ROOT).endsWith(".xml")) triggerRealtimeDiagnostics();
+            if (filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml")) triggerRealtimeDiagnostics();
             SketchwareUtil.toast("Replaced " + matches.size() + (matches.size() == 1 ? " occurrence" : " occurrences"));
         } catch (Exception error) {
             SketchwareUtil.toastError("Could not replace matches: " + error.getMessage());
@@ -1847,10 +1881,22 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        // Code Highlighting settings can be changed in a child Activity. Re-apply the
+        // shared palette when this editor returns to the foreground.
+        if (editor != null && filename != null) applySyntaxHighlighting();
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
         IntentFilter filter = new IntentFilter(ProjectBuilder.ACTION_BUILD_DIAGNOSTICS);
-        registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(buildDiagnosticsReceiver, filter);
+        }
     }
 
     @Override
@@ -1890,6 +1936,15 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         MenuItem saveItem = menu.add(Menu.NONE, 2, Menu.NONE, "Save");
         saveItem.setIcon(mutableIcon(R.drawable.ic_mtrl_save));
         saveItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+
+        if (canFormatLayoutTools()) {
+            MenuItem designItem = menu.add(Menu.NONE, 18, Menu.NONE, "Design");
+            designItem.setIcon(mutableIcon(R.drawable.ic_mtrl_design));
+            designItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            MenuItem previewItem = menu.add(Menu.NONE, 17, Menu.NONE, "Preview");
+            previewItem.setIcon(mutableIcon(R.drawable.ic_mtrl_preview));
+            previewItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        }
 
         MenuItem moreItem = menu.add(Menu.NONE, 16, Menu.NONE, "More options");
         moreItem.setIcon(mutableIcon(R.drawable.ic_mtrl_more_vertical));
@@ -1959,7 +2014,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private boolean canFormatLayoutTools() {
         return activeTab != null && activeTab.databaseLayout
-                && filename != null && filename.toLowerCase(java.util.Locale.ROOT).endsWith(".xml");
+                && filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml");
     }
 
     @Override
@@ -1972,6 +2027,8 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 else SketchwareUtil.toast("No changes to save");
                 return true;
             }
+            case 17 -> { dispatchOption(6); return true; }
+            case 18 -> { dispatchOption(16); return true; }
             case 16 -> { showMoreOptionsSheet(); return true; }
             default -> { return dispatchOption(item.getItemId()) || super.onOptionsItemSelected(item); }
         }
@@ -1999,14 +2056,38 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
                 startActivity(intent);
                 return true;
             }
+            case 16 -> {
+                if (!canFormatLayoutTools()) return true;
+                if (isContentModified()) saveCurrentTab();
+                Intent intent = new Intent(this, DesignActivity.class);
+                intent.putExtra("sc_id", sc_id);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                finish();
+                return true;
+            }
             case 7 -> { showLanguageSelector(); return true; }
             case 13 -> { if (activeTab != null && activeTab.databaseLayout) showGenerateLayoutWithAiDialog(); return true; }
             case 14 -> { showEditorSettingsDialog(); return true; }
             case 15 -> {
+                String help = "Project: " + projectName + "\nProject ID: " + sc_id + "\nFile: " + filename
+                        + "\n\nJava snippets\n"
+                        + "toast, logd, loge, intent, fori, psfs, if, ifelse, tryc, find, et, tvf, btnf, ivf, cbf, rbf, swf, spf, rvf, lvf, gvf, cvf, pbf, fabf, onclick, thread, runui, handler, finish, finisha, back, random, array, hashmap, dialog, date, time, switch, while, dowhile, foreach, return, newobj, bundle, putextra, getextra, shared, editor, commit, apply, prefput, prefget, anim, post, visible, gone, invisible, enable, disable, text, gettext, hint, focus, clear, img, bg, color, parse, str, equals, isempty, len, trim, upper, lower, contains, replace, split, sleep, exit"
+                        + "\n\nXML snippets\n"
+                        + "ll, rl, tv, btn, iv, cl, sv, hsv, et, cb, rb, rg, sw, pb, seek, rating, spinner, lv, gv, rv, card, space, view, include, merge, frag"
+                        + "\n\nType a shortcut and press Space or Enter to insert its code. The | marker shows the cursor position.";
+                android.widget.TextView message = new android.widget.TextView(this);
+                message.setText(help);
+                message.setTextSize(14);
+                message.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
+                int padding = (int) (20 * getResources().getDisplayMetrics().density);
+                message.setPadding(padding, padding, padding, padding);
+                android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+                scroll.addView(message);
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle("Direct XML Editor")
-                        .setMessage("Sketchware Neo\nProject: " + projectName + "\nProject ID: " + sc_id + "\nFile: " + filename)
-                        .setPositiveButton("OK", null)
+                        .setTitle("Editor Help")
+                        .setView(scroll)
+                        .setPositiveButton("Close", null)
                         .show();
                 return true;
             }
@@ -2019,7 +2100,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             SketchwareUtil.toast("Formatting is available for Java and XML files.");
             return;
         }
-        String lowerName = filename.toLowerCase(java.util.Locale.ROOT);
+        String lowerName = filename.toLowerCase(Locale.ROOT);
         String original = editor.getText().toString();
         String formatted;
         String successMessage;
@@ -2077,8 +2158,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         ViewCodeEditorOptionsBinding sheet = ViewCodeEditorOptionsBinding.inflate(getLayoutInflater());
         int layoutToolsVisibility = canFormatLayoutTools() ? View.VISIBLE : View.GONE;
-        sheet.optPreview.setVisibility(layoutToolsVisibility);
+        sheet.optExplorer.setVisibility(View.GONE);
+        sheet.optPreview.setVisibility(View.GONE);
         sheet.optQuickLayout.setVisibility(layoutToolsVisibility);
+        compactOptionGrid(sheet.getRoot());
         bindOptionTile(dialog, sheet.optExplorer, 12);
         bindOptionTile(dialog, sheet.optFind, 4);
         bindOptionTile(dialog, sheet.optFormat, 5);
@@ -2106,6 +2189,17 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         dialog.show();
     }
 
+    private void compactOptionGrid(View sheetRoot) {
+        GridLayout grid = sheetRoot.findViewById(R.id.options_grid);
+        if (grid == null) return;
+        for (int index = grid.getChildCount() - 1; index >= 0; index--) {
+            View tile = grid.getChildAt(index);
+            if (tile.getVisibility() != View.VISIBLE) grid.removeViewAt(index);
+        }
+        int visibleCount = grid.getChildCount();
+        grid.setColumnCount(Math.max(1, Math.min(3, visibleCount)));
+    }
+
     private void bindOptionTile(BottomSheetDialog dialog, View tile, int optionId) {
         tile.setOnClickListener(v -> {
             dialog.dismiss();
@@ -2122,20 +2216,22 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         label.setText("Font size: " + initialSize + " sp");
         label.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
         root.addView(label);
-        android.widget.SeekBar sizeSeek = new android.widget.SeekBar(this);
+        SeekBar sizeSeek = new SeekBar(this);
         sizeSeek.setMax(14);
         sizeSeek.setProgress(Math.max(0, Math.min(14, initialSize - 10)));
         root.addView(sizeSeek, new LinearLayout.LayoutParams(-1, dp(44f)));
-        sizeSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+        sizeSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 label.setText("Font size: " + (progress + 10) + " sp");
             }
-            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) { }
-            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) { }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
         });
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Editor Settings")
                 .setView(root)
+                .setNeutralButton("Syntax highlighting & colors", (dialog, which) ->
+                        startActivity(new Intent(this, CodeHighlightingSettingsActivity.class)))
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Apply", (dialog, which) -> {
                     int size = sizeSeek.getProgress() + 10;
@@ -2180,39 +2276,39 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         TextView title = new TextView(this);
         title.setText("Generate Layout with AI");
         title.setTextSize(20);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
+        title.setTypeface(null, Typeface.BOLD);
+        title.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
         root.addView(title);
 
         TextView subtitle = new TextView(this);
         subtitle.setText("Describe what this layout should look like or how it should change. AI will rewrite the XML.");
         subtitle.setTextSize(14);
-        subtitle.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant));
+        subtitle.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurfaceVariant));
         LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
         subParams.setMargins(0, dp8, 0, dp16);
         subtitle.setLayoutParams(subParams);
         root.addView(subtitle);
 
-        com.google.android.material.card.MaterialCardView card = new com.google.android.material.card.MaterialCardView(this);
+        MaterialCardView card = new MaterialCardView(this);
         card.setCardElevation(0);
         card.setRadius(dp8);
         card.setStrokeWidth(dp(1f));
-        card.setStrokeColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutlineVariant));
-        card.setCardBackgroundColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorSurfaceVariant));
+        card.setStrokeColor(ThemeUtils.getColor(this, R.attr.colorOutlineVariant));
+        card.setCardBackgroundColor(ThemeUtils.getColor(this, R.attr.colorSurfaceVariant));
 
         EditText promptInput = new EditText(this);
         promptInput.setHint("e.g. add a button below the title that says Submit");
         promptInput.setBackground(null);
         promptInput.setPadding(dp16, dp16, dp16, dp16);
-        promptInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        promptInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         promptInput.setMinLines(4);
         promptInput.setMaxLines(10);
-        promptInput.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        promptInput.setGravity(Gravity.TOP | Gravity.START);
         promptInput.setVerticalScrollBarEnabled(true);
-        promptInput.setTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOnSurface));
-        promptInput.setHintTextColor(ThemeUtils.getColor(this, com.google.android.material.R.attr.colorOutline));
+        promptInput.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
+        promptInput.setHintTextColor(ThemeUtils.getColor(this, R.attr.colorOutline));
 
         card.addView(promptInput, new ViewGroup.LayoutParams(-1, -2));
         root.addView(card, new LinearLayout.LayoutParams(-1, -2));
@@ -2241,7 +2337,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         final String targetXmlName = targetTab.title;
         String currentXml = editor.getText().toString();
 
-        neo.sketchware.ai.LayoutGenTask.generate(this, currentXml, prompt, new neo.sketchware.ai.AiResponseCallback() {
+        LayoutGenTask.generate(this, currentXml, prompt, new AiResponseCallback() {
             @Override
             public void onSuccess(String generatedXml) {
                 boolean wasActive = activeTab == targetTab;

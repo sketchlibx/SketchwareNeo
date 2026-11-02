@@ -54,6 +54,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
     public static final String SETTING_BACKUP_DIRECTORY = "backup-dir";
     public static final String SETTING_ROOT_AUTO_INSTALL_PROJECTS = "root-auto-install-projects";
     public static final String SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING = "root-auto-open-after-installing";
+    public static final String SETTING_SHIZUKU_AUTO_INSTALL = "shizuku-auto-install";
+    public static final String SETTING_SHIZUKU_AUTO_OPEN = "shizuku-auto-open";
     public static final String SETTING_BACKUP_FILENAME = "backup-filename";
     public static final String SETTING_SHOW_BUILT_IN_BLOCKS = "built-in-blocks";
     public static final String SETTING_SHOW_EVERY_SINGLE_BLOCK = "show-every-single-block";
@@ -132,7 +134,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
         settings.clear();
         List<String> keys = Arrays.asList(
                 SETTING_ALWAYS_SHOW_BLOCKS, SETTING_BACKUP_DIRECTORY, SETTING_ROOT_AUTO_INSTALL_PROJECTS,
-                SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING, SETTING_SHOW_BUILT_IN_BLOCKS, SETTING_SHOW_EVERY_SINGLE_BLOCK,
+                SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING, SETTING_SHIZUKU_AUTO_INSTALL, SETTING_SHIZUKU_AUTO_OPEN,
+                SETTING_SHOW_BUILT_IN_BLOCKS, SETTING_SHOW_EVERY_SINGLE_BLOCK,
                 SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH,
                 SETTING_BLOCKMANAGER_DIRECTORY_BLOCK_FILE_PATH, SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW,
                 SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, SETTING_GIT_DIRECT_PUSH,
@@ -149,7 +152,8 @@ public class ConfigActivity extends BaseAppCompatActivity {
             case SETTING_ALWAYS_SHOW_BLOCKS, SETTING_ROOT_AUTO_INSTALL_PROJECTS, SETTING_SHOW_BUILT_IN_BLOCKS,
                  SETTING_SHOW_EVERY_SINGLE_BLOCK, SETTING_USE_NEW_VERSION_CONTROL, SETTING_USE_ASD_HIGHLIGHTER, 
                  SETTING_TREE_VIEW, SETTING_JAVA_TREE_VIEW, SETTING_ASSETS_TREE_VIEW, SETTING_CPP_TREE_VIEW, SETTING_RESOURCE_TREE_VIEW, 
-                 SETTING_GIT_DIRECT_PUSH, SETTING_NEW_MOREBLOCK_CREATOR -> false;
+                 SETTING_GIT_DIRECT_PUSH, SETTING_NEW_MOREBLOCK_CREATOR,
+                 SETTING_SHIZUKU_AUTO_INSTALL, SETTING_SHIZUKU_AUTO_OPEN -> false;
             case SETTING_BACKUP_DIRECTORY -> "/.sketchware/backups/";
             case SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING -> true;
             case SETTING_BLOCKMANAGER_DIRECTORY_PALETTE_FILE_PATH -> "/.sketchware/resources/block/My Block/palette.json";
@@ -190,6 +194,13 @@ public class ConfigActivity extends BaseAppCompatActivity {
                 createSwitchPreference(R.drawable.ic_mtrl_puzzle, "New Moreblock Creator", "Use the redesigned Material 3 creator when adding Moreblocks", SETTING_NEW_MOREBLOCK_CREATOR)
         ));
         
+        content.addView(createCategoryHeader("Code Editor"));
+        content.addView(createPreferenceCard(
+                createActionPreference(R.drawable.ic_mtrl_code, "Code Highlighting", "Set colors for Java, XML and Gradle", v ->
+                        startActivity(new android.content.Intent(this,
+                                mod.hey.studios.code.settings.CodeHighlightingSettingsActivity.class)), null)
+        ));
+
         content.addView(createCategoryHeader("Project Explorer"));
         content.addView(createPreferenceCard(
                 createSwitchPreference(R.drawable.ic_mtrl_tree_view, "Enable Tree View", "Display project files in a hierarchical tree structure", SETTING_TREE_VIEW)
@@ -205,14 +216,17 @@ public class ConfigActivity extends BaseAppCompatActivity {
 
         content.addView(createCategoryHeader("Version Control"));
         content.addView(createPreferenceCard(
-                createSwitchPreference(R.drawable.ic_mtrl_version_control, "New Version Control", "Use optimized Git-based system for project history", SETTING_USE_NEW_VERSION_CONTROL),
-                createSwitchPreference(R.drawable.ic_mtrl_upload, "Git Direct Commit & Push", "Single action to commit and push changes", SETTING_GIT_DIRECT_PUSH)
+                createSwitchPreference(R.drawable.ic_mtrl_version_control, "New Version Control", "Use optimized Git-based system for project history", SETTING_USE_NEW_VERSION_CONTROL)
         ));
 
         content.addView(createCategoryHeader("Root Features"));
         content.addView(createPreferenceCard(
                 createSwitchPreference(R.drawable.ic_mtrl_code, "Auto Install Projects (Root)", "Silently install compiled APKs using root access", SETTING_ROOT_AUTO_INSTALL_PROJECTS),
-                createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING)
+                createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Open App", "Launch application immediately after install", SETTING_ROOT_AUTO_OPEN_AFTER_INSTALLING),
+                createActionPreference(R.drawable.ic_mtrl_android, "Shizuku Access", "Connect Shizuku or Sui and grant permission", v ->
+                        startActivity(new android.content.Intent(this, mod.hey.studios.shizuku.ShizukuAccessActivity.class)), null),
+                createSwitchPreference(R.drawable.ic_mtrl_apk_install, "Auto Install with Shizuku", "Install compiled APKs through Shizuku or Sui", SETTING_SHIZUKU_AUTO_INSTALL),
+                createSwitchPreference(R.drawable.ic_mtrl_android, "Auto Open with Shizuku", "Launch the installed app through Shizuku", SETTING_SHIZUKU_AUTO_OPEN)
         ));
     }
 
@@ -302,6 +316,13 @@ public class ConfigActivity extends BaseAppCompatActivity {
         row.setOnClickListener(v -> mSwitch.toggle());
 
         mSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if ((prefKey.equals(SETTING_SHIZUKU_AUTO_INSTALL) || prefKey.equals(SETTING_SHIZUKU_AUTO_OPEN))
+                    && isChecked && !mod.hey.studios.shizuku.ShizukuActions.hasPermission()) {
+                mSwitch.setChecked(false);
+                Snackbar.make(binding.getRoot(), "Grant Shizuku permission first", BaseTransientBottomBar.LENGTH_SHORT).show();
+                startActivity(new android.content.Intent(this, mod.hey.studios.shizuku.ShizukuAccessActivity.class));
+                return;
+            }
             if (prefKey.equals(SETTING_ROOT_AUTO_INSTALL_PROJECTS) && isChecked) {
                 Shell.getShell(shell -> {
                     if (!shell.isRoot()) {

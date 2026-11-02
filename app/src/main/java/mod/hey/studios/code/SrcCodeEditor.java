@@ -11,6 +11,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,13 +19,20 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Pair;
 import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.GridLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -37,6 +45,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.besome.sketch.design.DesignActivity;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -44,36 +53,6 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathFactory;
-
-import a.a.a.Lx;
-import a.a.a.ProjectBuilder;
 import io.github.rosemoe.sora.langs.java.JavaLanguage;
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme;
 import io.github.rosemoe.sora.text.Content;
@@ -88,14 +67,50 @@ import io.github.rosemoe.sora.widget.schemes.SchemeEclipse;
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub;
 import io.github.rosemoe.sora.widget.schemes.SchemeNotepadXX;
 import io.github.rosemoe.sora.widget.schemes.SchemeVS2019;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
+
+import mod.hey.studios.code.settings.CodeHighlightingSettingsActivity;
 import mod.hey.studios.ide.diagnostics.Diagnostic;
 import mod.hey.studios.ide.diagnostics.DiagnosticsAdapter;
 import mod.hey.studios.ide.diagnostics.GradleLogParser;
 import mod.hey.studios.util.Helper;
 import mod.jbk.code.CodeEditorColorSchemes;
-import mod.jbk.code.CodeEditorLanguages;
 import mod.jbk.code.CodeEditorLanguages.LanguageSpec;
+import mod.jbk.code.CodeEditorLanguages;
+import mod.sketchlibx.sync.BlockSyncEngine;
+
+import neo.sketchware.plugin.NeoDiagnostic;
+import neo.sketchware.plugin.NeoEditorAction;
+import neo.sketchware.plugin.NeoEditorContext;
+import neo.sketchware.plugin.NeoEditorLanguage;
+import neo.sketchware.plugin.NeoEvent;
+import neo.sketchware.plugin.PluginManager;
+
 import pro.sketchware.R;
+import pro.sketchware.SketchApplication;
 import pro.sketchware.activities.preview.LayoutPreviewActivity;
 import pro.sketchware.databinding.CodeEditorHsBinding;
 import pro.sketchware.databinding.CodeEditorHsOptionsBinding;
@@ -106,7 +121,16 @@ import pro.sketchware.utility.SketchwareUtil;
 import pro.sketchware.utility.ThemeUtils;
 import pro.sketchware.utility.UI;
 
+import a.a.a.Lx;
+import a.a.a.ProjectBuilder;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
 @SuppressWarnings({"deprecation", "removal"})
+
 public class SrcCodeEditor extends BaseAppCompatActivity {
     public static final String FLAG_FROM_ANDROID_MANIFEST = "from_android_manifest";
     public static final List<Pair<String, Class<? extends EditorColorScheme>>> KNOWN_COLOR_SCHEMES = List.of(
@@ -177,7 +201,10 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         boolean auto_c = pref.getBoolean(prefix + "_ac", true);
         boolean auto_complete_symbol_pairs = pref.getBoolean(prefix + "_acsp", true);
 
-        if (loadTheme) selectTheme(ed, theme);
+        if (loadTheme) {
+            selectTheme(ed, theme);
+            CodeEditorColorSchemes.applyNativeColorProfile(c, ed.getColorScheme());
+        }
         ed.setTextSize(text_size);
         ed.setWordwrap(word_wrap);
         ed.getProps().symbolPairAutoCompletion = auto_complete_symbol_pairs;
@@ -197,8 +224,8 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 case 5 -> new SchemeNotepadXX();
                 default -> new EditorColorScheme();
             };
+            CodeEditorColorSchemes.applyNativeColorProfile(ed.getContext(), scheme);
             ed.setColorScheme(scheme);
-            scheme.setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, 0xFF87CEEB);
         }
     }
 
@@ -210,27 +237,31 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
     @Deprecated
     public static void selectLanguage(CodeEditor ed, int which) {
-        selectLanguage(pro.sketchware.SketchApplication.getContext(), ed, which);
+        selectLanguage(SketchApplication.getContext(), ed, which);
     }
 
     public static void applyLanguageSpec(Context context, CodeEditor ed, LanguageSpec spec) {
+        if (context == null || ed == null || spec == null) return;
         switch (spec.kind) {
             case JAVA:
                 ed.setEditorLanguage(new JavaLanguage());
+                ed.setColorScheme(CodeEditorColorSchemes.loadNativeColorScheme(context));
                 break;
             case TEXTMATE:
                 ed.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(spec.scopeName));
                 ed.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(
-                        ThemeUtils.isDarkThemeEnabled(context)
+                        CodeEditorColorSchemes.isDarkAppearance(context)
                                 ? CodeEditorColorSchemes.THEME_DRACULA
                                 : CodeEditorColorSchemes.THEME_GITHUB));
                 break;
             case PLAIN:
             default:
                 EditorUtils.loadXmlConfig(ed);
+                ed.setColorScheme(CodeEditorColorSchemes.loadNativeColorScheme(context));
                 break;
         }
-        ed.getColorScheme().setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, 0xFF87CEEB);
+        ed.getColorScheme().setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND,
+                CodeEditorColorSchemes.getTokenColor(context, CodeEditorColorSchemes.COLOR_ATTRIBUTE));
     }
 
     public static String prettifyXml(String xml, int indentAmount, Intent extras) {
@@ -447,8 +478,8 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         setupSearchPanel();
         setupDiagnosticsPanel();
 
-        neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileOpened(
-                scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
+        PluginManager.publishEvent(new NeoEvent.FileOpened(
+                scId, currentTitle, NeoEditorLanguage.fromFilePath(currentTitle)));
 
         selectionSubscription = binding.editor.subscribeEvent(io.github.rosemoe.sora.event.SelectionChangeEvent.class, (event, unsubscribe) -> {
             // Debounced (150ms) so rapid cursor movement (e.g. holding an arrow
@@ -480,7 +511,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         View appBarLayout = findViewById(R.id.app_bar_layout);
         if(appBarLayout != null) UI.addSystemWindowInsetToPadding(appBarLayout, true, true, true, false);
         UI.addSystemWindowInsetToMargin(binding.editor, true, false, true, false);
-        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (view, windowInsets) -> {
             int bottomInset = Math.max(
                     windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom,
@@ -714,7 +745,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 lastPublishedSelStartColumn = sc;
                 lastPublishedSelEndLine = el;
                 lastPublishedSelEndColumn = ec;
-                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.SelectionChanged(
+                PluginManager.publishEvent(new NeoEvent.SelectionChanged(
                         scId, currentTitle, sl, sc, el, ec));
             } else {
                 int l = c.getRightLine(), col = c.getRightColumn();
@@ -723,7 +754,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 }
                 lastPublishedCursorLine = l;
                 lastPublishedCursorColumn = col;
-                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.CursorChanged(
+                PluginManager.publishEvent(new NeoEvent.CursorChanged(
                         scId, currentTitle, l, col));
             }
         } catch (Throwable ignored) {
@@ -744,10 +775,10 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
         if (pluginChangeRunnable != null) diagHandler.removeCallbacks(pluginChangeRunnable);
         pluginChangeRunnable = () -> {
-            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.TextChanged(
-                    scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
+            PluginManager.publishEvent(new NeoEvent.TextChanged(
+                    scId, currentTitle, NeoEditorLanguage.fromFilePath(currentTitle)));
             if (isJava) {
-                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.JavaCodeChanged(scId, currentTitle));
+                PluginManager.publishEvent(new NeoEvent.JavaCodeChanged(scId, currentTitle));
             }
         };
         diagHandler.postDelayed(pluginChangeRunnable, 800);
@@ -783,16 +814,16 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                         }
                     }
 
-                    List<neo.sketchware.plugin.NeoDiagnostic> neoDiags = new ArrayList<>();
+                    List<NeoDiagnostic> neoDiags = new ArrayList<>();
                     for (Diagnostic d : diags) {
-                        neo.sketchware.plugin.NeoDiagnostic.Severity severity =
-                                d.severity == Diagnostic.Severity.ERROR ? neo.sketchware.plugin.NeoDiagnostic.Severity.ERROR
-                                        : d.severity == Diagnostic.Severity.WARNING ? neo.sketchware.plugin.NeoDiagnostic.Severity.WARNING
-                                        : neo.sketchware.plugin.NeoDiagnostic.Severity.INFO;
-                        neoDiags.add(new neo.sketchware.plugin.NeoDiagnostic(severity, d.fileName, d.line, d.column, d.message, "xml"));
+                        NeoDiagnostic.Severity severity =
+                                d.severity == Diagnostic.Severity.ERROR ? NeoDiagnostic.Severity.ERROR
+                                        : d.severity == Diagnostic.Severity.WARNING ? NeoDiagnostic.Severity.WARNING
+                                        : NeoDiagnostic.Severity.INFO;
+                        neoDiags.add(new NeoDiagnostic(severity, d.fileName, d.line, d.column, d.message, "xml"));
                     }
-                    neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.DiagnosticsChanged(
-                            scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.XML, neoDiags));
+                    PluginManager.publishEvent(new NeoEvent.DiagnosticsChanged(
+                            scId, currentTitle, NeoEditorLanguage.XML, neoDiags));
 
                     runOnUiThread(() -> {
                         if (diagnosticsBehavior != null && !diags.isEmpty()) {
@@ -908,7 +939,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             LinearLayout root = new LinearLayout(parent.getContext());
             root.setLayoutParams(new RecyclerView.LayoutParams(-1, -2));
             root.setOrientation(LinearLayout.HORIZONTAL);
-            root.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            root.setGravity(Gravity.CENTER_VERTICAL);
             root.setPadding(SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(16), SketchwareUtil.dpToPx(8));
             
             TypedValue outValue = new TypedValue();
@@ -1019,7 +1050,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
     public void showDiagnostics(List<Diagnostic> diagnostics) {
         if(diagnosticsBehavior == null) return;
-        androidx.recyclerview.widget.RecyclerView rv = findViewById(R.id.rv_diagnostics);
+        RecyclerView rv = findViewById(R.id.rv_diagnostics);
         if (rv != null) {
             DiagnosticsAdapter adapter = new DiagnosticsAdapter(diagnostics, diagnostic -> {
                 if(diagnostic.fileName.equals(currentTitle)) {
@@ -1089,9 +1120,9 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             @Override public void afterTextChanged(Editable s) { updateFindResults(); }
         });
         searchBinding.findEdit.setOnEditorActionListener((view, actionId, event) -> {
-            boolean enterPressed = event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER
-                    && event.getAction() == android.view.KeyEvent.ACTION_DOWN;
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH || enterPressed) {
+            boolean enterPressed = event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN;
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || enterPressed) {
                 gotoSearchMatch(true);
                 return true;
             }
@@ -1138,15 +1169,15 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
 
     private void showKeyboard(View view) {
         view.post(() -> {
-            android.view.inputmethod.InputMethodManager manager =
-                    (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (manager != null) manager.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            InputMethodManager manager =
+                    (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (manager != null) manager.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
         });
     }
 
     private void hideKeyboard(View view) {
-        android.view.inputmethod.InputMethodManager manager =
-                (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        InputMethodManager manager =
+                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         if (manager != null && view != null) manager.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
 
@@ -1325,17 +1356,17 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
             String filePath = getIntent().getStringExtra("content");
             if (filePath != null && filePath.endsWith(".java")) {
                 try {
-                    mod.sketchlibx.sync.BlockSyncEngine.syncJavaToBlocks(scId, activityName, beforeContent);
+                    BlockSyncEngine.syncJavaToBlocks(scId, activityName, beforeContent);
                 } catch (Exception e) {
                     SketchwareUtil.toastError("Sync failed: " + e.getMessage());
                 }
             }
             FileUtil.writeFile(filePath, beforeContent);
             if (filePath != null && filePath.endsWith(".java")) {
-                neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.JavaCodeSaved(scId, filePath));
+                PluginManager.publishEvent(new NeoEvent.JavaCodeSaved(scId, filePath));
             }
-            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileSaved(
-                    scId, filePath, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(filePath)));
+            PluginManager.publishEvent(new NeoEvent.FileSaved(
+                    scId, filePath, NeoEditorLanguage.fromFilePath(filePath)));
         }
         SketchwareUtil.toast("Saved successfully!");
         updateMenuState();
@@ -1345,7 +1376,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     public void onStart() {
         super.onStart();
         IntentFilter filter = new IntentFilter(ProjectBuilder.ACTION_BUILD_DIAGNOSTICS);
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
+        if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(buildDiagnosticsReceiver, filter, Context.RECEIVER_NOT_EXPORTED); 
         } else {
             registerReceiver(buildDiagnosticsReceiver, filter); 
@@ -1359,8 +1390,8 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
         if (pluginChangeRunnable != null) diagHandler.removeCallbacks(pluginChangeRunnable);
         if (cursorEventRunnable != null) diagHandler.removeCallbacks(cursorEventRunnable);
-        neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.FileClosed(
-                scId, currentTitle, neo.sketchware.plugin.NeoEditorLanguage.fromFilePath(currentTitle)));
+        PluginManager.publishEvent(new NeoEvent.FileClosed(
+                scId, currentTitle, NeoEditorLanguage.fromFilePath(currentTitle)));
         float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
         pref.edit().putInt("act_ts", (int) (binding.editor.getTextSizePx() / scaledDensity)).apply();
     }
@@ -1419,6 +1450,15 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         saveItem.setIcon(mutableIcon(R.drawable.ic_mtrl_save));
         saveItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 
+        if (isLayoutFile() && getIntent().hasExtra("sc_id")) {
+            MenuItem designItem = menu.add(Menu.NONE, 18, Menu.NONE, "Design");
+            designItem.setIcon(mutableIcon(R.drawable.ic_mtrl_design));
+            designItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            MenuItem previewItem = menu.add(Menu.NONE, 17, Menu.NONE, "Preview");
+            previewItem.setIcon(mutableIcon(R.drawable.ic_mtrl_preview));
+            previewItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        }
+
         MenuItem moreItem = menu.add(Menu.NONE, 16, Menu.NONE, "More options");
         moreItem.setIcon(mutableIcon(R.drawable.ic_mtrl_more_vertical));
         moreItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
@@ -1426,23 +1466,23 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     }
 
     private void showPluginActionsDialog() {
-        java.util.List<neo.sketchware.plugin.NeoEditorAction> actions = neo.sketchware.plugin.PluginManager.getAllEditorActions();
+        java.util.List<NeoEditorAction> actions = PluginManager.getAllEditorActions();
         if (actions.isEmpty()) return;
 
         String[] labels = new String[actions.size()];
         for (int i = 0; i < actions.size(); i++) labels[i] = actions.get(i).label();
 
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle("Plugin Actions")
                 .setItems(labels, (dialog, which) -> runPluginAction(actions.get(which)))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void runPluginAction(neo.sketchware.plugin.NeoEditorAction action) {
+    private void runPluginAction(NeoEditorAction action) {
         String fullText = binding.editor.getText().toString();
-        neo.sketchware.plugin.NeoEditorContext context =
-                new neo.sketchware.plugin.NeoEditorContext(currentTitle, fullText, 0, fullText.length());
+        NeoEditorContext context =
+                new NeoEditorContext(currentTitle, fullText, 0, fullText.length());
 
         String replacement;
         try {
@@ -1498,7 +1538,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         boolean hadUndo = binding.editor.canUndo();
         if (hadUndo) {
             binding.editor.undo();
-            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.EditorUndo(scId, currentTitle));
+            PluginManager.publishEvent(new NeoEvent.EditorUndo(scId, currentTitle));
         }
         updateMenuState();
         scheduleEditorStateRefresh();
@@ -1508,7 +1548,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         boolean hadRedo = binding.editor.canRedo();
         if (hadRedo) {
             binding.editor.redo();
-            neo.sketchware.plugin.PluginManager.publishEvent(new neo.sketchware.plugin.NeoEvent.EditorRedo(scId, currentTitle));
+            PluginManager.publishEvent(new NeoEvent.EditorRedo(scId, currentTitle));
         }
         updateMenuState();
         scheduleEditorStateRefresh();
@@ -1595,15 +1635,31 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 return true;
             }
             case 8 -> {
-                showSwitchThemeDialog(this, binding.editor, (dialog, which) -> {
-                    selectTheme(binding.editor, which);
-                    pref.edit().putInt("act_theme", which).apply();
-                    dialog.dismiss();
-                });
+                // Keep the legacy Theme entry routed to the shared profile editor so
+                // it cannot override the new global palette with an older Sora scheme.
+                startActivity(new Intent(this, CodeHighlightingSettingsActivity.class));
+                return true;
+            }
+            case 9 -> {
+                showSnippetHelpDialog();
+                return true;
+            }
+            case 10 -> {
+                if (!isLayoutFile() || scId == null || scId.isEmpty()) return true;
+                if (isContentModified()) save();
+                Intent designIntent = new Intent(this, DesignActivity.class);
+                designIntent.putExtra("sc_id", scId);
+                designIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(designIntent);
+                finish();
                 return true;
             }
             case 13 -> {
                 showPluginActionsDialog();
+                return true;
+            }
+            case 14 -> {
+                startActivity(new Intent(this, CodeHighlightingSettingsActivity.class));
                 return true;
             }
             default -> { return false; }
@@ -1613,16 +1669,20 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
     private void showMoreOptionsSheet() {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         CodeEditorHsOptionsBinding sheet = CodeEditorHsOptionsBinding.inflate(getLayoutInflater());
-        sheet.optExplorer.setVisibility(isLayoutFile() && drawerLayout != null ? View.VISIBLE : View.GONE);
-        sheet.optPreview.setVisibility(isLayoutFile() && getIntent().hasExtra("sc_id") ? View.VISIBLE : View.GONE);
-        sheet.optPlugins.setVisibility(neo.sketchware.plugin.PluginManager.getAllEditorActions().isEmpty() ? View.GONE : View.VISIBLE);
+        sheet.optExplorer.setVisibility(View.GONE);
+        sheet.optPreview.setVisibility(View.GONE);
+        sheet.optPlugins.setVisibility(PluginManager.getAllEditorActions().isEmpty() ? View.GONE : View.VISIBLE);
+        sheet.optTheme.setVisibility(View.GONE);
+        compactOptionGrid(sheet.getRoot());
         bindOptionTile(dialog, sheet.optExplorer, 12);
         bindOptionTile(dialog, sheet.optFind, 4);
         bindOptionTile(dialog, sheet.optFormat, 5);
         bindOptionTile(dialog, sheet.optPreview, 6);
         bindOptionTile(dialog, sheet.optLanguage, 7);
         bindOptionTile(dialog, sheet.optTheme, 8);
+        bindOptionTile(dialog, sheet.optHighlighting, 14);
         bindOptionTile(dialog, sheet.optPlugins, 13);
+        bindOptionTile(dialog, sheet.optAbout, 9);
         sheet.switchWordWrap.setChecked(pref.getBoolean("act_ww", false));
         sheet.switchWordWrap.setOnCheckedChangeListener((button, checked) -> {
             binding.editor.setWordwrap(checked);
@@ -1642,6 +1702,50 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
         dialog.show();
     }
 
+    private void showSnippetHelpDialog() {
+        boolean xml = currentTitle != null && currentTitle.toLowerCase(Locale.ROOT).endsWith(".xml");
+        String shortcuts = xml
+                ? "XML layout snippets\n\n"
+                        + "ll — LinearLayout\nrl — RelativeLayout\ntv — TextView\nbtn — Button\niv — ImageView\ncl — ConstraintLayout\nsv — ScrollView\nhsv — HorizontalScrollView\net — EditText\ncb — CheckBox\nrb — RadioButton\nrg — RadioGroup\nsw — Switch\npb — ProgressBar\nseek — SeekBar\nrating — RatingBar\nspinner — Spinner\nlv — ListView\ngv — GridView\nrv — RecyclerView\ncard — CardView\nspace — Space\nview — Divider View\ninclude — Include layout\nmerge — Merge root\nfrag — Fragment"
+                : "Java snippets\n\n"
+                        + "toast — Create a Toast message\nlogd / loge — Add debug or error logs\nintent — Create an Intent and start an Activity\nfori — Create an indexed for loop\nif / ifelse — Create condition blocks\ntryc — Create a try-catch block\nfind — Find a view by its ID\net / tvf / btnf / ivf — Create common view references\nonclick — Add a click listener\nthread / runui / handler — Run delayed or UI-thread code\narray / hashmap — Create collection objects\ndialog — Create an AlertDialog\ndate / time — Format date or time\nshared / prefput / prefget — Use SharedPreferences\nvisible / gone / invisible — Change view visibility\ntext / gettext / hint — Read or update view text\nimg / bg / color — Change image, background or text color\nparse / str — Convert values\nlen / trim / upper / lower — Common String operations\nsleep / finish / finisha / back — Common flow helpers\n\nMore Java shortcuts: "
+                        + "All Java shortcuts: toast, logd, loge, intent, fori, psfs, if, ifelse, tryc, find, "
+                        + "et, tvf, btnf, ivf, cbf, rbf, swf, spf, rvf, lvf, gvf, cvf, pbf, fabf, "
+                        + "onclick, thread, runui, handler, finish, finisha, back, random, array, hashmap, dialog, "
+                        + "date, time, switch, while, dowhile, foreach, return, newobj, bundle, putextra, getextra, "
+                        + "shared, editor, commit, apply, prefput, prefget, anim, post, visible, gone, invisible, "
+                        + "enable, disable, text, gettext, hint, focus, clear, img, bg, color, parse, str, equals, "
+                        + "isempty, len, trim, upper, lower, contains, replace, split, sleep, exit";
+
+        TextView content = new TextView(this);
+        content.setText(shortcuts + "\n\nType a shortcut and press Space or Enter to insert its code. The | marker shows where the cursor will be placed.");
+        content.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
+        content.setTextSize(14f);
+        content.setLineSpacing(SketchwareUtil.dpToPx(3), 1.05f);
+        int padding = SketchwareUtil.dpToPx(20);
+        content.setPadding(padding, padding, padding, padding);
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        scrollView.addView(content);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Editor shortcuts")
+                .setView(scrollView)
+                .setPositiveButton(R.string.common_word_close, null)
+                .show();
+    }
+
+    private void compactOptionGrid(View sheetRoot) {
+        GridLayout grid = sheetRoot.findViewById(R.id.options_grid);
+        if (grid == null) return;
+        for (int index = grid.getChildCount() - 1; index >= 0; index--) {
+            View tile = grid.getChildAt(index);
+            if (tile.getVisibility() != View.VISIBLE) grid.removeViewAt(index);
+        }
+        int visibleCount = grid.getChildCount();
+        grid.setColumnCount(Math.max(1, Math.min(3, visibleCount)));
+    }
+
     private void bindOptionTile(BottomSheetDialog dialog, View tile, int optionId) {
         tile.setOnClickListener(v -> {
             dialog.dismiss();
@@ -1659,11 +1763,23 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 else SketchwareUtil.toast("No changes to save");
                 return true;
             }
+            case 17 -> { dispatchOption(6); return true; }
+            case 18 -> { dispatchOption(10); return true; }
             case 16 -> { showMoreOptionsSheet(); return true; }
             default -> { return dispatchOption(item.getItemId()) || super.onOptionsItemSelected(item); }
         }
     }
     
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (binding != null && binding.editor != null && currentTitle != null) {
+            // Keep a manually selected language while refreshing only the palette.
+            applyLanguageSpec(this, binding.editor, LanguageSpec.fromId(languageId));
+        }
+    }
+
     private boolean isFileInLayoutFolder() {
         String contentLocal = getIntent().getStringExtra("content");
         if (contentLocal != null) {

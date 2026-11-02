@@ -19,14 +19,190 @@
             app:subtitle="onCreate"
             app:title="Activity" />
 
-        <com.besome.sketch.editor.view.ViewLogicEditor
-            android:id="@+id/editor"
+        <FrameLayout
+            android:id="@+id/editor_surface"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:layout_margin="4dp"
-            android:forceDarkAllowed="false"
-            tools:ignore="UnusedAttribute" />
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <com.besome.sketch.editor.view.ViewLogicEditor
+                android:id="@+id/editor"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:forceDarkAllowed="false"
+                tools:ignore="UnusedAttribute" />
+
+            <FrameLayout
+                android:id="@+id/editor_notes_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clickable="false"
+                android:focusable="false"
+                android:clipChildren="false"
+                android:clipToPadding="false" />
+        </FrameLayout>
     </LinearLayout>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/editor_status_card"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="80dp"
+        android:elevation="10dp"
+        android:visibility="invisible"
+        android:clickable="false"
+        android:focusable="false"
+        app:cardBackgroundColor="?attr/colorSurfaceContainer"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="4dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="7dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp">
+
+            <TextView
+                android:id="@+id/editor_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 blocks"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:fontFamily="sans"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="7dp"
+                android:layout_marginEnd="7dp"
+                android:background="?attr/colorOutlineVariant" />
+
+            <TextView
+                android:id="@+id/editor_status_changes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No changes"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                android:fontFamily="sans"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/editor_status_problem_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginStart="6dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="7dp"
+                android:paddingEnd="8dp"
+                android:visibility="gone"
+                android:background="@drawable/bg_editor_problem_chip"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/editor_status_problem_icon"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:contentDescription="Problems"
+                    android:src="@drawable/ic_mtrl_warning"
+                    android:tint="?attr/colorError" />
+
+                <TextView
+                    android:id="@+id/editor_status_problem_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:text="3 problems"
+                    android:textColor="?attr/colorError"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/editor_zoom_card"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginTop="80dp"
+        android:layout_marginEnd="12dp"
+        android:elevation="10dp"
+        app:cardBackgroundColor="?attr/colorSurface"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="3dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
+
+            <ImageButton
+                android:id="@+id/editor_zoom_in"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Zoom in"
+                android:src="@drawable/ic_mtrl_add_circle"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+            <TextView
+                android:id="@+id/editor_zoom_percent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingVertical="4dp"
+                android:text="100%"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/editor_zoom_out"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:gravity="center"
+                android:text="−"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="26sp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Zoom out" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="32dp"
+                android:layout_height="1dp"
+                android:layout_marginVertical="4dp" />
+
+            <ImageButton
+                android:id="@+id/editor_zoom_reset"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Center canvas"
+                android:src="@drawable/ic_mtrl_center"
+                app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <com.besome.sketch.editor.LogicEditorDrawer
         android:id="@+id/right_drawer"
