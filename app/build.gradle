@@ -1,9 +1,189 @@
+import java.io.FileOutputStream
+import java.util.jar.JarEntry
+import java.util.jar.JarFile
+import java.util.jar.JarOutputStream
+import org.gradle.api.tasks.compile.JavaCompile
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+
 def secrets = System.getenv("GOOGLE_SERVICES_JSON")
 
 apply plugin: "com.android.application"
 apply plugin: "kotlin-android"
 apply plugin: "com.google.gms.google-services"
 apply plugin: "com.google.firebase.crashlytics"
+
+def ecjOriginalConfiguration = configurations.create("ecjOriginal") {
+    canBeConsumed = false
+    canBeResolved = true
+    transitive = false
+}
+
+def patchedEcjFile = layout.buildDirectory.file("intermediates/ecj-android/ecj-3.32.0-android.jar")
+
+def prepareAndroidCompatibleEcj = tasks.register("prepareAndroidCompatibleEcj") {
+    inputs.property("ecjAndroidCompatibilityTransformVersion", 1)
+    inputs.files(ecjOriginalConfiguration)
+    inputs.file(layout.projectDirectory.file("src/main/java/pro/sketchware/compiler/AndroidInputStreamCompat.java"))
+    outputs.file(patchedEcjFile)
+
+    doLast {
+        String helperOwner = "pro/sketchware/compiler/AndroidInputStreamCompat"
+        int[] rewrittenCalls = [0] as int[]
+        int[] remainingCalls = [0] as int[]
+
+        File helperSource = file("src/main/java/pro/sketchware/compiler/AndroidInputStreamCompat.java")
+        if (!helperSource.isFile()) {
+            throw new GradleException("AndroidInputStreamCompat.java is required by the ECJ compatibility transform")
+        }
+        if (ecjOriginalConfiguration.files.size() != 1) {
+            throw new GradleException("Expected exactly one original ECJ JAR, found ${ecjOriginalConfiguration.files.size()}")
+        }
+
+        File inputJar = ecjOriginalConfiguration.singleFile
+        File outputJar = patchedEcjFile.get().asFile
+        outputJar.parentFile.mkdirs()
+
+        Closure<Boolean> isUnsupportedInputStreamMethod = { String owner, String methodName, String methodDescriptor ->
+            if (!owner.startsWith("java/io/")) return false
+            return (methodName == "readAllBytes" && methodDescriptor == "()[B") ||
+                    (methodName == "readNBytes" && (methodDescriptor == "(I)[B" || methodDescriptor == "([BII)I")) ||
+                    (methodName == "transferTo" && methodDescriptor == "(Ljava/io/OutputStream;)J") ||
+                    (methodName == "skipNBytes" && methodDescriptor == "(J)V")
+        }
+        JarFile source = new JarFile(inputJar)
+        JarOutputStream target = new JarOutputStream(new FileOutputStream(outputJar))
+        try {
+            Enumeration<JarEntry> entries = source.entries()
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement()
+                String entryName = entry.name
+                String upperName = entryName.toUpperCase(Locale.ROOT)
+                boolean signatureFile = upperName.startsWith("META-INF/") &&
+                        (upperName.endsWith(".SF") || upperName.endsWith(".RSA") ||
+                         upperName.endsWith(".DSA") || upperName.endsWith(".EC") || upperName.endsWith(".SIG"))
+                if (entry.directory || signatureFile) {
+                    if (entry.directory) {
+                        target.putNextEntry(new JarEntry(entryName))
+                        target.closeEntry()
+                    }
+                    continue
+                }
+
+                byte[] content = source.getInputStream(entry).withCloseable { it.bytes }
+                if (entryName.endsWith(".class")) {
+                    ClassReader reader = new ClassReader(content)
+                    ClassWriter writer = new ClassWriter(0)
+                    ClassVisitor patcher = new ClassVisitor(Opcodes.ASM9, writer) {
+                        @Override
+                        MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                            MethodVisitor delegate = super.visitMethod(access, name, descriptor, signature, exceptions)
+                            return new MethodVisitor(Opcodes.ASM9, delegate) {
+                                @Override
+                                void visitMethodInsn(int opcode, String owner, String methodName, String methodDescriptor, boolean isInterface) {
+                                    String replacementName = null
+                                    String replacementDescriptor = null
+
+                                    if (isUnsupportedInputStreamMethod(owner, methodName, methodDescriptor) && opcode == Opcodes.INVOKEVIRTUAL) {
+                                        if (methodName == "readAllBytes" && methodDescriptor == "()[B") {
+                                            replacementName = "readAllBytes"
+                                            replacementDescriptor = "(Ljava/io/InputStream;)[B"
+                                        } else if (methodName == "readNBytes" && methodDescriptor == "(I)[B") {
+                                            replacementName = "readNBytes"
+                                            replacementDescriptor = "(Ljava/io/InputStream;I)[B"
+                                        } else if (methodName == "readNBytes" && methodDescriptor == "([BII)I") {
+                                            replacementName = "readNBytes"
+                                            replacementDescriptor = "(Ljava/io/InputStream;[BII)I"
+                                        } else if (methodName == "transferTo" && methodDescriptor == "(Ljava/io/OutputStream;)J") {
+                                            replacementName = "transferTo"
+                                            replacementDescriptor = "(Ljava/io/InputStream;Ljava/io/OutputStream;)J"
+                                        } else if (methodName == "skipNBytes" && methodDescriptor == "(J)V") {
+                                            replacementName = "skipNBytes"
+                                            replacementDescriptor = "(Ljava/io/InputStream;J)V"
+                                        }
+                                    } else if (owner == "java/io/InputStream" && opcode == Opcodes.INVOKESTATIC &&
+                                            methodName == "nullInputStream" && methodDescriptor == "()Ljava/io/InputStream;") {
+                                        replacementName = "nullInputStream"
+                                        replacementDescriptor = "()Ljava/io/InputStream;"
+                                    }
+
+                                    if (replacementName != null) {
+                                        rewrittenCalls[0]++
+                                        super.visitMethodInsn(Opcodes.INVOKESTATIC, helperOwner, replacementName,
+                                                replacementDescriptor, false)
+                                    } else {
+                                        super.visitMethodInsn(opcode, owner, methodName, methodDescriptor, isInterface)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    reader.accept(patcher, 0)
+                    content = writer.toByteArray()
+                }
+
+                JarEntry patchedEntry = new JarEntry(entryName)
+                if (entry.time >= 0) patchedEntry.time = entry.time
+                target.putNextEntry(patchedEntry)
+                target.write(content)
+                target.closeEntry()
+            }
+        } finally {
+            target.close()
+            source.close()
+        }
+
+        JarFile verificationJar = new JarFile(outputJar)
+        try {
+            Enumeration<JarEntry> entries = verificationJar.entries()
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement()
+                if (entry.directory || !entry.name.endsWith(".class")) continue
+                byte[] content = verificationJar.getInputStream(entry).withCloseable { it.bytes }
+                ClassReader reader = new ClassReader(content)
+                ClassVisitor verifier = new ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                        return new MethodVisitor(Opcodes.ASM9) {
+                            @Override
+                            void visitMethodInsn(int opcode, String owner, String methodName, String methodDescriptor, boolean isInterface) {
+                                if (isUnsupportedInputStreamMethod(owner, methodName, methodDescriptor) ||
+                                        (owner == "java/io/InputStream" && methodName == "nullInputStream" &&
+                                         methodDescriptor == "()Ljava/io/InputStream;")) {
+                                    remainingCalls[0]++
+                                }
+                            }
+                        }
+                    }
+                }
+                reader.accept(verifier, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES)
+            }
+        } finally {
+            verificationJar.close()
+        }
+
+        if (remainingCalls[0] != 0) {
+            outputJar.delete()
+            throw new GradleException("ECJ Android compatibility patch incomplete: ${remainingCalls[0]} newer-than-API-26 InputStream call(s) remain")
+        }
+        if (rewrittenCalls[0] == 0) {
+            outputJar.delete()
+            throw new GradleException("No unsupported InputStream calls were found in ECJ; verify the resolved ECJ artifact before packaging")
+        }
+
+        logger.lifecycle("Prepared Android-compatible ECJ: rewrote ${rewrittenCalls[0]} newer-than-API-26 InputStream call(s); verification passed")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareAndroidCompatibleEcj)
+}
+tasks.withType(JavaCompile).configureEach {
+    dependsOn(prepareAndroidCompatibleEcj)
+}
 
 android {
     compileSdk = 36
@@ -104,11 +284,16 @@ android {
     }
 }
 
-configurations.configureEach {
-    resolutionStrategy.force("org.eclipse.jdt:ecj:3.32.0")
+configurations.configureEach { configuration ->
+    configuration.resolutionStrategy.force("org.eclipse.jdt:ecj:3.32.0")
+    if (configuration.name != ecjOriginalConfiguration.name) {
+        configuration.exclude group: "org.eclipse.jdt", module: "ecj"
+    }
 }
 
 dependencies {
+    add(ecjOriginalConfiguration.name, libs.ecj)
+    implementation files(patchedEcjFile).builtBy(prepareAndroidCompatibleEcj)
     implementation fileTree(dir: "libs", include: ["*.jar", "*.aar"])
 
     implementation libs.bundles.ui
@@ -135,7 +320,6 @@ dependencies {
 
     implementation libs.bundles.networking
 
-    implementation libs.ecj
     implementation libs.stax.api
 
     implementation libs.bundles.kotlin.compiler

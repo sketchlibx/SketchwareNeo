@@ -91,6 +91,7 @@ import mod.pranav.viewbinding.ViewBindingBuilder;
 import pro.sketchware.SketchApplication;
 import pro.sketchware.util.library.BuiltInLibraryManager;
 import pro.sketchware.utility.FilePathUtil;
+import pro.sketchware.compiler.EclipseCompilerBridge;
 import mod.hey.studios.activity.managers.cpp.CppExporter;
 import mod.hey.studios.activity.managers.cpp.NativeCompiler;
 import pro.sketchware.utility.FileUtil;
@@ -666,17 +667,16 @@ public class ProjectBuilder {
                 LogUtil.w(TAG, "Failed to delete file " + rJavaFileWithoutPackage.getAbsolutePath());
             }
 
-            org.eclipse.jdt.internal.compiler.batch.Main main = new org.eclipse.jdt.internal.compiler.batch.Main(outWriter, errWriter, false, null, null);
             LogUtil.d(TAG, "Running Eclipse compiler with these arguments: " + args);
 
-            boolean compileSucceeded;
+            EclipseCompilerBridge.CompilationResult compilationResult;
             try {
-                compileSucceeded = main.compile(args.toArray(new String[0]));
+                compilationResult = EclipseCompilerBridge.compile(args.toArray(new String[0]), outWriter, errWriter);
             } catch (LinkageError hostRuntimeMismatch) {
                 String diagnostic = "Java compiler crashed with a LinkageError (" + hostRuntimeMismatch.getMessage()
-                        + "). The loaded ECJ compiler called an API that is not available on this Android runtime. "
-                        + "Keep org.eclipse.jdt:ecj pinned to 3.32.0 in gradle/libs.versions.toml "
-                        + "and verify that no dependency overrides this version.";
+                        + "). The running Android API is " + Build.VERSION.SDK_INT
+                        + ". Rebuild the app and confirm prepareAndroidCompatibleEcj completed successfully "
+                        + "so the installed compiler uses the verified Android-compatible ECJ artifact.";
                 LogUtil.e(TAG, diagnostic, hostRuntimeMismatch);
                 broadcastBuildOutput(diagnostic);
                 throw new zy(diagnostic);
@@ -684,7 +684,7 @@ public class ProjectBuilder {
 
             LogUtil.d(TAG, "System.out of Eclipse compiler: " + outOutputStream.getOut());
 
-            if (compileSucceeded && main.globalErrorsCount <= 0) {
+            if (compilationResult.succeeded && compilationResult.errorCount <= 0) {
                 if (!directoryContainsAnyFile(new File(yq.compiledClassesPath), ".class")) {
                     String diagnostic = "Java compiler reported success (0 errors) but produced NO .class files.\n"
                             + "This usually means ECJ rejected the -source/-target arguments for Java version '"
@@ -701,7 +701,7 @@ public class ProjectBuilder {
                 LogUtil.d(TAG, "Compiling Java files took " + (System.currentTimeMillis() - savedTimeMillis) + " ms");
             } else {
                 String errorOutput = errOutputStream.getOut();
-                if (!compileSucceeded) {
+                if (!compilationResult.succeeded) {
                     errorOutput = "Eclipse compiler reported a configuration failure (invalid arguments, "
                             + "unsupported -source/-target '" + javaVer + "', or similar) before any file was "
                             + "compiled.\n\n" + errorOutput;
