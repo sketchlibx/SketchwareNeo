@@ -145,8 +145,12 @@ public final class CodeEditorColorSchemes {
     }
 
     public static EditorColorScheme loadTextMateColorScheme(String fallbackTheme) {
+        return loadTextMateColorScheme(SketchApplication.getContext(), fallbackTheme);
+    }
+
+    public static EditorColorScheme loadTextMateColorScheme(Context context, String fallbackTheme) {
+        if (context == null) context = SketchApplication.getContext();
         try {
-            Context context = SketchApplication.getContext();
             String json = createTextMateTheme(context);
             String themeId = "sketchneo_" + Integer.toHexString(json.hashCode());
             synchronized (LOADED_THEMES) {
@@ -167,15 +171,15 @@ public final class CodeEditorColorSchemes {
             try {
                 String fallback = fallbackTheme;
                 if (fallback == null || fallback.trim().isEmpty()) {
-                    fallback = isDarkAppearance(SketchApplication.getContext()) ? THEME_DRACULA : THEME_GITHUB;
+                    fallback = isDarkAppearance(context) ? THEME_DRACULA : THEME_GITHUB;
                 }
                 ThemeRegistry.getInstance().setTheme(fallback);
                 TextMateColorScheme scheme = TextMateColorScheme.create(ThemeRegistry.getInstance());
-                applyTextMateViewColors(SketchApplication.getContext(), scheme);
+                applyTextMateViewColors(context, scheme);
                 return scheme;
             } catch (Exception ignored) {
                 EditorColorScheme scheme = new EditorColorScheme();
-                applyNativeColorProfile(SketchApplication.getContext(), scheme);
+                applyNativeColorProfile(context, scheme);
                 return scheme;
             }
         }

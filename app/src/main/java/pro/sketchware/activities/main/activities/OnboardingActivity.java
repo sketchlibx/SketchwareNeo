@@ -13,7 +13,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
 
@@ -24,7 +24,7 @@ import mod.sketchlibx.project.backup.CloudBackupManagerActivity;
 import pro.sketchware.R;
 import pro.sketchware.utility.ThemeUtils;
 
-public class OnboardingActivity extends AppCompatActivity {
+public class OnboardingActivity extends PaletteAwareAppCompatActivity {
     private static final String PREFS_NAME = "onboarding";
     private static final String KEY_COMPLETED = "completed";
 

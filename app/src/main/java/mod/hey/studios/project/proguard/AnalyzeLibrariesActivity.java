@@ -3,7 +3,7 @@ package mod.hey.studios.project.proguard;
 import android.os.Bundle;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -20,7 +20,7 @@ import mod.agus.jcoderz.editor.manage.library.locallibrary.ManageLocalLibrary;
 import pro.sketchware.utility.FilePathUtil;
 import pro.sketchware.utility.FileUtil;
 
-public class AnalyzeLibrariesActivity extends AppCompatActivity {
+public class AnalyzeLibrariesActivity extends PaletteAwareAppCompatActivity {
 
     public static class LibraryInfo {
         public String name;

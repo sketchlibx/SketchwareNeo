@@ -46,7 +46,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
-import android.view.WindowManager;
+import android.view.ViewParent;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.widget.CheckBox;
@@ -60,6 +60,7 @@ import android.widget.PopupMenu;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -69,8 +70,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
-import androidx.core.graphics.ColorUtils;
-import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -99,7 +98,13 @@ import com.besome.sketch.lib.ui.ColorPickerDialog;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.bottomsheet.BottomSheetDragHandleView;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.flexbox.AlignItems;
+import com.google.android.flexbox.FlexDirection;
+import com.google.android.flexbox.FlexWrap;
+import com.google.android.flexbox.FlexboxLayout;
+import com.google.android.flexbox.JustifyContent;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -167,7 +172,6 @@ import a.a.a.FB;
 import a.a.a.Fx;
 import a.a.a.GB;
 import a.a.a.Gx;
-import a.a.a.MA;
 import a.a.a.Mp;
 import a.a.a.NB;
 import a.a.a.Ox;
@@ -222,8 +226,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     private int minDist, S, x, y;
     private int T = -30;
     private View currentTouchedView;
-    private Ss touchedBlockInput;
-    private boolean touchStartedOnInput;
     private boolean G, isDragged, W, X, da, ea, ha, ia;
     private ArrayList<BlockBean> savedBlockBean = new ArrayList<>();
     private final Runnable longPressed = this::r;
@@ -239,6 +241,10 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     private View editorStatusProblemChip;
     private FrameLayout editorNotesOverlay;
     private boolean editorBlocksReady;
+    private boolean editorBlocksLoadFailed;
+    private boolean exitRequestedWhileLoading;
+    private boolean exitSavePending;
+    private ExecutorService eventSaveExecutor;
     private int loadedEventBlockCount;
     private ArrayList<BlockBean> loadedEventBlockBeans = new ArrayList<>();
     private final HashMap<String, NoteBadgeView> blockNoteBadges = new HashMap<>();
@@ -282,6 +288,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             loadedEventBlockCount = 0;
             h();
             updateEditorStatus();
+            continuePendingExit();
             return;
         }
         loadedEventBlockCount = 0;
@@ -297,6 +304,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             h();
             updateEditorStatus();
             updateBlockNotePositions();
+            continuePendingExit();
             return;
         }
 
@@ -417,6 +425,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 h();
                 updateEditorStatus();
                 updateBlockNotePositions();
+                continuePendingExit();
             }
         });
     }
@@ -649,14 +658,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         });
         dialog.setNegativeButton(R.string.common_word_cancel, null);
         dialog.show();
-    }
-
-    public void L() {
-        try {
-            new Handler().postDelayed(() -> new ProjectSaver(this).execute(), 500L);
-        } catch (Exception e) {
-            crashlytics.recordException(e);
-        }
     }
 
     private void undo() {
@@ -1839,6 +1840,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     @Override
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (eventSaveExecutor != null) eventSaveExecutor.shutdown();
         clearInputHighlightAnimations();
         if (blockMorePopup != null && blockMorePopup.isShowing()) blockMorePopup.dismiss();
         blockMorePopup = null;
@@ -2099,6 +2101,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
     @Override
     public void onBackPressed() {
+        if (exitSavePending) return;
         if (ia) {
             g(false);
             return;
@@ -2107,11 +2110,12 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             e(false);
             return;
         }
-        k();
-        if (!p()) {
+        if (!editorBlocksReady) {
+            exitRequestedWhileLoading = true;
             return;
         }
-        L();
+        if (!p()) return;
+        persistAndExit();
     }
 
     @Override
@@ -2290,7 +2294,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         container.setOrientation(LinearLayout.HORIZONTAL);
         container.setClickable(true);
         container.setFocusable(true);
-        container.setBackgroundColor(Color.TRANSPARENT);
+        container.setBackgroundResource(android.R.color.transparent);
 
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
@@ -2331,48 +2335,72 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         toolbar.addView(container, params);
     }
 
+    private static final class EventPickerItem {
+        final ProjectFileBean projectFile;
+        final EventBean event;
+
+        EventPickerItem(ProjectFileBean projectFile, EventBean event) {
+            this.projectFile = projectFile;
+            this.event = event;
+        }
+
+        String screenName() {
+            if (projectFile == null) return "Unknown screen";
+            String name = projectFile.getActivityName();
+            return name == null || name.isEmpty() ? projectFile.fileName : name;
+        }
+
+        String displayName() {
+            if (event != null && event.eventType == EventBean.EVENT_TYPE_ACTIVITY
+                    && "onCreate".equals(event.targetId) && "initializeLogic".equals(event.eventName)) {
+                return "onCreate";
+            }
+            return event == null || TextUtils.isEmpty(event.eventName) ? "Unnamed event" : event.eventName;
+        }
+    }
+
+    private static final class EventPickerRow {
+        final String title;
+        final String subtitle;
+        final EventPickerItem item;
+
+        EventPickerRow(String title, String subtitle, EventPickerItem item) {
+            this.title = title;
+            this.subtitle = subtitle;
+            this.item = item;
+        }
+
+        boolean isHeader() { return item == null; }
+    }
+
     private void showEventPicker() {
-        ArrayList<EventBean> allEvents;
+        ArrayList<EventPickerItem> currentScreenEvents = new ArrayList<>();
         try {
-            ArrayList<EventBean> storedEvents = jC.a(scId).g(M.getJavaName());
-            allEvents = storedEvents == null ? new ArrayList<>() : new ArrayList<>(storedEvents);
+            ArrayList<EventBean> events = jC.a(scId).g(M.getJavaName());
+            if (events != null) {
+                for (EventBean event : events) {
+                    if (event != null) currentScreenEvents.add(new EventPickerItem(M, event));
+                }
+            }
+            addInitializeLogicEvent(currentScreenEvents, M);
         } catch (RuntimeException error) {
             crashlytics.recordException(error);
             SketchwareUtil.toastError("Could not load events");
             return;
         }
-        boolean hasInitializeLogic = false;
-        for (EventBean event : allEvents) {
-            if (event != null && TextUtils.equals("onCreate", event.targetId)
-                    && TextUtils.equals("initializeLogic", event.eventName)) {
-                hasInitializeLogic = true;
-                break;
-            }
-        }
-        if (!hasInitializeLogic) {
-            EventBean initializeLogic = new EventBean(EventBean.EVENT_TYPE_ACTIVITY, -1,
-                    "onCreate", "initializeLogic");
-            initializeLogic.initValue();
-            allEvents.add(0, initializeLogic);
-        }
-        if (allEvents.isEmpty()) {
-            SketchwareUtil.toast("No events are available in this file");
-            return;
-        }
-
-        int maxSheetHeight = Math.round(getResources().getDisplayMetrics().heightPixels * 0.86f);
-        int maxEventListHeight = Math.round(getResources().getDisplayMetrics().heightPixels * 0.56f);
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_switch_event, null, false);
         RecyclerView list = sheet.findViewById(R.id.event_list);
         TextInputEditText search = sheet.findViewById(R.id.event_search_input);
         View empty = sheet.findViewById(R.id.event_empty_state);
         Chip currentChip = sheet.findViewById(R.id.current_event_chip);
-        String currentEventLabel = TextUtils.equals(id, "onCreate")
-                && TextUtils.equals(eventName, "initializeLogic") ? "onCreate"
-                : (eventName == null ? "Event" : eventName);
-        currentChip.setText("CURRENT  ·  " + currentEventLabel);
+        MaterialButton searchAllScreens = sheet.findViewById(R.id.btn_search_all_screens);
+        TextView resultsLabel = sheet.findViewById(R.id.event_results_label);
+        String currentDisplayName = "onCreate".equals(id) && "initializeLogic".equals(eventName)
+                ? "onCreate" : (eventName == null ? "Event" : eventName);
+        currentChip.setText("CURRENT  ·  " + currentDisplayName);
         list.setLayoutManager(new LinearLayoutManager(this));
+        list.setHasFixedSize(false);
         list.setNestedScrollingEnabled(true);
         DefaultItemAnimator listAnimator = new DefaultItemAnimator();
         listAnimator.setAddDuration(140);
@@ -2381,34 +2409,57 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         listAnimator.setChangeDuration(0);
         list.setItemAnimator(listAnimator);
 
-        ArrayList<EventBean> filtered = new ArrayList<>(allEvents);
+        ArrayList<EventPickerItem> filtered = new ArrayList<>(currentScreenEvents);
+        ArrayList<EventPickerItem> allScreenEvents = new ArrayList<>();
+        ArrayList<EventPickerRow> rows = new ArrayList<>();
+        boolean[] searchingAllScreens = {false};
+        boolean[] allScreenEventsLoaded = {false};
         RecyclerView.Adapter<RecyclerView.ViewHolder> adapter = new RecyclerView.Adapter<>() {
+            private static final int TYPE_HEADER = 0;
+            private static final int TYPE_EVENT = 1;
+
+            @Override
+            public int getItemViewType(int position) {
+                return rows.get(position).isHeader() ? TYPE_HEADER : TYPE_EVENT;
+            }
+
             @NonNull
             @Override
             public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                return new RecyclerView.ViewHolder(getLayoutInflater().inflate(R.layout.item_switch_event, parent, false)) { };
+                if (viewType == TYPE_HEADER) {
+                    return new RecyclerView.ViewHolder(getLayoutInflater().inflate(
+                            R.layout.item_switch_event_header, parent, false)) { };
+                }
+                return new RecyclerView.ViewHolder(getLayoutInflater().inflate(
+                        R.layout.item_switch_event, parent, false)) { };
             }
 
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-                EventBean event = filtered.get(position);
+                EventPickerRow row = rows.get(position);
+                if (row.isHeader()) {
+                    TextView title = holder.itemView.findViewById(R.id.event_group_title);
+                    TextView subtitle = holder.itemView.findViewById(R.id.event_group_subtitle);
+                    title.setText(row.title);
+                    subtitle.setText(row.subtitle);
+                    holder.itemView.setOnClickListener(null);
+                    return;
+                }
+                EventPickerItem pickerItem = row.item;
+                EventBean event = pickerItem.event;
                 TextView name = holder.itemView.findViewById(R.id.event_name);
                 TextView subtitle = holder.itemView.findViewById(R.id.event_subtitle);
                 ImageView icon = holder.itemView.findViewById(R.id.event_icon);
                 ImageView selected = holder.itemView.findViewById(R.id.event_selected);
                 ImageView arrow = holder.itemView.findViewById(R.id.event_arrow);
                 MaterialCardView eventCard = holder.itemView.findViewById(R.id.event_card);
+                String eventTitle = pickerItem.displayName();
                 String target = event.targetId == null ? "" : event.targetId;
-                boolean isInitializeLogic = TextUtils.equals("onCreate", target)
-                        && TextUtils.equals("initializeLogic", event.eventName);
-                String eventTitle = isInitializeLogic ? "onCreate"
-                        : (event.eventName == null ? "Unnamed event" : event.eventName);
-                boolean isCurrent = TextUtils.equals(event.eventName, eventName)
-                        && TextUtils.equals(target, id);
+                boolean isCurrent = pickerItem.projectFile != null
+                        && TextUtils.equals(pickerItem.projectFile.getJavaName(), M.getJavaName())
+                        && TextUtils.equals(event.eventName, eventName) && TextUtils.equals(target, id);
                 name.setText(eventTitle);
-                String targetLabel = event.eventType == EventBean.EVENT_TYPE_ACTIVITY
-                        || target.isEmpty() ? M.getActivityName() : target;
-                subtitle.setText(targetLabel + "  ·  " + EventBean.getEventTypeName(event.eventType));
+                subtitle.setText(EventBean.getEventTypeName(event.eventType));
                 icon.setImageResource(EventBean.getEventIconResource(event.eventType, event.targetType));
                 selected.setVisibility(isCurrent ? View.VISIBLE : View.GONE);
                 arrow.setVisibility(isCurrent ? View.GONE : View.VISIBLE);
@@ -2421,90 +2472,175 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 }
                 icon.setColorFilter(ThemeUtils.getColor(LogicEditorActivity.this,
                         isCurrent ? R.attr.colorOnSecondaryContainer : R.attr.colorPrimary));
-                holder.itemView.setAlpha(isCurrent ? 1f : 0.96f);
                 holder.itemView.setOnClickListener(v -> {
-                    v.animate().scaleX(0.985f).scaleY(0.985f).alpha(0.88f).setDuration(70)
-                            .withEndAction(() -> v.animate().scaleX(1f).scaleY(1f).alpha(1f)
-                                    .setDuration(110).withEndAction(() -> {
-                                        dialog.dismiss();
-                                        if (!isCurrent) switchToEvent(event);
-                                    }).start()).start();
+                    dialog.dismiss();
+                    if (!isCurrent) switchToEvent(pickerItem);
                 });
             }
 
             @Override
-            public int getItemCount() { return filtered.size(); }
+            public int getItemCount() { return rows.size(); }
         };
         list.setAdapter(adapter);
-        updateEventSheetEmptyState(list, empty, filtered.size(), maxEventListHeight);
+
+        Runnable applyFilter = () -> {
+            String query = search.getText() == null ? "" : search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            if (query.isEmpty()) searchingAllScreens[0] = false;
+            ArrayList<EventPickerItem> source = currentScreenEvents;
+            if (searchingAllScreens[0]) {
+                if (!allScreenEventsLoaded[0]) {
+                    loadAllScreenEvents(allScreenEvents);
+                    allScreenEventsLoaded[0] = true;
+                }
+                source = allScreenEvents;
+            }
+            filtered.clear();
+            for (EventPickerItem pickerItem : source) {
+                EventBean event = pickerItem.event;
+                String title = pickerItem.displayName();
+                String rawTitle = event.eventName == null ? "" : event.eventName;
+                String target = event.targetId == null ? "" : event.targetId;
+                String type = EventBean.getEventTypeName(event.eventType);
+                String screen = pickerItem.screenName();
+                if (query.isEmpty() || title.toLowerCase(Locale.ROOT).contains(query)
+                        || rawTitle.toLowerCase(Locale.ROOT).contains(query)
+                        || target.toLowerCase(Locale.ROOT).contains(query)
+                        || type.toLowerCase(Locale.ROOT).contains(query)
+                        || (searchingAllScreens[0] && screen.toLowerCase(Locale.ROOT).contains(query))) {
+                    filtered.add(pickerItem);
+                }
+            }
+            rebuildEventPickerRows(filtered, rows, searchingAllScreens[0]);
+            if (searchAllScreens != null) {
+                searchAllScreens.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                searchAllScreens.setText(searchingAllScreens[0] ? "Search this screen only" : "Search all screens");
+            }
+            if (resultsLabel != null) {
+                resultsLabel.setText((searchingAllScreens[0] ? "ALL SCREENS" : "THIS SCREEN")
+                        + "  ·  " + filtered.size() + " EVENTS");
+            }
+            adapter.notifyDataSetChanged();
+            updateEventSheetEmptyState(list, empty, filtered.isEmpty());
+        };
+
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                String query = s == null ? "" : s.toString().trim().toLowerCase(Locale.ROOT);
-                filtered.clear();
-                for (EventBean event : allEvents) {
-                    String title = event.eventName == null ? "" : event.eventName;
-                    String displayTitle = TextUtils.equals("onCreate", event.targetId)
-                            && TextUtils.equals("initializeLogic", event.eventName) ? "onCreate" : title;
-                    String target = event.targetId == null ? "" : event.targetId;
-                    String type = EventBean.getEventTypeName(event.eventType);
-                    if (title.toLowerCase(Locale.ROOT).contains(query)
-                            || displayTitle.toLowerCase(Locale.ROOT).contains(query)
-                            || target.toLowerCase(Locale.ROOT).contains(query)
-                            || type.toLowerCase(Locale.ROOT).contains(query)) filtered.add(event);
-                }
-                adapter.notifyDataSetChanged();
-                updateEventSheetEmptyState(list, empty, filtered.size(), maxEventListHeight);
-            }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { applyFilter.run(); }
             @Override public void afterTextChanged(Editable s) { }
         });
+        searchAllScreens.setOnClickListener(v -> {
+            if (search.getText() == null || search.getText().toString().trim().isEmpty()) return;
+            searchingAllScreens[0] = !searchingAllScreens[0];
+            applyFilter.run();
+        });
+        applyFilter.run();
 
         dialog.setContentView(sheet);
         dialog.setOnShowListener(ignored -> {
+            int maxHeight = Math.round(getResources().getDisplayMetrics().heightPixels * 0.84f);
+            dialog.getBehavior().setMaxHeight(maxHeight);
+            dialog.getBehavior().setFitToContents(true);
+            dialog.getBehavior().setSkipCollapsed(true);
+            dialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
             if (dialog.getWindow() != null) {
                 dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT);
-                dialog.getWindow().setSoftInputMode(
-                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             }
-            BottomSheetBehavior<?> behavior = dialog.getBehavior();
-            behavior.setMaxHeight(maxSheetHeight);
-            behavior.setFitToContents(true);
-            behavior.setSkipCollapsed(true);
-            behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
         });
         dialog.show();
     }
 
-    private void updateEventSheetEmptyState(RecyclerView list, View empty, int itemCount,
-                                            int maxListHeight) {
-        if (list == null || empty == null) return;
-        boolean isEmpty = itemCount == 0;
-        list.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
-        empty.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
-        ViewGroup.LayoutParams listParams = list.getLayoutParams();
-        if (listParams != null) {
-            int rowHeight = SketchwareUtil.dpToPx(62);
-            listParams.height = isEmpty ? 0 : Math.min(maxListHeight, itemCount * rowHeight);
-            list.setLayoutParams(listParams);
+    private void rebuildEventPickerRows(ArrayList<EventPickerItem> filtered,
+                                        ArrayList<EventPickerRow> rows, boolean allScreens) {
+        rows.clear();
+        LinkedHashMap<String, ArrayList<EventPickerItem>> grouped = new LinkedHashMap<>();
+        for (EventPickerItem item : filtered) {
+            if (item == null || item.event == null) continue;
+            EventBean event = item.event;
+            String screen = item.screenName();
+            boolean activityEvent = event.eventType == EventBean.EVENT_TYPE_ACTIVITY;
+            String target = TextUtils.isEmpty(event.targetId) ? screen : event.targetId;
+            String groupKey = (allScreens ? screen + "|" : "")
+                    + (activityEvent ? "activity" : event.eventType + "|" + target);
+            grouped.computeIfAbsent(groupKey, key -> new ArrayList<>()).add(item);
         }
-        ViewGroup.LayoutParams emptyParams = empty.getLayoutParams();
-        if (emptyParams != null) {
-            emptyParams.height = isEmpty ? SketchwareUtil.dpToPx(116) : 0;
-            empty.setLayoutParams(emptyParams);
+        for (ArrayList<EventPickerItem> group : grouped.values()) {
+            if (group.isEmpty()) continue;
+            EventPickerItem first = group.get(0);
+            EventBean event = first.event;
+            boolean activityEvent = event.eventType == EventBean.EVENT_TYPE_ACTIVITY;
+            String title = activityEvent ? first.screenName()
+                    : (TextUtils.isEmpty(event.targetId) ? first.screenName() : event.targetId);
+            if (allScreens && !activityEvent) title = first.screenName() + "  ·  " + title;
+            String subtitle = group.size() + (group.size() == 1 ? " event" : " events");
+            rows.add(new EventPickerRow(title, subtitle, null));
+            for (EventPickerItem item : group) {
+                rows.add(new EventPickerRow(null, null, item));
+            }
         }
     }
 
-    private void switchToEvent(EventBean event) {
-        if (event == null || (TextUtils.equals(id, event.targetId)
-                && TextUtils.equals(eventName, event.eventName))) return;
+    private void addInitializeLogicEvent(ArrayList<EventPickerItem> output, ProjectFileBean screen) {
+        if (output == null || screen == null) return;
+        for (EventPickerItem item : output) {
+            if (item == null || item.event == null) continue;
+            EventBean event = item.event;
+            if (TextUtils.equals(screen.getJavaName(), item.projectFile == null ? null : item.projectFile.getJavaName())
+                    && event.eventType == EventBean.EVENT_TYPE_ACTIVITY
+                    && "onCreate".equals(event.targetId) && "initializeLogic".equals(event.eventName)) {
+                return;
+            }
+        }
+        output.add(new EventPickerItem(screen,
+                new EventBean(EventBean.EVENT_TYPE_ACTIVITY, -1, "onCreate", "initializeLogic")));
+    }
+
+    private void loadAllScreenEvents(ArrayList<EventPickerItem> output) {
+        if (output == null || !output.isEmpty()) return;
+        Set<String> seenScreens = new HashSet<>();
+        try {
+            ArrayList<ProjectFileBean> screens = new ArrayList<>();
+            ArrayList<ProjectFileBean> mainScreens = jC.b(scId).b();
+            ArrayList<ProjectFileBean> extraScreens = jC.b(scId).c();
+            if (mainScreens != null) screens.addAll(mainScreens);
+            if (extraScreens != null) screens.addAll(extraScreens);
+            for (ProjectFileBean screen : screens) {
+                if (screen == null || TextUtils.isEmpty(screen.getJavaName())) continue;
+                String javaName = screen.getJavaName();
+                if (!seenScreens.add(javaName)) continue;
+                ArrayList<EventBean> events = jC.a(scId).g(javaName);
+                if (events != null) {
+                    for (EventBean event : events) {
+                        if (event != null) output.add(new EventPickerItem(screen, event));
+                    }
+                }
+                addInitializeLogicEvent(output, screen);
+            }
+        } catch (RuntimeException error) {
+            crashlytics.recordException(error);
+            SketchwareUtil.toastError("Could not search events across screens");
+        }
+    }
+
+    private void updateEventSheetEmptyState(RecyclerView list, View empty, boolean isEmpty) {
+        if (list == null || empty == null) return;
+        list.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+        empty.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+    }
+
+    private void switchToEvent(EventPickerItem pickerItem) {
+        if (pickerItem == null || pickerItem.event == null || pickerItem.projectFile == null) return;
+        EventBean event = pickerItem.event;
+        boolean sameScreen = TextUtils.equals(pickerItem.projectFile.getJavaName(), M.getJavaName());
+        if (sameScreen && TextUtils.equals(id, event.targetId)
+                && TextUtils.equals(eventName, event.eventName)) return;
         E();
         jC.a(scId).k();
         Intent intent = new Intent(this, LogicEditorActivity.class);
         intent.putExtra("sc_id", scId);
         intent.putExtra("id", event.targetId);
         intent.putExtra("event", event.eventName);
-        intent.putExtra("project_file", M);
+        intent.putExtra("project_file", pickerItem.projectFile);
         intent.putExtra("event_text", event.targetId);
         startActivity(intent);
         finish();
@@ -2748,21 +2884,10 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         updateBlockNotePositions();
     }
 
-    private BlockBean cloneBlockBean(BlockBean bean) {
-        if (bean.parameters != null) return bean.clone();
-        BlockBean cloned = new BlockBean(bean.id, bean.spec, bean.type, bean.typeName, bean.opCode);
-        cloned.color = bean.color;
-        cloned.parameters = new ArrayList<>();
-        cloned.subStack1 = bean.subStack1;
-        cloned.subStack2 = bean.subStack2;
-        cloned.nextBlock = bean.nextBlock;
-        return cloned;
-    }
-
     private ArrayList<BlockBean> cloneBlockBeans(ArrayList<BlockBean> blocks) {
         ArrayList<BlockBean> copy = new ArrayList<>();
         if (blocks == null) return copy;
-        for (BlockBean bean : blocks) if (bean != null) copy.add(cloneBlockBean(bean));
+        for (BlockBean bean : blocks) if (bean != null) copy.add(bean.clone());
         return copy;
     }
 
@@ -2874,60 +2999,36 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         ? R.attr.colorPrimary : R.attr.colorOnSurfaceVariant));
             }
             if (editorStatusCard instanceof MaterialCardView card) {
-                card.setCardBackgroundColor(ColorUtils.setAlphaComponent(
-                        ThemeUtils.getColor(this, R.attr.colorSurfaceContainer), 228));
-                card.setStrokeColor(ColorUtils.setAlphaComponent(
-                        ThemeUtils.getColor(this, R.attr.colorOutlineVariant), 112));
+                card.setCardBackgroundColor(ThemeUtils.getColor(this, R.attr.colorSurfaceContainer));
+                card.setStrokeColor(ThemeUtils.getColor(this, R.attr.colorOutlineVariant));
                 card.setStrokeWidth(SketchwareUtil.dpToPx(1));
             }
             if (editorStatusCard != null) {
                 editorStatusCard.setVisibility(View.VISIBLE);
                 editorStatusCard.setContentDescription(blocks + (blocks == 1 ? " block. " : " blocks. ")
-                        + (editorChanged ? "Changed. " : "No changes. ")
-                        + problems + (problems == 1 ? " problem." : " problems."));
+                        + (editorChanged ? "Changed." : "No changes."));
                 editorStatusCard.setAlpha(1f);
             }
 
             if (editorStatusProblemChip != null) {
                 int previousVisibility = editorStatusProblemChip.getVisibility();
-                boolean hasProblems = problems > 0;
-                int chipBackgroundColor = ThemeUtils.getColor(this, hasProblems
-                        ? R.attr.colorErrorContainer : R.attr.colorSurfaceContainerHigh);
-                int chipOutlineColor = ThemeUtils.getColor(this, hasProblems
-                        ? R.attr.colorError : R.attr.colorOutlineVariant);
-                int chipForegroundColor = ThemeUtils.getColor(this, hasProblems
-                        ? R.attr.colorError : R.attr.colorOnSurfaceVariant);
-                GradientDrawable problemBackground = makeRoundedBackground(
-                        ColorUtils.setAlphaComponent(chipBackgroundColor, hasProblems ? 226 : 176),
-                        SketchwareUtil.dpToPx(14));
-                problemBackground.setStroke(SketchwareUtil.dpToPx(1),
-                        ColorUtils.setAlphaComponent(chipOutlineColor, hasProblems ? 92 : 82));
-                editorStatusProblemChip.setBackground(problemBackground);
-                editorStatusProblemChip.setVisibility(View.VISIBLE);
-                editorStatusProblemChip.setClickable(hasProblems);
-                editorStatusProblemChip.setFocusable(hasProblems);
-                editorStatusProblemChip.setContentDescription(hasProblems
-                        ? problems + " empty inputs. Tap to highlight them."
-                        : "No empty inputs.");
-                if (editorStatusProblemText != null) {
-                    editorStatusProblemText.setText(problems + (problems == 1 ? " problem" : " problems"));
-                    editorStatusProblemText.setTextColor(chipForegroundColor);
-                }
-                ImageView problemIcon = editorStatusProblemChip.findViewById(R.id.editor_status_problem_icon);
-                if (problemIcon != null) {
-                    problemIcon.setImageResource(hasProblems
-                            ? R.drawable.ic_mtrl_warning : R.drawable.ic_mtrl_check);
-                    problemIcon.setColorFilter(ThemeUtils.getColor(this,
-                            hasProblems ? R.attr.colorError : R.attr.colorPrimary));
-                }
-                if (hasProblems && previousVisibility != View.VISIBLE) {
-                    editorStatusProblemChip.setScaleX(0.92f);
-                    editorStatusProblemChip.setScaleY(0.92f);
-                    editorStatusProblemChip.setAlpha(0f);
-                    editorStatusProblemChip.animate().scaleX(1f).scaleY(1f).alpha(1f)
-                            .setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+                if (problems > 0) {
+                    editorStatusProblemChip.setVisibility(View.VISIBLE);
+                    editorStatusProblemChip.setContentDescription(problems + " empty inputs. Tap to blink all problems in red.");
+                    if (editorStatusProblemText != null) {
+                        editorStatusProblemText.setText(problems + (problems == 1 ? " problem" : " problems"));
+                        editorStatusProblemText.setTextColor(ThemeUtils.getColor(this, R.attr.colorError));
+                    }
+                    if (previousVisibility != View.VISIBLE) {
+                        editorStatusProblemChip.setScaleX(0.92f);
+                        editorStatusProblemChip.setScaleY(0.92f);
+                        editorStatusProblemChip.setAlpha(0f);
+                        editorStatusProblemChip.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                                .setDuration(160).setInterpolator(new DecelerateInterpolator()).start();
+                    }
                 } else {
                     editorStatusProblemChip.animate().cancel();
+                    editorStatusProblemChip.setVisibility(View.GONE);
                     editorStatusProblemChip.setScaleX(1f);
                     editorStatusProblemChip.setScaleY(1f);
                     editorStatusProblemChip.setAlpha(1f);
@@ -2961,22 +3062,74 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         if (firstInput != null) scrollEditorToView(firstInput);
     }
 
-    private Ss findBlockInputAtScreenPosition(Rs block, float screenX, float screenY) {
-        if (block == null || block.V == null) return null;
+    private View findBlockInputSlotAt(Rs block, float x, float y) {
+        if (block == null || block.V == null || block.getWidth() <= 0 || block.getHeight() <= 0) return null;
+        int[] blockLocation = new int[2];
+        block.getLocationOnScreen(blockLocation);
+        float screenX = blockLocation[0] + x;
+        float screenY = blockLocation[1] + y;
         for (int i = block.V.size() - 1; i >= 0; i--) {
             View slot = block.V.get(i);
-            if (!(slot instanceof Ss input) || slot.getVisibility() != View.VISIBLE
-                    || slot.getWidth() <= 0 || slot.getHeight() <= 0 || !slot.isShown()) {
-                continue;
-            }
-            int[] location = new int[2];
-            slot.getLocationOnScreen(location);
-            if (screenX >= location[0] && screenX < location[0] + slot.getWidth()
-                    && screenY >= location[1] && screenY < location[1] + slot.getHeight()) {
-                return input;
-            }
+            if (slot == null || slot.getWidth() <= 0 || slot.getHeight() <= 0) continue;
+            int[] slotLocation = new int[2];
+            slot.getLocationOnScreen(slotLocation);
+            if (screenX >= slotLocation[0] && screenX <= slotLocation[0] + slot.getWidth()
+                    && screenY >= slotLocation[1] && screenY <= slotLocation[1] + slot.getHeight()) return slot;
         }
         return null;
+    }
+
+    private boolean isTouchOnBlockInput(Rs block, float x, float y) {
+        return findBlockInputSlotAt(block, x, y) != null;
+    }
+
+    private View findDeepestInputTarget(View view, float x, float y) {
+        if (view == null) return null;
+        if (view instanceof ViewGroup group) {
+            for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                View child = group.getChildAt(i);
+                if (child == null) continue;
+                float childX = x - child.getLeft();
+                float childY = y - child.getTop();
+                if (childX >= 0 && childX <= child.getWidth()
+                        && childY >= 0 && childY <= child.getHeight()) {
+                    View nested = findDeepestInputTarget(child, childX, childY);
+                    if (nested != null) return nested;
+                }
+            }
+        }
+        return view;
+    }
+
+    private void handleBlockInputTap(Rs block, float x, float y) {
+        View slot = findBlockInputSlotAt(block, x, y);
+        if (slot == null) return;
+        int[] blockLocation = new int[2];
+        int[] slotLocation = new int[2];
+        block.getLocationOnScreen(blockLocation);
+        slot.getLocationOnScreen(slotLocation);
+        float localX = blockLocation[0] + x - slotLocation[0];
+        float localY = blockLocation[1] + y - slotLocation[1];
+        View target = findDeepestInputTarget(slot, localX, localY);
+        // Prefer the nearest Sketchware input component so variable/view/resource
+        // selectors are opened instead of the block action toolbar.
+        for (View candidate = target; candidate != null && candidate != block; ) {
+            if (candidate instanceof Ss input) {
+                new ExtraMenuBean(this).defineMenuSelector(input);
+                return;
+            }
+            if (candidate.isClickable() || candidate.hasOnClickListeners()) {
+                candidate.performClick();
+                return;
+            }
+            ViewParent parent = candidate.getParent();
+            candidate = parent instanceof View ? (View) parent : null;
+        }
+        if (slot instanceof Ss input) {
+            new ExtraMenuBean(this).defineMenuSelector(input);
+        } else if (slot.isClickable() || slot.hasOnClickListeners()) {
+            slot.performClick();
+        }
     }
 
     private void showBlockActionBar(Rs block) {
@@ -3104,91 +3257,121 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     private void showBlockDetails(Rs block) {
         if (block == null || isFinishing()) return;
         BlockBean bean = block.getBean();
+        if (bean == null) return;
+
         BottomSheetDialog dialog = new BottomSheetDialog(this);
-        View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_block_details, null, false);
-        NestedScrollView scroll = sheet.findViewById(R.id.block_details_scroll);
-        LinearLayout content = sheet.findViewById(R.id.block_details_content);
+        View sheet = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_block_details, null, false);
+        LinearLayout header = sheet.findViewById(R.id.block_details_header);
+        LinearLayout inputs = sheet.findViewById(R.id.block_details_inputs);
+        LinearLayout codeSection = sheet.findViewById(R.id.block_details_code);
+        LinearLayout actionsSection = sheet.findViewById(R.id.block_details_actions);
+        header.addView(createBlockDetailsHeader(bean));
 
-        content.addView(createBlockDetailsHeader(bean));
-        addDetailsSectionTitle(content, "INPUTS");
+        addDetailsSectionTitle(inputs, "INPUTS");
         int inputCount = block.V == null ? 0 : block.V.size();
-        if (inputCount == 0) {
-            content.addView(detailsBody("This block has no editable inputs."));
-        } else {
-            for (int i = 0; i < inputCount; i++) {
-                View inputView = block.V.get(i);
-                if (!(inputView instanceof Ss)) continue;
-                Ss input = (Ss) inputView;
-                String value = "";
-                try {
-                    Object arg = input.getArgValue();
-                    value = arg == null ? "" : arg.toString();
-                } catch (RuntimeException ignored) {
-                }
+        int editableCount = 0;
+        for (int i = 0; i < inputCount; i++) {
+            View inputView = block.V.get(i);
+            if (!(inputView instanceof Ss input)) continue;
+            editableCount++;
+            String value = "";
+            try {
+                Object argument = input.getArgValue();
+                value = argument == null ? "" : argument.toString();
+            } catch (RuntimeException ignored) { }
 
-                String parameterType = "Input " + (i + 1);
-                try {
-                    ArrayList<Gx> parameterInfo = bean.getParamClassInfo();
-                    if (parameterInfo != null && i < parameterInfo.size() && parameterInfo.get(i) != null) {
-                        String className = parameterInfo.get(i).getClassName();
-                        if (className != null && !className.trim().isEmpty()) {
-                            parameterType = (parameterInfo.get(i).c() ? "Var " : "") + className;
-                        }
+            String parameterType = "Input " + (i + 1);
+            try {
+                ArrayList<Gx> parameterInfo = bean.getParamClassInfo();
+                if (parameterInfo != null && i < parameterInfo.size() && parameterInfo.get(i) != null) {
+                    Gx info = parameterInfo.get(i);
+                    String className = info.getClassName();
+                    if (className != null && !className.trim().isEmpty()) {
+                        parameterType = (info.c() ? "Variable · " : "") + className;
                     }
-                } catch (RuntimeException ignored) {
                 }
+            } catch (RuntimeException ignored) { }
 
-                View inputCard = getLayoutInflater().inflate(
-                        R.layout.item_block_detail_input, content, false);
-                TextView label = inputCard.findViewById(R.id.input_type);
-                TextView currentValue = inputCard.findViewById(R.id.input_value);
-                TextView hint = inputCard.findViewById(R.id.input_hint);
-                MaterialButton change = inputCard.findViewById(R.id.input_change);
-                boolean isEmpty = value.trim().isEmpty();
-                label.setText(parameterType);
-                currentValue.setText(isEmpty ? "Not set" : value);
-                currentValue.setTextColor(ThemeUtils.getColor(this,
-                        isEmpty ? R.attr.colorError : R.attr.colorOnSurface));
-                hint.setText(isEmpty ? "Choose a value to complete this block."
-                        : "Change the current input value.");
-                change.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    new ExtraMenuBean(this).defineMenuSelector(input);
-                });
-                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
-                cardParams.bottomMargin = SketchwareUtil.dpToPx(10);
-                content.addView(inputCard, cardParams);
-            }
+            LinearLayout inputContent = new LinearLayout(this);
+            inputContent.setOrientation(LinearLayout.VERTICAL);
+            inputContent.setPadding(0, SketchwareUtil.dpToPx(8), 0, SketchwareUtil.dpToPx(8));
+            inputContent.addView(detailsText(parameterType, 12, R.attr.colorOnSurfaceVariant, true));
+
+            TextView currentValue = detailsText(value.trim().isEmpty() ? "Not set" : value, 15,
+                    value.trim().isEmpty() ? R.attr.colorError : R.attr.colorOnSurface, true);
+            currentValue.setPadding(SketchwareUtil.dpToPx(12), SketchwareUtil.dpToPx(12),
+                    SketchwareUtil.dpToPx(12), SketchwareUtil.dpToPx(12));
+            currentValue.setMinHeight(SketchwareUtil.dpToPx(48));
+            currentValue.setBackground(makeRoundedBackground(
+                    ThemeUtils.getColor(this, R.attr.colorSurfaceContainerHigh), SketchwareUtil.dpToPx(12)));
+            currentValue.setClickable(true);
+            currentValue.setFocusable(true);
+            currentValue.setOnClickListener(v -> {
+                dialog.dismiss();
+                new ExtraMenuBean(this).defineMenuSelector(input);
+            });
+            LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(-1, -2);
+            valueParams.topMargin = SketchwareUtil.dpToPx(9);
+            inputContent.addView(currentValue, valueParams);
+
+            LinearLayout actionRow = new LinearLayout(this);
+            actionRow.setGravity(Gravity.CENTER_VERTICAL);
+            TextView hint = detailsText(value.trim().isEmpty()
+                    ? "Choose a value for this input."
+                    : "Tap to edit or select another value.", 12, R.attr.colorOnSurfaceVariant, false);
+            hint.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+            MaterialButton change = new MaterialButton(this, null, R.attr.materialButtonOutlinedStyle);
+            change.setText(getBlockInputActionLabel(input));
+            change.setAllCaps(false);
+            change.setMinHeight(SketchwareUtil.dpToPx(40));
+            change.setIconResource(R.drawable.ic_mtrl_edit);
+            change.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
+            change.setIconPadding(SketchwareUtil.dpToPx(6));
+            change.setOnClickListener(v -> {
+                dialog.dismiss();
+                new ExtraMenuBean(this).defineMenuSelector(input);
+            });
+            actionRow.addView(hint);
+            actionRow.addView(change);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+            rowParams.topMargin = SketchwareUtil.dpToPx(7);
+            inputContent.addView(actionRow, rowParams);
+            LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, -2);
+            inputParams.bottomMargin = SketchwareUtil.dpToPx(4);
+            inputs.addView(inputContent, inputParams);
         }
+        if (editableCount == 0) inputs.addView(detailsBody("This block has no editable inputs."));
 
         if (bean.getClassInfo() != null && bean.getClassInfo().c()) {
-            addVariableUsageSection(content, bean);
+            addVariableUsageSection(inputs, bean);
         }
 
-        addDetailsSectionTitle(content, "THE JAVA IT MAKES");
+        addDetailsSectionTitle(codeSection, "THE JAVA IT MAKES");
         String javaCode = generateBlockJava(block);
         if (javaCode == null || javaCode.trim().isEmpty()) {
-            content.addView(detailsBody("This block makes no Java on its own."));
+            codeSection.addView(detailsBody("This block makes no Java on its own."));
         } else {
+            MaterialCardView codeCard = new MaterialCardView(this);
+            codeCard.setRadius(SketchwareUtil.dpToPx(14));
+            codeCard.setCardElevation(0);
+            codeCard.setStrokeWidth(SketchwareUtil.dpToPx(1));
+            codeCard.setStrokeColor(ThemeUtils.getColor(this, R.attr.colorOutlineVariant));
+            codeCard.setCardBackgroundColor(ThemeUtils.getColor(this, R.attr.colorSurfaceContainerLow));
             HorizontalScrollView codeScroll = new HorizontalScrollView(this);
             codeScroll.setFillViewport(false);
-            codeScroll.setHorizontalScrollBarEnabled(true);
-            TextView code = detailsText(javaCode, 12, R.attr.colorOnSurface, false);
+            TextView code = detailsText(javaCode, 13, R.attr.colorOnSurface, false);
             code.setTypeface(Typeface.MONOSPACE);
             code.setTextIsSelectable(true);
-            code.setLineSpacing(SketchwareUtil.dpToPx(2), 1f);
-            code.setPadding(SketchwareUtil.dpToPx(14), SketchwareUtil.dpToPx(12),
-                    SketchwareUtil.dpToPx(14), SketchwareUtil.dpToPx(12));
-            code.setBackground(makeRoundedBackground(
-                    ThemeUtils.getColor(this, R.attr.colorSurfaceContainer),
-                    SketchwareUtil.dpToPx(14)));
+            code.setPadding(SketchwareUtil.dpToPx(14), SketchwareUtil.dpToPx(13),
+                    SketchwareUtil.dpToPx(14), SketchwareUtil.dpToPx(13));
             codeScroll.addView(code, new HorizontalScrollView.LayoutParams(-2, -2));
-            content.addView(codeScroll);
+            codeCard.addView(codeScroll, new ViewGroup.LayoutParams(-1, -2));
+            codeSection.addView(codeCard, new LinearLayout.LayoutParams(-1, -2));
             MaterialButton copyJava = new MaterialButton(this, null, R.attr.materialButtonOutlinedStyle);
             copyJava.setText("Copy Java");
-            copyJava.setMinHeight(SketchwareUtil.dpToPx(38));
-            copyJava.setInsetTop(0);
-            copyJava.setInsetBottom(0);
+            copyJava.setAllCaps(false);
+            copyJava.setIconResource(R.drawable.ic_mtrl_copy);
+            copyJava.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
             copyJava.setOnClickListener(v -> {
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("Block Java", javaCode));
@@ -3196,47 +3379,57 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             });
             LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(-2, -2);
             copyParams.topMargin = SketchwareUtil.dpToPx(8);
-            content.addView(copyJava, copyParams);
+            codeSection.addView(copyJava, copyParams);
         }
 
-        addDetailsSectionTitle(content, "ACTIONS");
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.START);
+        addDetailsSectionTitle(actionsSection, "ACTIONS");
+        FlexboxLayout actions = new FlexboxLayout(this);
+        actions.setFlexDirection(FlexDirection.ROW);
+        actions.setFlexWrap(FlexWrap.WRAP);
+        actions.setAlignItems(AlignItems.CENTER);
+        actions.setJustifyContent(JustifyContent.FLEX_START);
         actions.setPadding(0, SketchwareUtil.dpToPx(4), 0, 0);
         addDetailAction(actions, "Duplicate", () -> { dialog.dismiss(); duplicateBlock(block); });
         addDetailAction(actions, "Copy", () -> copyBlockTreeToClipboard(block));
         addDetailAction(actions, "Turn off", this::showTurnOffLimitation);
-        content.addView(actions);
-        LinearLayout actions2 = new LinearLayout(this);
-        actions2.setOrientation(LinearLayout.HORIZONTAL);
-        addDetailAction(actions2, "Save as a collection", () -> { dialog.dismiss(); c(block); });
-        addDetailAction(actions2, hasBlockNote(block) ? "Edit note" : "Add a note",
+        addDetailAction(actions, "Save as a collection", () -> { dialog.dismiss(); c(block); });
+        addDetailAction(actions, hasBlockNote(block) ? "Edit note" : "Add a note",
                 () -> { dialog.dismiss(); showBlockNote(block); });
-        content.addView(actions2);
-        LinearLayout actions3 = new LinearLayout(this);
-        actions3.setOrientation(LinearLayout.HORIZONTAL);
-        addDetailAction(actions3, "Delete", () -> { dialog.dismiss(); deleteBlockWithHistory(block); });
-        addDetailAction(actions3, "About this block", () -> { dialog.dismiss(); showBlockAbout(block); });
-        content.addView(actions3);
+        addDetailAction(actions, "Delete", () -> { dialog.dismiss(); deleteBlockWithHistory(block); });
+        addDetailAction(actions, "About this block", () -> { dialog.dismiss(); showBlockAbout(block); });
+        actionsSection.addView(actions);
 
-        scroll.setFillViewport(true);
-        scroll.setNestedScrollingEnabled(true);
         dialog.setContentView(sheet);
         dialog.setOnShowListener(ignored -> {
+            int maxHeight = Math.round(getResources().getDisplayMetrics().heightPixels * 0.88f);
             if (dialog.getWindow() != null) {
-                dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
-                dialog.getWindow().setSoftInputMode(
-                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, maxHeight);
             }
-            BottomSheetBehavior<?> behavior = dialog.getBehavior();
-            behavior.setMaxHeight(Math.round(getResources().getDisplayMetrics().heightPixels * 0.90f));
-            behavior.setFitToContents(true);
-            behavior.setSkipCollapsed(true);
-            behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            dialog.getBehavior().setFitToContents(true);
+            dialog.getBehavior().setSkipCollapsed(true);
+            dialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
         });
         dialog.show();
+    }
+
+    private String getBlockInputActionLabel(Ss input) {
+        if (input == null) return "Change";
+        String menuType = input.b == null ? "" : input.b;
+        String menuName = input.getMenuName();
+        if ("s".equals(menuType)) return "Edit text";
+        if ("d".equals(menuType)) return "Choose value";
+        if ("m".equals(menuType)) {
+            if (menuName == null) return "Change";
+            String normalized = menuName.toLowerCase(Locale.ROOT);
+            if (normalized.contains("view") || normalized.equals("textview") || normalized.equals("imageview")) return "Choose view";
+            if (normalized.contains("color")) return "Choose color";
+            if (normalized.contains("resource")) return "Choose resource";
+            if (normalized.startsWith("var")) return "Select variable";
+            if (normalized.contains("list")) return "Select list";
+            if (normalized.contains("font") || normalized.contains("typeface")) return "Choose font";
+            if (normalized.contains("sound")) return "Choose sound";
+        }
+        return "Change";
     }
 
     private void addVariableUsageSection(LinearLayout content, BlockBean variableBean) {
@@ -3356,27 +3549,42 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         return drawable;
     }
 
-    private void addDetailAction(LinearLayout parent, String label, Runnable action) {
+    private void addDetailAction(FlexboxLayout parent, String label, Runnable action) {
         MaterialButton button = new MaterialButton(
                 this, null, R.attr.materialButtonOutlinedStyle);
         button.setText(label);
-        button.setTextSize(11);
-        button.setMinHeight(SketchwareUtil.dpToPx(38));
+        button.setAllCaps(false);
+        button.setTextSize(12);
+        button.setMaxWidth(SketchwareUtil.dpToPx(190));
+        int icon = switch (label) {
+            case "Duplicate", "Copy" -> R.drawable.ic_mtrl_copy;
+            case "Save as a collection" -> R.drawable.ic_mtrl_save_as;
+            case "Add a note" -> R.drawable.ic_mtrl_add;
+            case "Edit note" -> R.drawable.ic_mtrl_edit;
+            case "Delete" -> R.drawable.ic_mtrl_delete;
+            case "About this block" -> R.drawable.ic_mtrl_info;
+            default -> 0;
+        };
+        if (icon != 0) {
+            button.setIconResource(icon);
+            button.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
+            button.setIconPadding(SketchwareUtil.dpToPx(6));
+        }
+        button.setMinHeight(SketchwareUtil.dpToPx(40));
         button.setInsetTop(0);
         button.setInsetBottom(0);
         button.setOnClickListener(v -> {
             v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(70)
                     .withEndAction(() -> { v.animate().scaleX(1f).scaleY(1f).setDuration(110).start(); action.run(); }).start();
         });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2);
-        params.rightMargin = SketchwareUtil.dpToPx(6);
-        params.bottomMargin = SketchwareUtil.dpToPx(6);
+        FlexboxLayout.LayoutParams params = new FlexboxLayout.LayoutParams(-2, -2);
+        params.setMargins(0, 0, SketchwareUtil.dpToPx(8), SketchwareUtil.dpToPx(8));
         parent.addView(button, params);
     }
 
     private String generateBlockJava(Rs block) {
         try {
-            ArrayList<BlockBean> beans = copyBlockCodeTree(block);
+            ArrayList<BlockBean> beans = copyBlockTree(block);
             yq holder = new yq(this, scId);
             holder.a(jC.c(scId), jC.b(scId), jC.a(scId));
             return new Fx(M.getActivityName(), "preview", holder.N, beans, isViewBindingEnabled).a();
@@ -3389,57 +3597,73 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     private ArrayList<BlockBean> copyBlockTree(Rs block) {
         ArrayList<BlockBean> data = new ArrayList<>();
         if (block == null) return data;
-        for (Rs child : block.getAllChildren()) data.add(child.getBean().clone());
-        if (data.isEmpty()) data.add(block.getBean().clone());
-        return data;
-    }
-
-    private ArrayList<BlockBean> copyBlockCodeTree(Rs block) {
-        ArrayList<BlockBean> data = new ArrayList<>();
-        if (block == null || o == null) return data;
-        appendBlockCodeTree(block, false, data, new HashSet<>());
-        return data;
-    }
-
-    private void appendBlockCodeTree(Rs block, boolean includeNext,
-                                     ArrayList<BlockBean> destination, HashSet<Integer> visited) {
-        if (block == null || block.getBean() == null) return;
-        BlockBean source = block.getBean();
-        int blockId;
+        BlockBean rootBean;
         try {
-            blockId = Integer.parseInt(source.id);
-        } catch (RuntimeException invalidId) {
-            return;
+            rootBean = block.getBean();
+        } catch (RuntimeException error) {
+            return data;
         }
-        if (!visited.add(blockId)) return;
+        if (rootBean == null || rootBean.id == null) return data;
 
-        BlockBean copy = cloneBlockBean(source);
-        if (!includeNext) copy.nextBlock = -1;
-        destination.add(copy);
+        ArrayList<Rs> all;
+        try {
+            all = block.getAllChildren();
+        } catch (RuntimeException error) {
+            return createSingleBlockCopy(rootBean);
+        }
+        if (all == null || all.isEmpty()) return createSingleBlockCopy(rootBean);
 
-        if (source.parameters != null) {
-            for (String parameter : source.parameters) {
-                if (parameter == null || parameter.length() < 2 || parameter.charAt(0) != '@') continue;
-                try {
-                    appendBlockCodeTreeById(Integer.parseInt(parameter.substring(1)),
-                            destination, visited);
-                } catch (NumberFormatException ignored) {
+        HashSet<String> nextChainIds = new HashSet<>();
+        HashSet<Integer> visitedNextBlocks = new HashSet<>();
+        int nextId = rootBean.nextBlock;
+        try {
+            while (nextId >= 0) {
+                if (block.pa == null || !visitedNextBlocks.add(nextId)) {
+                    return createSingleBlockCopy(rootBean);
                 }
+                Rs next = block.pa.findViewWithTag(nextId);
+                if (next == null) return createSingleBlockCopy(rootBean);
+                ArrayList<Rs> following = next.getAllChildren();
+                if (following == null || following.isEmpty()) return createSingleBlockCopy(rootBean);
+                boolean addedAny = false;
+                for (Rs child : following) {
+                    if (child == null) continue;
+                    BlockBean childBean = child.getBean();
+                    if (childBean == null || childBean.id == null) continue;
+                    addedAny |= nextChainIds.add(childBean.id);
+                }
+                if (!addedAny) return createSingleBlockCopy(rootBean);
+                BlockBean nextBean = next.getBean();
+                if (nextBean == null) return createSingleBlockCopy(rootBean);
+                nextId = nextBean.nextBlock;
+            }
+        } catch (RuntimeException error) {
+            return createSingleBlockCopy(rootBean);
+        }
+
+        for (Rs child : all) {
+            if (child == null) continue;
+            BlockBean childBean = child.getBean();
+            if (childBean == null || childBean.id == null || nextChainIds.contains(childBean.id)) continue;
+            data.add(childBean.clone());
+        }
+        if (data.isEmpty()) return createSingleBlockCopy(rootBean);
+        for (BlockBean child : data) {
+            if (child != null && TextUtils.equals(child.id, rootBean.id)) {
+                child.nextBlock = -1;
+                return data;
             }
         }
-        if (source.subStack1 >= 0) appendBlockCodeTreeById(source.subStack1, destination, visited);
-        if (source.subStack2 >= 0) appendBlockCodeTreeById(source.subStack2, destination, visited);
-        if (includeNext && source.nextBlock >= 0) {
-            appendBlockCodeTreeById(source.nextBlock, destination, visited);
-        }
+        return createSingleBlockCopy(rootBean);
     }
 
-    private void appendBlockCodeTreeById(int blockId, ArrayList<BlockBean> destination,
-                                         HashSet<Integer> visited) {
-        try {
-            appendBlockCodeTree(o.a(blockId), true, destination, visited);
-        } catch (RuntimeException ignored) {
-        }
+    private ArrayList<BlockBean> createSingleBlockCopy(BlockBean bean) {
+        ArrayList<BlockBean> data = new ArrayList<>();
+        if (bean == null) return data;
+        BlockBean copy = bean.clone();
+        copy.nextBlock = -1;
+        data.add(copy);
+        return data;
     }
 
     private void copyBlockTreeToClipboard(Rs block) {
@@ -3745,8 +3969,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     private static final class NoteBadgeView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float density;
-        private final int surfaceColor;
-        private final int outlineColor;
         private String note = "";
         private int tint = Color.YELLOW;
         private boolean noteOnRight = true;
@@ -3754,8 +3976,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         NoteBadgeView(Context context) {
             super(context);
             density = context.getResources().getDisplayMetrics().density;
-            surfaceColor = ThemeUtils.getColor(context, R.attr.colorSurface);
-            outlineColor = ThemeUtils.getColor(context, R.attr.colorOutlineVariant);
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             setClickable(true);
             setFocusable(true);
@@ -3775,7 +3995,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             float h = getHeight();
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1.5f * density);
-            paint.setColor(ColorUtils.setAlphaComponent(tint, 208));
+            paint.setColor((tint & 0x00FFFFFF) | 0xAA000000);
             paint.setPathEffect(new DashPathEffect(new float[]{3f * density, 3f * density}, 0));
             float connector = 24f * density;
             if (noteOnRight) {
@@ -3785,20 +4005,17 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             }
             paint.setPathEffect(null);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(ColorUtils.setAlphaComponent(tint, 76));
+            paint.setColor((tint & 0x00FFFFFF) | 0x46000000);
             RectF chip = noteOnRight
                     ? new RectF(22f * density, 2f * density, getWidth() - 2f * density, h - 2f * density)
                     : new RectF(2f * density, 2f * density, getWidth() - 22f * density, h - 2f * density);
             canvas.drawRoundRect(chip, 8f * density, 8f * density, paint);
-            paint.setColor(ColorUtils.setAlphaComponent(outlineColor, 150));
+            paint.setColor(Color.argb(38, 0, 0, 0));
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1f * density);
             canvas.drawRoundRect(chip, 8f * density, 8f * density, paint);
             paint.setStyle(Paint.Style.FILL);
-            int compositeBackground = ColorUtils.compositeColors(
-                    ColorUtils.setAlphaComponent(tint, 76), surfaceColor);
-            paint.setColor(ColorUtils.calculateLuminance(compositeBackground) > 0.179
-                    ? Color.rgb(28, 28, 30) : Color.WHITE);
+            paint.setColor(Color.BLACK);
             paint.setTextSize(11f * density);
             paint.setFakeBoldText(true);
             float available = Math.max(0, chip.width() - 18f * density);
@@ -3811,7 +4028,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
 
     private void showBlockJava(Rs block) {
         try {
-            ArrayList<BlockBean> beans = copyBlockCodeTree(block);
+            ArrayList<BlockBean> beans = copyBlockTree(block);
             yq holder = new yq(this, scId); holder.a(jC.c(scId), jC.b(scId), jC.a(scId));
             String code = new Fx(M.getActivityName(), "preview", holder.N, beans, isViewBindingEnabled).a();
             Intent intent = new Intent(this, CodeViewerActivity.class); intent.putExtra("code", code); intent.putExtra("sc_id", scId); intent.putExtra("scheme", CodeViewerActivity.SCHEME_JAVA); startActivity(intent);
@@ -3953,22 +4170,115 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         }
     }
 
+    private void persistAndExit() {
+        if (exitSavePending || !editorBlocksReady || editorBlocksLoadFailed || o == null || M == null
+                || scId == null || id == null || eventName == null) return;
+
+        final ArrayList<BlockBean> blocksToSave;
+        final ArrayList<BlockBean> savedEditorSnapshot;
+        final String projectId = scId;
+        final String javaName = M.getJavaName();
+        final String eventKey = id + "_" + eventName;
+        final int savedBlockCount;
+        try {
+            blocksToSave = cloneBlockBeans(o.getBlocks());
+            savedEditorSnapshot = cloneBlockBeans(collectCurrentBlockBeans());
+            savedBlockCount = countBlockBeans(savedEditorSnapshot);
+        } catch (RuntimeException snapshotError) {
+            crashlytics.recordException(snapshotError);
+            Toast.makeText(this, R.string.common_error_failed_to_save, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        exitSavePending = true;
+        k();
+        WeakReference<LogicEditorActivity> activityReference = new WeakReference<>(this);
+        if (eventSaveExecutor == null || eventSaveExecutor.isShutdown()) {
+            eventSaveExecutor = Executors.newSingleThreadExecutor();
+        }
+        ExecutorService saveExecutor = eventSaveExecutor;
+        try {
+            saveExecutor.execute(() -> {
+                RuntimeException saveError = null;
+                try {
+                    eC eventStore = jC.a(projectId);
+                    eventStore.a(javaName, eventKey, blocksToSave);
+                    eventStore.k();
+                } catch (RuntimeException error) {
+                    saveError = error;
+                }
+                saveExecutor.shutdown();
+                RuntimeException resultError = saveError;
+                LogicEditorActivity activity = activityReference.get();
+                if (activity != null) {
+                    activity.runOnUiThread(() -> activity.completeEventSave(resultError,
+                            savedEditorSnapshot, savedBlockCount));
+                }
+            });
+        } catch (RuntimeException schedulingError) {
+            saveExecutor.shutdown();
+            h();
+            exitSavePending = false;
+            crashlytics.recordException(schedulingError);
+            Toast.makeText(this, R.string.common_error_failed_to_save, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void completeEventSave(RuntimeException saveError, ArrayList<BlockBean> savedSnapshot,
+                                   int savedBlockCount) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed()) return;
+        h();
+        if (saveError != null) {
+            exitSavePending = false;
+            editorChanged = true;
+            crashlytics.recordException(saveError);
+            updateEditorStatus();
+            Toast.makeText(this, R.string.common_error_failed_to_save, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        loadedEventBlockBeans = savedSnapshot;
+        loadedEventBlockCount = savedBlockCount;
+        editorChanged = false;
+        updateEditorStatus();
+        finish();
+    }
+
+    private void continuePendingExit() {
+        if (!exitRequestedWhileLoading || !editorBlocksReady || exitSavePending) return;
+        exitRequestedWhileLoading = false;
+        if (editorBlocksLoadFailed) {
+            exitSavePending = true;
+            handler.postDelayed(() -> {
+                if (isFinishing() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed())) return;
+                h();
+                finish();
+            }, 150L);
+            return;
+        }
+        persistAndExit();
+    }
+
+    private void persistCurrentEventBlocks() {
+        if (!editorBlocksReady || editorBlocksLoadFailed || o == null || M == null
+                || scId == null || id == null || eventName == null) return;
+        ArrayList<BlockBean> blocks = o.getBlocks();
+        eC eventStore = jC.a(scId);
+        eventStore.a(M.getJavaName(), id + "_" + eventName, blocks);
+        loadedEventBlockBeans = cloneBlockBeans(collectCurrentBlockBeans());
+        loadedEventBlockCount = countBlockBeans(loadedEventBlockBeans);
+        editorChanged = false;
+        updateEditorStatus();
+        eventStore.k();
+    }
+
     @Override
     public void onSaveInstanceState(Bundle bundle) {
         bundle.putString("sc_id", scId);
         bundle.putString("id", id);
         bundle.putString("event", eventName);
         bundle.putParcelable("project_file", M);
+        if (editorBlocksReady && !editorBlocksLoadFailed) persistCurrentEventBlocks();
         super.onSaveInstanceState(bundle);
-        ArrayList<BlockBean> blocks = o.getBlocks();
-        eC a2 = jC.a(scId);
-        String javaName = M.getJavaName();
-        a2.a(javaName, id + "_" + eventName, blocks);
-        loadedEventBlockBeans = cloneBlockBeans(collectCurrentBlockBeans());
-        loadedEventBlockCount = countBlockBeans(loadedEventBlockBeans);
-        editorChanged = false;
-        updateEditorStatus();
-        jC.a(scId).k();
     }
 
     @Override
@@ -3984,66 +4294,24 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         }
         if (actionMasked == MotionEvent.ACTION_DOWN) {
             isDragged = false;
-            touchedBlockInput = null;
-            touchStartedOnInput = false;
+            handler.removeCallbacks(longPressed);
             int[] locationOnScreen = new int[2];
             v.getLocationOnScreen(locationOnScreen);
             s = locationOnScreen[0];
             t = locationOnScreen[1];
             posInitX = event.getRawX();
             posInitY = event.getRawY();
-
-            if (v instanceof Rs block && block.getBlockType() == 0) {
-                touchedBlockInput = findBlockInputAtScreenPosition(
-                        block, posInitX, posInitY);
-                if (touchedBlockInput != null) {
-                    touchStartedOnInput = true;
-                    currentTouchedView = null;
-                    handler.removeCallbacks(longPressed);
-                    return true;
-                }
+            boolean inputGesture = v instanceof Rs rs && rs.getBlockType() == 0
+                    && isTouchOnBlockInput(rs, event.getX(), event.getY());
+            currentTouchedView = inputGesture ? null : v;
+            if (!inputGesture) {
+                handler.postDelayed(longPressed, ViewConfiguration.getLongPressTimeout() / 2);
             }
-
-            currentTouchedView = v;
-            handler.postDelayed(longPressed, ViewConfiguration.getLongPressTimeout() / 2);
             return true;
         }
-
-        if (touchStartedOnInput) {
-            if (actionMasked == MotionEvent.ACTION_MOVE) {
-                int touchSlop = Math.max(1,
-                        ViewConfiguration.get(this).getScaledTouchSlop());
-                if (Math.abs(event.getRawX() - posInitX) >= touchSlop
-                        || Math.abs(event.getRawY() - posInitY) >= touchSlop) {
-                    touchedBlockInput = null;
-                    return false;
-                }
-                return true;
-            }
-            if (actionMasked == MotionEvent.ACTION_UP) {
-                Ss input = touchedBlockInput;
-                touchedBlockInput = null;
-                touchStartedOnInput = false;
-                currentTouchedView = null;
-                handler.removeCallbacks(longPressed);
-                if (input != null && input.isShown()) {
-                    new ExtraMenuBean(this).defineMenuSelector(input);
-                }
-                return true;
-            }
-            if (actionMasked == MotionEvent.ACTION_CANCEL) {
-                touchedBlockInput = null;
-                touchStartedOnInput = false;
-                currentTouchedView = null;
-                handler.removeCallbacks(longPressed);
-                return true;
-            }
-        }
-
         if (actionMasked == MotionEvent.ACTION_MOVE) {
             if (!isDragged) {
-                if (Math.abs(posInitX - s - event.getX()) >= minDist
-                        || Math.abs(posInitY - t - event.getY()) >= minDist) {
+                if (Math.abs(posInitX - s - event.getX()) >= minDist || Math.abs(posInitY - t - event.getY()) >= minDist) {
                     currentTouchedView = null;
                     handler.removeCallbacks(longPressed);
                 }
@@ -4053,7 +4321,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             float rawX = event.getRawX();
             float rawY = event.getRawY();
             dummy.a(v, rawX - s, rawY - t, posInitX - s, posInitY - t, S, T);
-            if (hitTestIconDelete(rawX, rawY)) {
+            if (hitTestIconDelete(event.getRawX(), event.getRawY())) {
                 dummy.setAllow(true);
                 activeIconDelete(true);
                 a(false);
@@ -4062,7 +4330,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 return true;
             }
             activeIconDelete(false);
-            if (a(rawX, rawY)) {
+            if (a(event.getRawX(), event.getRawY())) {
                 dummy.setAllow(true);
                 a(true);
                 d(false);
@@ -4070,14 +4338,14 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 return true;
             }
             a(false);
-            if (d(rawX, rawY)) {
+            if (d(event.getRawX(), event.getRawY())) {
                 dummy.setAllow(true);
                 d(true);
                 c(false);
                 return true;
             }
             d(false);
-            if (c(rawX, rawY)) {
+            if (c(event.getRawX(), event.getRawY())) {
                 dummy.setAllow(true);
                 c(true);
                 return true;
@@ -4092,16 +4360,19 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 o.d();
             }
             return true;
-        }
-
-        if (actionMasked == MotionEvent.ACTION_UP) {
+        } else if (actionMasked == MotionEvent.ACTION_UP) {
             currentTouchedView = null;
             handler.removeCallbacks(longPressed);
             if (!isDragged) {
-                if (v instanceof Rs block && block.getBlockType() == 0) {
-                    showBlockActionBar(block);
+                if (v instanceof Rs rs && rs.getBlockType() == 0) {
+                    if (isTouchOnBlockInput(rs, event.getX(), event.getY())) {
+                        handleBlockInputTap(rs, event.getX(), event.getY());
+                    } else {
+                        showBlockActionBar(rs);
+                    }
+                    return true;
                 }
-                return true;
+                return false;
             }
             m.setDragEnabled(true);
             viewLogicEditor.setScrollEnabled(true);
@@ -4171,8 +4442,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     }
                     int[] oLocationOnScreen = new int[2];
                     o.getLocationOnScreen(oLocationOnScreen);
-                    bC.d(scId).b(s(), arrayList, ((int) s) - oLocationOnScreen[0],
-                            ((int) t) - oLocationOnScreen[1], blockBean2, blockBean3);
+                    bC.d(scId).b(s(), arrayList, ((int) s) - oLocationOnScreen[0], ((int) t) - oLocationOnScreen[1], blockBean2, blockBean3);
                     C();
                 }
             } else if (logicTopMenu.isFavoriteActive) {
@@ -4222,6 +4492,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     }
                     rs10.E = w;
                     w.p().k();
+                } else {
                 }
                 ArrayList<BlockBean> arrayList2 = new ArrayList<>();
                 for (Rs rs : rs10.getAllChildren()) {
@@ -4273,8 +4544,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     }
                     int[] locationOnScreen = new int[2];
                     o.getLocationOnScreen(locationOnScreen);
-                    bC.d(scId).a(s(), a4.getBean().clone(), this.v[0] - locationOnScreen[0],
-                            this.v[1] - locationOnScreen[1], clone3, blockBean3);
+                    bC.d(scId).a(s(), a4.getBean().clone(), this.v[0] - locationOnScreen[0], this.v[1] - locationOnScreen[1], clone3, blockBean3);
                     if (clone3 != null) {
                         clone3.print();
                     }
@@ -4295,8 +4565,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         }
                         int[] locationOnScreen = new int[2];
                         o.getLocationOnScreen(locationOnScreen);
-                        bC.d(scId).a(s(), a5, this.v[0] - locationOnScreen[0],
-                                this.v[1] - locationOnScreen[1], clone5, blockBean3);
+                        bC.d(scId).a(s(), a5, this.v[0] - locationOnScreen[0], this.v[1] - locationOnScreen[1], clone5, blockBean3);
                     }
                     o.c();
                 } else {
@@ -4319,8 +4588,8 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                     }
                     Rs a7 = o.a(o.getAddTargetId());
                     BlockBean clone6 = a7 != null ? a7.getBean().clone() : null;
-                    ArrayList<BlockBean> arrayList3 = new ArrayList<>();
                     ArrayList<Rs> allChildren3 = rs13.getAllChildren();
+                    ArrayList<BlockBean> arrayList3 = new ArrayList<>();
                     for (Rs rs : allChildren3) {
                         arrayList3.add(rs.getBean().clone());
                     }
@@ -4339,10 +4608,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         o.getLocationOnScreen(locationOnScreen);
                         int x = locationOnScreen[0];
                         int y = locationOnScreen[1];
-                        bC.d(scId).a(s(), arrayList3, arrayList4,
-                                ((int) s) - x, ((int) t) - y,
-                                this.v[0] - x, this.v[1] - y,
-                                blockBean, clone7, clone6, blockBean3);
+                        bC.d(scId).a(s(), arrayList3, arrayList4, ((int) s) - x, ((int) t) - y, this.v[0] - x, this.v[1] - y, blockBean, clone7, clone6, blockBean3);
                     }
                     o.c();
                 }
@@ -4353,34 +4619,17 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
             h(false);
             isDragged = false;
             return true;
-        }
-
-        if (actionMasked == MotionEvent.ACTION_CANCEL) {
+        } else if (actionMasked == MotionEvent.ACTION_CANCEL) {
             handler.removeCallbacks(longPressed);
-            currentTouchedView = null;
-            touchedBlockInput = null;
-            touchStartedOnInput = false;
-            if (isDragged) {
-                m.setDragEnabled(true);
-                viewLogicEditor.setScrollEnabled(true);
-                O.setDragEnabled(true);
-                dummy.setDummyVisibility(View.GONE);
-                activeIconDelete(false);
-                a(false);
-                d(false);
-                c(false);
-                h(false);
-            }
-            isDragged = false;
-            return true;
-        }
-        if (actionMasked == MotionEvent.ACTION_SCROLL) {
-            handler.removeCallbacks(longPressed);
-            currentTouchedView = null;
             isDragged = false;
             return false;
+        } else if (actionMasked == MotionEvent.ACTION_SCROLL) {
+            handler.removeCallbacks(longPressed);
+            isDragged = false;
+            return false;
+        } else {
+            return true;
         }
-        return true;
     }
 
     public boolean p() {
@@ -4688,7 +4937,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                 .show();
     }
 
-    private void insertConvertedBlocks(ArrayList<BlockBean> blocks) {
+    private void insertConvertedBlocks(java.util.ArrayList<com.besome.sketch.beans.BlockBean> blocks) {
         if (blocks == null || blocks.isEmpty()) {
             SketchwareUtil.toastError("No blocks to insert.");
             return;
@@ -4698,7 +4947,7 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         int insertX = oLoc[0] + SketchwareUtil.dpToPx(16);
         int insertY = oLoc[1] + SketchwareUtil.dpToPx(80);
 
-        ArrayList<BlockBean> inserted =
+        java.util.ArrayList<com.besome.sketch.beans.BlockBean> inserted =
                 a(blocks, insertX, insertY, true);
 
         bC.d(scId).a(s(), inserted,
@@ -4712,14 +4961,14 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
     
     private void exportBlockPatternForAI() {
     try {
-        ArrayList<BlockBean> currentBlocks = o.getBlocks();
+        java.util.ArrayList<com.besome.sketch.beans.BlockBean> currentBlocks = o.getBlocks();
         if (currentBlocks == null || currentBlocks.isEmpty()) {
             SketchwareUtil.toast("No blocks to export!");
             return;
         }
 
         yq logicHolder = new yq(this, scId);
-        logicHolder.a(jC.c(scId), jC.b(scId), jC.a(scId));
+        logicHolder.a(a.a.a.jC.c(scId), a.a.a.jC.b(scId), a.a.a.jC.a(scId));
         String generatedJava = new Fx(M.getActivityName(), "preview", logicHolder.N, currentBlocks, isViewBindingEnabled).a();
 
         String blockJson = new GsonBuilder().setPrettyPrinting().create().toJson(currentBlocks);
@@ -4764,56 +5013,6 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         }
     }
 
-    private static class ProjectSaver extends MA {
-        private final WeakReference<LogicEditorActivity> activity;
-        private final String projectId;
-        private final String javaName;
-        private final String eventKey;
-        private final ArrayList<BlockBean> blockSnapshot;
-
-        public ProjectSaver(LogicEditorActivity logicEditorActivity) {
-            super(logicEditorActivity);
-            activity = new WeakReference<>(logicEditorActivity);
-            projectId = logicEditorActivity.scId;
-            javaName = logicEditorActivity.M.getJavaName();
-            eventKey = logicEditorActivity.id + "_" + logicEditorActivity.eventName;
-            ArrayList<BlockBean> currentBlocks = logicEditorActivity.o == null
-                    ? new ArrayList<>() : logicEditorActivity.o.getBlocks();
-            blockSnapshot = logicEditorActivity.cloneBlockBeans(currentBlocks);
-            logicEditorActivity.addTask(this);
-        }
-
-        @Override
-        public void a() {
-            LogicEditorActivity target = activity.get();
-            if (target == null) return;
-            target.onProjectSaveCompleted();
-            target.h();
-            target.finish();
-        }
-
-        @Override
-        public void a(String str) {
-            LogicEditorActivity target = activity.get();
-            if (target == null) return;
-            Toast.makeText(target, R.string.common_error_failed_to_save, Toast.LENGTH_SHORT).show();
-            target.h();
-        }
-
-        @Override
-        public void b() {
-            publishProgress("Now saving..");
-            jC.a(projectId).a(javaName, eventKey, blockSnapshot);
-        }
-    }
-
-    private void onProjectSaveCompleted() {
-        loadedEventBlockBeans = cloneBlockBeans(collectCurrentBlockBeans());
-        loadedEventBlockCount = countBlockBeans(loadedEventBlockBeans);
-        editorChanged = false;
-        updateEditorStatus();
-    }
-
     public static class LoadEventBlocksTask {
         private final WeakReference<LogicEditorActivity> activityRef;
         private final ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -4851,9 +5050,11 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
                         if (error != null) {
                             current.crashlytics.recordException(error);
                             current.editorBlocksReady = true;
+                            current.editorBlocksLoadFailed = true;
                             current.h();
                             current.updateEditorStatus();
                             SketchwareUtil.toastError("Could not load blocks for this event");
+                            current.continuePendingExit();
                         } else {
                             current.attachEventBlocks(result);
                         }

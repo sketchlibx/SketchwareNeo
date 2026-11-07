@@ -55,7 +55,6 @@ import com.besome.sketch.beans.HistoryViewBean;
 import com.besome.sketch.beans.ProjectFileBean;
 import com.besome.sketch.beans.ProjectLibraryBean;
 import com.besome.sketch.beans.ViewBean;
-import com.besome.sketch.design.DesignActivity;
 import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -126,9 +125,17 @@ import pro.sketchware.utility.UI;
 import pro.sketchware.utility.relativelayout.CircularDependencyDetector;
 
 import a.a.a.Lx;
+import a.a.a.Ox;
 import a.a.a.ProjectBuilder;
 import a.a.a.cC;
+import a.a.a.eC;
 import a.a.a.jC;
+import a.a.a.jq;
+import a.a.a.lC;
+import a.a.a.wq;
+import a.a.a.yB;
+import a.a.a.yq;
+import pro.sketchware.activities.editor.gradle.CustomGradleBuildManager;
 
 @SuppressWarnings({"deprecation", "removal"})
 
@@ -250,6 +257,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         updateCursorPosition();
         applySyntaxHighlighting();
         setupTabs();
+        setupXmlEditorTools();
         setupSearchPanel();
         setupDiagnosticsPanel();
         setupProjectExplorer();
@@ -281,13 +289,15 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private void syncStatusBarColor() {
         if (editor == null || binding == null || binding.statusBar == null) return;
-        int bgColor = editor.getColorScheme().getColor(EditorColorScheme.WHOLE_BACKGROUND);
-        int textColor = editor.getColorScheme().getColor(EditorColorScheme.TEXT_NORMAL);
-        binding.statusBar.setBackgroundColor(bgColor);
-        if (binding.tvLanguage != null) binding.tvLanguage.setTextColor(textColor);
+        int surfaceColor = ThemeUtils.getColor(this, R.attr.colorSurfaceContainer);
+        int controlColor = ThemeUtils.getColor(this, R.attr.colorSurfaceContainerHighest);
+        int textColor = ThemeUtils.getColor(this, R.attr.colorOnSurfaceVariant);
+        binding.statusBar.setBackgroundColor(surfaceColor);
+        if (binding.tvLanguage != null) binding.tvLanguage.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
         if (binding.tvEncoding != null) binding.tvEncoding.setTextColor(textColor);
         if (binding.tvCursorPos != null) binding.tvCursorPos.setTextColor(textColor);
-        if (binding.languageSelector != null) binding.languageSelector.setCardBackgroundColor(ThemeUtils.getColor(this, R.attr.colorSurfaceContainerHighest));
+        if (binding.languageSelector != null) binding.languageSelector.setCardBackgroundColor(controlColor);
+        if (binding.issueStatusCard != null) binding.issueStatusCard.setCardBackgroundColor(controlColor);
     }
 
     private void updateCursorPosition() {
@@ -326,9 +336,9 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private void loadProjectHeaderData() {
         try {
-            HashMap<String, Object> metadata = a.a.a.lC.b(sc_id);
+            HashMap<String, Object> metadata = lC.b(sc_id);
             if (metadata != null) {
-                String name = a.a.a.yB.c(metadata, "my_ws_name");
+                String name = yB.c(metadata, "my_ws_name");
                 if (!TextUtils.isEmpty(name)) projectName = name;
             }
         } catch (Exception ignored) { }
@@ -365,9 +375,9 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private Drawable resolveProjectIcon() {
         int iconSize = Math.max(1, dp(28f));
         try {
-            HashMap<String, Object> metadata = a.a.a.lC.b(sc_id);
-            if (metadata != null && a.a.a.yB.a(metadata, "custom_icon")) {
-                File iconFile = new File(a.a.a.wq.e() + File.separator + sc_id, "icon.png");
+            HashMap<String, Object> metadata = lC.b(sc_id);
+            if (metadata != null && yB.a(metadata, "custom_icon")) {
+                File iconFile = new File(wq.e() + File.separator + sc_id, "icon.png");
                 if (iconFile.isFile() && iconFile.canRead()) {
                     BitmapFactory.Options bounds = new BitmapFactory.Options();
                     bounds.inJustDecodeBounds = true;
@@ -432,17 +442,21 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         row.setPadding(dp(12), 0, dp(8), 0);
         TextView title = new TextView(this);
         title.setSingleLine(true);
+        title.setGravity(Gravity.CENTER_VERTICAL);
         title.setEllipsize(TextUtils.TruncateAt.MIDDLE);
         title.setMaxWidth(dp(170));
         title.setTextSize(13);
         title.setTextColor(ThemeUtils.getColor(this, R.attr.colorOnSurface));
         title.setText(model.title);
-        row.addView(title, new LinearLayout.LayoutParams(-2, -1));
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(title, titleParams);
         ImageView close = new ImageView(this);
         close.setImageResource(R.drawable.ic_mtrl_close);
         close.setColorFilter(ThemeUtils.getColor(this, R.attr.colorOnSurfaceVariant));
-        close.setPadding(dp(6), dp(6), dp(6), dp(6));
+        close.setPadding(dp(7), dp(7), dp(7), dp(7));
+        close.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        closeParams.gravity = Gravity.CENTER_VERTICAL;
         closeParams.setMarginStart(dp(4));
         row.addView(close, closeParams);
         model.tabTitleView = title;
@@ -523,12 +537,12 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private void loadXmlToEditor(ProjectFileBean bean) {
         try {
-            a.a.a.jq buildConfig = new a.a.a.jq();
-            a.a.a.Ox xmlGenerator = new a.a.a.Ox(buildConfig, bean);
+            jq buildConfig = new jq();
+            Ox xmlGenerator = new Ox(buildConfig, bean);
             xmlGenerator.setExcludeAppCompat(true);
             ArrayList<ViewBean> viewBeans = jC.a(sc_id).d(bean.getXmlName());
             ViewBean viewFab = jC.a(sc_id).h(bean.getXmlName());
-            xmlGenerator.a(a.a.a.eC.a(viewBeans), viewFab);
+            xmlGenerator.a(eC.a(viewBeans), viewFab);
             
             content = xmlGenerator.b();
             beforeContent = content;
@@ -769,6 +783,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     private ExplorerNode buildExplorerTree() {
         ExplorerNode root = new ExplorerNode(projectName, null, null, null, true, 0, true);
         ExplorerNode app = childDirectory(root, "app", 1, true);
+        addGradleExplorerFiles(root, app);
         ExplorerNode src = childDirectory(app, "src", 2, true);
         ExplorerNode main = childDirectory(src, "main", 3, true);
 
@@ -820,11 +835,108 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             if (manifest.isFile()) main.children.add(new ExplorerNode("AndroidManifest.xml", manifest, null, null, false, 4, false));
         }
 
-        File customGradle = new File(new FilePathUtil().getPathCustomGradle(sc_id), "app_build.gradle");
-        if (customGradle.isFile()) root.children.add(new ExplorerNode("app_build.gradle", customGradle, null, null, false, 1, false));
-
         root.children.sort(Comparator.comparing(node -> node.name.equals("app") ? "" : node.name.toLowerCase(Locale.ROOT)));
         return root;
+    }
+
+    private void addGradleExplorerFiles(ExplorerNode root, ExplorerNode appNode) {
+        boolean customEnabled = CustomGradleBuildManager.isEnabled(sc_id);
+        File gradleRoot = customEnabled
+                ? CustomGradleBuildManager.getDirectory(sc_id)
+                : new yq(getApplicationContext(), sc_id).getProjectDirectory();
+        if (gradleRoot == null || !gradleRoot.isDirectory()) return;
+
+        Set<String> includedPaths = new HashSet<>();
+        addGradleDirectoryContents(root, gradleRoot, 1, includedPaths, true);
+
+        File appBuild = customEnabled
+                ? new File(gradleRoot, CustomGradleBuildManager.FILE_APP_BUILD)
+                : new File(new File(gradleRoot, "app"), CustomGradleBuildManager.FILE_BUILD);
+        if (appBuild.isFile() && appBuild.canRead()) {
+            String path = canonicalFilePath(appBuild);
+            if (includedPaths.add(path)) {
+                appNode.children.add(new ExplorerNode("build.gradle", appBuild, null, null, false, 2, false));
+            }
+        }
+
+        File appGradleDirectory = new File(gradleRoot, "app");
+        if (appGradleDirectory.isDirectory()) {
+            addGradleDirectoryContents(appNode, appGradleDirectory, 2, includedPaths, false);
+        }
+        root.children.sort(Comparator.comparing(node -> node.name.toLowerCase(Locale.ROOT)));
+        appNode.children.sort(Comparator.comparing(node -> node.name.equals("src") ? "~src" : node.name.toLowerCase(Locale.ROOT)));
+    }
+
+    private void addGradleDirectoryContents(ExplorerNode parent, File directory, int depth,
+                                            Set<String> includedPaths, boolean skipAppDirectory) {
+        if (parent == null || directory == null || !directory.isDirectory() || depth > 5) return;
+        File[] children = directory.listFiles();
+        if (children == null) return;
+        Arrays.sort(children, Comparator.comparing(file -> file.getName().toLowerCase(Locale.ROOT)));
+        for (File child : children) {
+            if (child == null || child.isHidden() || child.getName().startsWith(".")) continue;
+            if (child.isDirectory()) {
+                String name = child.getName();
+                if ("build".equalsIgnoreCase(name) || ".gradle".equalsIgnoreCase(name)
+                        || ".git".equalsIgnoreCase(name) || (skipAppDirectory && "app".equalsIgnoreCase(name))) continue;
+                if (!containsGradleEditorFiles(child, depth + 1)) continue;
+                ExplorerNode directoryNode = childDirectory(parent, name, depth + 1, false);
+                addGradleDirectoryContents(directoryNode, child, depth + 1, includedPaths, false);
+                if (directoryNode.children.isEmpty()) parent.children.remove(directoryNode);
+            } else if (child.isFile() && child.canRead() && isGradleEditorFile(child)) {
+                String path = canonicalFilePath(child);
+                if (includedPaths.add(path)) {
+                    parent.children.add(new ExplorerNode(child.getName(), child, null, null, false, depth, false));
+                }
+            }
+        }
+    }
+
+    private boolean containsGradleEditorFiles(File directory, int depth) {
+        if (directory == null || !directory.isDirectory() || depth > 5) return false;
+        File[] children = directory.listFiles();
+        if (children == null) return false;
+        for (File child : children) {
+            if (child == null || child.isHidden() || child.getName().startsWith(".")) continue;
+            if (child.isFile() && child.canRead() && isGradleEditorFile(child)) return true;
+            if (child.isDirectory() && !"build".equalsIgnoreCase(child.getName())
+                    && !".gradle".equalsIgnoreCase(child.getName())
+                    && !".git".equalsIgnoreCase(child.getName())
+                    && containsGradleEditorFiles(child, depth + 1)) return true;
+        }
+        return false;
+    }
+
+    private boolean isGradleEditorFile(File file) {
+        if (file == null) return false;
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        return !"app_build.gradle".equals(name)
+                && (name.endsWith(".gradle") || name.endsWith(".gradle.kts")
+                || "gradle.properties".equals(name) || "gradle-wrapper.properties".equals(name)
+                || "libs.versions.toml".equals(name) || "verification-metadata.xml".equals(name)
+                || "gradlew".equals(name) || "gradlew.bat".equals(name)
+                || name.endsWith(".lockfile"));
+    }
+
+    private String getGradleDisplayTabTitle(File file) {
+        if (file == null) return "Gradle file";
+        if (CustomGradleBuildManager.FILE_APP_BUILD.equals(file.getName())) return "app/build.gradle";
+        File gradleRoot = CustomGradleBuildManager.isEnabled(sc_id)
+                ? CustomGradleBuildManager.getDirectory(sc_id)
+                : new yq(getApplicationContext(), sc_id).getProjectDirectory();
+        if (gradleRoot == null) return file.getName();
+        String rootPath = canonicalFilePath(gradleRoot);
+        String filePath = canonicalFilePath(file);
+        String prefix = rootPath.endsWith(File.separator) ? rootPath : rootPath + File.separator;
+        if (filePath.startsWith(prefix)) {
+            return filePath.substring(prefix.length()).replace(File.separatorChar, '/');
+        }
+        return file.getName();
+    }
+
+    private String canonicalFilePath(File file) {
+        try { return file.getCanonicalPath(); }
+        catch (IOException ignored) { return file.getAbsolutePath(); }
     }
 
     private ExplorerNode childDirectory(ExplorerNode parent, String name, int depth, boolean expanded) {
@@ -912,7 +1024,9 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         String name = file.getName().toLowerCase(Locale.ROOT);
         return name.endsWith(".xml") || name.endsWith(".java") || name.endsWith(".kt")
                 || name.endsWith(".json") || name.endsWith(".txt") || name.endsWith(".gradle")
+                || name.endsWith(".gradle.kts") || name.endsWith(".toml") || name.endsWith(".lockfile")
                 || name.endsWith(".properties") || name.endsWith(".pro") || name.endsWith(".md")
+                || name.endsWith(".bat") || "gradlew".equals(name)
                 || name.endsWith(".sh") || name.endsWith(".c") || name.endsWith(".h")
                 || name.endsWith(".cpp") || name.endsWith(".hpp") || name.endsWith(".cmake");
     }
@@ -930,7 +1044,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             openLayoutTab(node.layoutBean);
             return;
         }
-        if (node.file != null && node.file.isFile()) openPhysicalFileTab(node.file);
+        if (node.file != null && node.file.isFile()) {
+            String tabName = isGradleEditorFile(node.file) || CustomGradleBuildManager.FILE_APP_BUILD.equals(node.file.getName())
+                    ? getGradleDisplayTabTitle(node.file) : node.name;
+            openPhysicalFileTab(node.file, tabName);
+        }
     }
 
     private void openLayoutTab(ProjectFileBean bean) {
@@ -952,12 +1070,12 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private String generateXmlContent(ProjectFileBean bean) {
         try {
-            a.a.a.jq buildConfig = new a.a.a.jq();
-            a.a.a.Ox xmlGenerator = new a.a.a.Ox(buildConfig, bean);
+            jq buildConfig = new jq();
+            Ox xmlGenerator = new Ox(buildConfig, bean);
             xmlGenerator.setExcludeAppCompat(true);
             ArrayList<ViewBean> viewBeans = jC.a(sc_id).d(bean.getXmlName());
             ViewBean viewFab = jC.a(sc_id).h(bean.getXmlName());
-            xmlGenerator.a(a.a.a.eC.a(viewBeans), viewFab);
+            xmlGenerator.a(eC.a(viewBeans), viewFab);
             return xmlGenerator.b();
         } catch (Exception e) {
             return null;
@@ -982,7 +1100,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         new Thread(() -> {
             Exception failure = null;
             try {
-                String source = new a.a.a.yq(getApplicationContext(), sc_id)
+                String source = new yq(getApplicationContext(), sc_id)
                         .getFileSrc(javaName, jC.b(sc_id), jC.a(sc_id), jC.c(sc_id));
                 if (TextUtils.isEmpty(source)) {
                     File generated = new File(new FilePathUtil().getPathJava(sc_id), javaName);
@@ -1013,6 +1131,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
     }
 
     private void openPhysicalFileTab(File file) {
+        openPhysicalFileTab(file, file == null ? null : file.getName());
+    }
+
+    private void openPhysicalFileTab(File file, String displayName) {
         if (file == null || !file.isFile() || !file.canRead()) {
             SketchwareUtil.toastError("File cannot be opened.");
             return;
@@ -1027,7 +1149,10 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
         try {
             String text = FileUtil.readFile(file.getAbsolutePath());
-            requestOpenTab(new EditorTab(file.getName(), file.getAbsolutePath(), null, false, text == null ? "" : text));
+            String title = TextUtils.isEmpty(displayName) ? file.getName() : displayName;
+            if ("build.gradle".equals(title) && file.getParentFile() != null
+                    && "app".equals(file.getParentFile().getName())) title = "app/build.gradle";
+            requestOpenTab(new EditorTab(title, file.getAbsolutePath(), null, false, text == null ? "" : text));
         } catch (Exception e) {
             SketchwareUtil.toastError("Could not read file: " + e.getMessage());
         }
@@ -1109,6 +1234,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         else getIntent().removeExtra("file_path");
         applySyntaxHighlighting();
         updateTabTitle(target);
+        updateXmlEditorToolsVisibility();
         invalidateOptionsMenu();
         updateMenuState();
         if (diagRunnable != null) diagHandler.removeCallbacks(diagRunnable);
@@ -1534,10 +1660,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
         }
         int count = errors + others;
         if (count == 0) {
+            int clearColor = ThemeUtils.getColor(this, R.attr.colorCoolGreen);
             binding.tvIssueStatus.setText("No issues");
-            binding.tvIssueStatus.setTextColor(0xFF2EA866);
+            binding.tvIssueStatus.setTextColor(clearColor);
             binding.imgIssueStatus.setImageResource(R.drawable.ic_mtrl_check);
-            binding.imgIssueStatus.setColorFilter(0xFF2EA866);
+            binding.imgIssueStatus.setColorFilter(clearColor);
         } else {
             StringBuilder label = new StringBuilder();
             if (errors > 0) label.append(errors).append(errors == 1 ? " error" : " errors");
@@ -1983,6 +2110,7 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             activeTab.workingContent = editor.getText().toString();
             updateTabTitle(activeTab);
         }
+        updateXmlEditorToolsVisibility();
         if (optionsMenu == null) return;
         boolean canUndo = false;
         boolean canRedo = false;
@@ -2014,7 +2142,20 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
 
     private boolean canFormatLayoutTools() {
         return activeTab != null && activeTab.databaseLayout
-                && filename != null && filename.toLowerCase(Locale.ROOT).endsWith(".xml");
+                && activeTab.title != null && activeTab.title.toLowerCase(Locale.ROOT).endsWith(".xml");
+    }
+
+    private void setupXmlEditorTools() {
+        View preview = findViewById(R.id.btn_xml_preview);
+        View design = findViewById(R.id.btn_xml_design);
+        if (preview != null) preview.setOnClickListener(v -> dispatchOption(6));
+        if (design != null) design.setOnClickListener(v -> dispatchOption(16));
+        updateXmlEditorToolsVisibility();
+    }
+
+    private void updateXmlEditorToolsVisibility() {
+        View tools = findViewById(R.id.xml_editor_tools);
+        if (tools != null) tools.setVisibility(canFormatLayoutTools() ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -2058,12 +2199,11 @@ public class ViewCodeEditorActivity extends BaseAppCompatActivity {
             }
             case 16 -> {
                 if (!canFormatLayoutTools()) return true;
-                if (isContentModified()) saveCurrentTab();
-                Intent intent = new Intent(this, DesignActivity.class);
+                Intent intent = new Intent(this, XmlLayoutStructureActivity.class);
                 intent.putExtra("sc_id", sc_id);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                intent.putExtra("xml", editor.getText().toString());
+                intent.putExtra("file_name", activeTab.title);
                 startActivity(intent);
-                finish();
                 return true;
             }
             case 7 -> { showLanguageSelector(); return true; }

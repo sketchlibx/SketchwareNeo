@@ -92,6 +92,51 @@
                 android:layout_below="@id/note_card" />
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/xml_editor_tools"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentTop="true"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="10dp"
+                android:alpha="0.86"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="6dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="4dp">
+
+                    <ImageButton
+                        android:id="@+id/btn_xml_preview"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Preview layout"
+                        android:padding="11dp"
+                        android:src="@drawable/ic_mtrl_preview"
+                        app:tint="?attr/colorPrimary" />
+
+                    <ImageButton
+                        android:id="@+id/btn_xml_design"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Open visual designer"
+                        android:padding="11dp"
+                        android:src="@drawable/ic_mtrl_design"
+                        app:tint="?attr/colorPrimary" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/search_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -301,7 +346,7 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="#22000000"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
                     app:cardCornerRadius="13dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
@@ -344,7 +389,7 @@
                     android:layout_height="18dp"
                     android:layout_marginStart="8dp"
                     android:layout_marginEnd="8dp"
-                    android:background="#33888888" />
+                    android:background="?attr/colorOutlineVariant" />
 
                 <TextView
                     android:id="@+id/tv_encoding"
@@ -391,7 +436,7 @@
                             android:layout_width="14dp"
                             android:layout_height="14dp"
                             android:src="@drawable/ic_mtrl_check"
-                            app:tint="#2EA866" />
+                            app:tint="?attr/colorCoolGreen" />
                             
                         <TextView
                             android:id="@+id/tv_issue_status"
@@ -400,7 +445,7 @@
                             android:layout_marginStart="4dp"
                             android:singleLine="true"
                             android:text="No issues"
-                            android:textColor="#2EA866"
+                            android:textColor="?attr/colorCoolGreen"
                             android:textSize="10sp" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>

@@ -249,7 +249,7 @@ public class SrcCodeEditor extends BaseAppCompatActivity {
                 break;
             case TEXTMATE:
                 ed.setEditorLanguage(CodeEditorLanguages.loadTextMateLanguage(spec.scopeName));
-                ed.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(
+                ed.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(context,
                         CodeEditorColorSchemes.isDarkAppearance(context)
                                 ? CodeEditorColorSchemes.THEME_DRACULA
                                 : CodeEditorColorSchemes.THEME_GITHUB));

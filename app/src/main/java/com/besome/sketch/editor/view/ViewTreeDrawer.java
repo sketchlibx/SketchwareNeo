@@ -2,9 +2,8 @@ package com.besome.sketch.editor.view;
 
 import android.animation.ObjectAnimator;
 import android.content.Context;
-import android.graphics.Canvas;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.graphics.Paint;
 import android.text.Editable;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -16,6 +15,8 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -27,7 +28,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.activity.OnBackPressedCallback;
 import androidx.fragment.app.FragmentActivity;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
@@ -38,11 +41,13 @@ import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.shape.ShapeAppearanceModel;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.Objects;
 
 import pro.sketchware.R;
 import pro.sketchware.utility.SketchwareUtil;
@@ -53,6 +58,8 @@ public class ViewTreeDrawer {
     public interface OnViewSelectedListener {
         void onSelected(String viewId);
         default boolean onMoveRequested(String sourceViewId, String targetParentId) { return false; }
+        default boolean onTreeActionRequested(String sourceViewId, String action, String targetViewId) { return false; }
+        default ArrayList<ViewBean> onReloadViews() { return null; }
     }
 
     private final ArrayList<ViewBean> currentViews;
@@ -62,6 +69,7 @@ public class ViewTreeDrawer {
     private OnBackPressedCallback backCallback;
     private final OnViewSelectedListener listener;
     private final String selectedViewId;
+    private final String layoutFileName;
 
     private final List<TreeNode> rootNodes = new ArrayList<>();
     private final List<TreeNode> displayNodes = new ArrayList<>();
@@ -71,20 +79,30 @@ public class ViewTreeDrawer {
     private RecyclerView recyclerView;
     private HorizontalScrollView hsvTree;
     private TextView tvNoResults;
+    private TextView tvCountBadge;
+    private TextView tvTreeSubtitle;
     private ItemTouchHelper itemTouchHelper;
     private TreeNode draggedNode;
     private TreeNode dropTargetNode;
+    private int draggedPosition = RecyclerView.NO_POSITION;
+    private int dropTargetPosition = RecyclerView.NO_POSITION;
 
     public ViewTreeDrawer(ArrayList<ViewBean> views, OnViewSelectedListener listener, @Nullable String selectedViewId) {
+        this(views, listener, selectedViewId, null);
+    }
+
+    public ViewTreeDrawer(ArrayList<ViewBean> views, OnViewSelectedListener listener,
+                          @Nullable String selectedViewId, @Nullable String layoutFileName) {
         this.currentViews = views == null ? new ArrayList<>() : new ArrayList<>(views);
         this.listener = listener;
         this.selectedViewId = selectedViewId;
+        this.layoutFileName = layoutFileName;
     }
 
     public void show(@NonNull FragmentActivity activity) {
         if (overlay != null || activity.isFinishing() || activity.isDestroyed()) return;
         hostActivity = activity;
-        android.view.View content = activity.findViewById(android.R.id.content);
+        View content = activity.findViewById(android.R.id.content);
         if (!(content instanceof ViewGroup)) return;
 
         overlay = new FrameLayout(activity);
@@ -97,23 +115,53 @@ public class ViewTreeDrawer {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         drawerRoot = createView();
-        int maxWidth = SketchwareUtil.dpToPx(300);
+        View sheetHandle = drawerRoot.findViewById(R.id.tree_sheet_handle);
+        if (sheetHandle != null) {
+            float[] touchStartY = new float[1];
+            sheetHandle.setOnTouchListener((view, event) -> {
+                if (drawerRoot == null) return true;
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN -> {
+                        touchStartY[0] = event.getRawY();
+                        return true;
+                    }
+                    case MotionEvent.ACTION_MOVE -> {
+                        float offset = Math.max(0f, event.getRawY() - touchStartY[0]);
+                        drawerRoot.setTranslationY(offset);
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        if (drawerRoot.getTranslationY() > SketchwareUtil.dpToPx(96)) {
+                            dismiss();
+                        } else {
+                            drawerRoot.animate().translationY(0f).setDuration(180L).start();
+                        }
+                        return true;
+                    }
+                    default -> { return true; }
+                }
+            });
+        }
         DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
-        int drawerWidth = Math.min(maxWidth, (int) (metrics.widthPixels * 0.88f));
+        int sheetHeight = Math.round(metrics.heightPixels * 0.88f);
         FrameLayout.LayoutParams drawerParams = new FrameLayout.LayoutParams(
-                drawerWidth, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END);
+                ViewGroup.LayoutParams.MATCH_PARENT, sheetHeight, Gravity.BOTTOM);
         overlay.addView(drawerRoot, drawerParams);
         ((ViewGroup) content).addView(overlay, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         overlay.bringToFront();
         overlay.requestFocus();
-        drawerRoot.setTranslationX(drawerWidth);
-        drawerRoot.animate().translationX(0f).setDuration(220L).start();
+        drawerRoot.setTranslationY(sheetHeight);
+        drawerRoot.animate().translationY(0f).setDuration(240L).start();
 
         backCallback = new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() { dismiss(); }
         };
         activity.getOnBackPressedDispatcher().addCallback(activity, backCallback);
+    }
+
+    public boolean isShowing() {
+        return overlay != null;
     }
 
     public void dismiss() {
@@ -126,8 +174,8 @@ public class ViewTreeDrawer {
         }
         View oldDrawer = drawerRoot;
         drawerRoot = null;
-        if (oldDrawer != null && oldDrawer.getWidth() > 0) {
-            oldDrawer.animate().translationX(oldDrawer.getWidth()).setDuration(160L)
+        if (oldDrawer != null && oldDrawer.getHeight() > 0) {
+            oldDrawer.animate().translationY(oldDrawer.getHeight()).setDuration(180L)
                     .withEndAction(() -> removeOverlay(oldOverlay)).start();
         } else {
             removeOverlay(oldOverlay);
@@ -144,20 +192,23 @@ public class ViewTreeDrawer {
         View root = inflater.inflate(R.layout.layout_view_tree_drawer, null, false);
 
         ShapeAppearanceModel shape = ShapeAppearanceModel.builder()
-                .setTopLeftCornerSize(SketchwareUtil.dpToPx(24))
-                .setBottomLeftCornerSize(SketchwareUtil.dpToPx(24))
+                .setTopLeftCornerSize(SketchwareUtil.dpToPx(26))
+                .setTopRightCornerSize(SketchwareUtil.dpToPx(26))
+                .setBottomLeftCornerSize(0)
+                .setBottomRightCornerSize(0)
                 .build();
         MaterialShapeDrawable bg = new MaterialShapeDrawable(shape);
-        bg.setFillColor(android.content.res.ColorStateList.valueOf(ThemeUtils.getColor(hostActivity, R.attr.colorSurfaceContainerLow)));
+        bg.setFillColor(ColorStateList.valueOf(ThemeUtils.getColor(hostActivity, R.attr.colorSurfaceContainerLow)));
         root.setBackground(bg);
 
-        TextView tvCountBadge = root.findViewById(R.id.tv_count_badge);
+        tvCountBadge = root.findViewById(R.id.tv_count_badge);
+        tvTreeSubtitle = root.findViewById(R.id.tv_tree_subtitle);
         EditText etSearch = root.findViewById(R.id.et_search);
         recyclerView = root.findViewById(R.id.recycler_view);
         hsvTree = root.findViewById(R.id.hsv_tree);
         tvNoResults = root.findViewById(R.id.tv_no_results);
 
-        tvCountBadge.setText(String.valueOf(currentViews.size()));
+        updateTreeHeader();
         
         ((View) root.findViewById(R.id.tv_count_badge).getParent()).setOnLongClickListener(v -> {
             boolean anyExpanded = false;
@@ -184,6 +235,13 @@ public class ViewTreeDrawer {
             }
         };
         recyclerView.setLayoutManager(layoutManager);
+        DefaultItemAnimator treeAnimator = new DefaultItemAnimator();
+        treeAnimator.setAddDuration(0);
+        treeAnimator.setRemoveDuration(0);
+        treeAnimator.setChangeDuration(0);
+        treeAnimator.setMoveDuration(170);
+        treeAnimator.setSupportsChangeAnimations(false);
+        recyclerView.setItemAnimator(treeAnimator);
         recyclerView.setItemViewCacheSize(30);
         recyclerView.setHasFixedSize(false);
         
@@ -206,13 +264,25 @@ public class ViewTreeDrawer {
                     dropTargetNode = null;
                     return false;
                 }
-                if (draggedNode == null) draggedNode = adapter.currentList.get(sourcePosition);
+                if (draggedNode == null) {
+                    draggedNode = adapter.currentList.get(sourcePosition);
+                    draggedPosition = sourcePosition;
+                }
                 TreeNode target = adapter.currentList.get(targetPosition);
-                if (isValidDropTarget(draggedNode, target)) {
+                boolean moveInto = isValidDropTarget(draggedNode, target)
+                        && !target.viewBean.id.equals(draggedNode.viewBean.parent);
+                boolean reorderSibling = target != null && target.viewBean != null
+                        && draggedNode != null && draggedNode.viewBean != null
+                        && !target.viewBean.id.equals(draggedNode.viewBean.id)
+                        && normalizeParentId(target.viewBean.parent).equals(normalizeParentId(draggedNode.viewBean.parent));
+                if (moveInto || reorderSibling) {
                     dropTargetNode = target;
+                    dropTargetPosition = targetPosition;
+                    adapter.moveItem(sourcePosition, targetPosition);
                     return true;
                 }
                 dropTargetNode = null;
+                dropTargetPosition = RecyclerView.NO_POSITION;
                 return false;
             }
 
@@ -225,8 +295,10 @@ public class ViewTreeDrawer {
                     int position = viewHolder.getBindingAdapterPosition();
                     if (position != RecyclerView.NO_POSITION && position < adapter.currentList.size()) {
                         draggedNode = adapter.currentList.get(position);
+                        draggedPosition = position;
                     }
                     dropTargetNode = null;
+                    dropTargetPosition = RecyclerView.NO_POSITION;
                 }
             }
 
@@ -235,20 +307,30 @@ public class ViewTreeDrawer {
                 super.clearView(recyclerView, viewHolder);
                 TreeNode source = draggedNode;
                 TreeNode target = dropTargetNode;
+                int sourcePosition = adapter == null ? RecyclerView.NO_POSITION : adapter.currentList.indexOf(source);
+                int targetPosition = adapter == null ? RecyclerView.NO_POSITION : adapter.currentList.indexOf(target);
                 draggedNode = null;
                 dropTargetNode = null;
-                if (source == null || target == null) return;
-                if (!isValidDropTarget(source, target)) {
-                    SketchwareUtil.toastError("Choose a valid container; parent/child cycles are not allowed");
-                    return;
-                }
-                boolean moved = listener != null && listener.onMoveRequested(source.viewBean.id, target.viewBean.id);
-                if (moved) {
-                    buildTree();
-                    rebuildDisplayList();
-                    adapter.submitList(new ArrayList<>(displayNodes));
+                draggedPosition = RecyclerView.NO_POSITION;
+                dropTargetPosition = RecyclerView.NO_POSITION;
+                if (source == null || target == null || source == target
+                        || source.viewBean == null || target.viewBean == null
+                        || source.viewBean.id == null || target.viewBean.id == null
+                        || source.viewBean.id.equals(target.viewBean.id)) return;
+                boolean moved;
+                if (isValidDropTarget(source, target) && !target.viewBean.id.equals(source.viewBean.parent)) {
+                    moved = listener != null && listener.onMoveRequested(source.viewBean.id, target.viewBean.id);
+                } else if (normalizeParentId(source.viewBean.parent).equals(normalizeParentId(target.viewBean.parent))
+                        && sourcePosition != RecyclerView.NO_POSITION && targetPosition != RecyclerView.NO_POSITION) {
+                    String action = sourcePosition > targetPosition ? "MOVE_AFTER" : "MOVE_BEFORE";
+                    moved = listener != null && listener.onTreeActionRequested(source.viewBean.id, action, target.viewBean.id);
                 } else {
-                    SketchwareUtil.toastError("The view could not be moved into that container");
+                    moved = false;
+                }
+                if (moved) {
+                    refreshTreeFromSource();
+                } else {
+                    SketchwareUtil.toastError("The component could not be moved to that position");
                 }
             }
         };
@@ -267,10 +349,29 @@ public class ViewTreeDrawer {
             }
         });
 
-        recyclerView.setAlpha(0f);
-        recyclerView.animate().alpha(1f).setDuration(250).setStartDelay(50).start();
-
         return root;
+    }
+
+    private void refreshTreeFromSource() {
+        ArrayList<ViewBean> refreshed = listener == null ? null : listener.onReloadViews();
+        if (refreshed != null) {
+            currentViews.clear();
+            currentViews.addAll(refreshed);
+        }
+        updateTreeHeader();
+        buildTree();
+        rebuildDisplayList();
+        if (adapter != null) adapter.submitList(new ArrayList<>(displayNodes));
+    }
+
+    private void updateTreeHeader() {
+        if (tvCountBadge != null) tvCountBadge.setText(String.valueOf(currentViews.size()));
+        if (tvTreeSubtitle != null) {
+            String fileName = layoutFileName == null ? "" : layoutFileName;
+            int slash = fileName.lastIndexOf('/');
+            if (slash >= 0) fileName = fileName.substring(slash + 1);
+            tvTreeSubtitle.setText(currentViews.size() + " views" + (fileName.isEmpty() ? "" : " on " + fileName));
+        }
     }
 
     private void buildTree() {
@@ -290,6 +391,10 @@ public class ViewTreeDrawer {
             } else {
                 childrenMap.computeIfAbsent(bean.parent, k -> new ArrayList<>()).add(bean);
             }
+        }
+        roots.sort(Comparator.comparingInt(bean -> bean.index));
+        for (List<ViewBean> siblings : childrenMap.values()) {
+            siblings.sort(Comparator.comparingInt(bean -> bean.index));
         }
 
         Set<String> visited = new HashSet<>();
@@ -424,6 +529,10 @@ public class ViewTreeDrawer {
         }
     }
 
+    private String normalizeParentId(String parentId) {
+        return parentId == null || parentId.isEmpty() || "root".equals(parentId) ? "root" : parentId;
+    }
+
     private boolean isValidDropTarget(TreeNode source, TreeNode target) {
         if (source == null || target == null || source.viewBean == null || target.viewBean == null) return false;
         if (source.viewBean.id == null || target.viewBean.id == null
@@ -456,55 +565,18 @@ public class ViewTreeDrawer {
     }
 
     public static class TreeIndentView extends View {
-        private int depth = 0;
-        private boolean isLastChild = false;
-        private List<Boolean> parentIsLastList = new ArrayList<>();
-        private final Paint paint;
         private final int indentWidth;
 
         public TreeIndentView(Context context) {
             super(context);
-            paint = new Paint();
-            paint.setColor(ThemeUtils.getColor(context, R.attr.colorOutlineVariant));
-            paint.setStrokeWidth(SketchwareUtil.dpToPx(1f));
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setAntiAlias(true);
-            indentWidth = SketchwareUtil.dpToPx(20); 
+            indentWidth = SketchwareUtil.dpToPx(20);
         }
 
         public void bind(int depth, boolean isLastChild, List<Boolean> parentIsLastList) {
-            this.depth = depth;
-            this.isLastChild = isLastChild;
-            this.parentIsLastList = parentIsLastList;
             ViewGroup.LayoutParams lp = getLayoutParams();
             if (lp != null) {
                 lp.width = depth > 0 ? depth * indentWidth : 0;
                 setLayoutParams(lp);
-            }
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            if (depth == 0) return;
-            int h = getHeight();
-            int halfH = h / 2;
-            int w = indentWidth;
-
-            for (int i = 0; i < depth; i++) {
-                int x = i * w + w / 2;
-                if (i == depth - 1) {
-                    canvas.drawLine(x, 0, x, halfH, paint);
-                    if (!isLastChild) {
-                        canvas.drawLine(x, halfH, x, h, paint);
-                    }
-                    canvas.drawLine(x, halfH, i * w + w, halfH, paint);
-                } else {
-                    if (parentIsLastList.size() > i && !parentIsLastList.get(i)) {
-                        canvas.drawLine(x, 0, x, h, paint);
-                    }
-                }
             }
         }
     }
@@ -529,6 +601,16 @@ public class ViewTreeDrawer {
 
     private class TreeAdapter extends RecyclerView.Adapter<TreeAdapter.VH> {
         private List<TreeNode> currentList = new ArrayList<>();
+
+        void moveItem(int fromPosition, int toPosition) {
+            if (fromPosition < 0 || toPosition < 0 || fromPosition >= currentList.size()
+                    || toPosition >= currentList.size() || fromPosition == toPosition) return;
+            ArrayList<TreeNode> updated = new ArrayList<>(currentList);
+            TreeNode moved = updated.remove(fromPosition);
+            updated.add(toPosition, moved);
+            currentList = updated;
+            notifyItemMoved(fromPosition, toPosition);
+        }
 
         void submitList(List<TreeNode> newList) {
             DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
@@ -570,7 +652,7 @@ public class ViewTreeDrawer {
             View rootLayout;
             FrameLayout indentContainer;
             TreeIndentView indentView;
-            ImageView imgArrow, imgIcon;
+            ImageView imgArrow, imgIcon, imgMore, imgDrag;
             TextView tvId, tvType;
 
             VH(View v) {
@@ -584,6 +666,8 @@ public class ViewTreeDrawer {
                 imgIcon = v.findViewById(R.id.img_icon);
                 tvId = v.findViewById(R.id.tv_title);
                 tvType = v.findViewById(R.id.tv_subtitle);
+                imgMore = v.findViewById(R.id.img_more);
+                imgDrag = v.findViewById(R.id.img_drag);
             }
 
             void bind(TreeNode node, boolean isSelected, String query) {
@@ -645,13 +729,96 @@ public class ViewTreeDrawer {
                         dismiss();
                     }
                 });
-                rootLayout.setOnLongClickListener(v -> {
-                    if (itemTouchHelper != null) {
+                rootLayout.setOnLongClickListener(null);
+                imgMore.setOnClickListener(v -> showNodeActions(v, node));
+                imgDrag.setOnLongClickListener(v -> {
+                    if (itemTouchHelper != null && getBindingAdapterPosition() != RecyclerView.NO_POSITION) {
                         itemTouchHelper.startDrag(this);
                         return true;
                     }
                     return false;
                 });
+            }
+
+            private void showNodeActions(View anchor, TreeNode node) {
+                PopupMenu popup = new PopupMenu(hostActivity, anchor);
+                List<TreeNode> siblings = getSiblings(node);
+                int position = siblings.indexOf(node);
+                MenuItem moveUp = popup.getMenu().add(0, 1, 0, "Move up");
+                MenuItem moveDown = popup.getMenu().add(0, 2, 1, "Move down");
+                String parentName = node.viewBean.parent == null || node.viewBean.parent.isEmpty()
+                        || "root".equals(node.viewBean.parent) ? "root layout" : node.viewBean.parent;
+                MenuItem moveOut = popup.getMenu().add(0, 3, 2, "Move out of " + parentName);
+                TreeNode previousContainer = findPreviousContainer(node, siblings, position);
+                String previousContainerName = previousContainer == null || previousContainer.viewBean == null
+                        ? "layout above" : previousContainer.viewBean.id;
+                MenuItem moveInto = popup.getMenu().add(0, 4, 3, "Move into " + previousContainerName);
+                MenuItem copy = popup.getMenu().add(0, 5, 4, "Copy");
+                MenuItem delete = popup.getMenu().add(0, 6, 5, "Delete");
+                moveUp.setIcon(R.drawable.ic_mtrl_arrow_up);
+                moveDown.setIcon(R.drawable.ic_mtrl_arrow_down);
+                moveOut.setIcon(R.drawable.ic_mtrl_arrow_left);
+                moveInto.setIcon(R.drawable.ic_mtrl_arrow_right);
+                copy.setIcon(R.drawable.ic_mtrl_copy);
+                delete.setIcon(R.drawable.ic_mtrl_delete);
+                popup.setForceShowIcon(true);
+                moveUp.setEnabled(position > 0);
+                moveDown.setEnabled(position >= 0 && position < siblings.size() - 1);
+                moveOut.setEnabled(node.viewBean.parent != null && !node.viewBean.parent.isEmpty()
+                        && !"root".equals(node.viewBean.parent));
+                moveInto.setEnabled(previousContainer != null);
+                popup.setOnMenuItemClickListener(item -> {
+                    String action;
+                    String targetId = null;
+                    switch (item.getItemId()) {
+                        case 1 -> action = "MOVE_UP";
+                        case 2 -> action = "MOVE_DOWN";
+                        case 3 -> action = "MOVE_OUT";
+                        case 4 -> {
+                            action = "MOVE_INTO";
+                            targetId = previousContainer == null ? null : previousContainer.viewBean.id;
+                        }
+                        case 5 -> action = "COPY";
+                        case 6 -> action = "DELETE";
+                        default -> { return false; }
+                    }
+                    if ("DELETE".equals(action)) {
+                        if (listener != null) listener.onTreeActionRequested(node.viewBean.id, action, targetId);
+                        dismiss();
+                        return true;
+                    }
+                    boolean success = listener != null && listener.onTreeActionRequested(node.viewBean.id, action, targetId);
+                    if (success) refreshTreeFromSource();
+                    return true;
+                });
+                popup.show();
+            }
+
+            private List<TreeNode> getSiblings(TreeNode node) {
+                ArrayList<TreeNode> siblings = new ArrayList<>();
+                collectSiblings(rootNodes, node, siblings);
+                siblings.sort((first, second) -> Integer.compare(first.viewBean.index, second.viewBean.index));
+                return siblings;
+            }
+
+            private void collectSiblings(List<TreeNode> nodes, TreeNode target, List<TreeNode> result) {
+                for (TreeNode candidate : nodes) {
+                    if (candidate == target) {
+                        result.addAll(nodes);
+                        return;
+                    }
+                    collectSiblings(candidate.children, target, result);
+                    if (!result.isEmpty()) return;
+                }
+            }
+
+            private TreeNode findPreviousContainer(TreeNode node, List<TreeNode> siblings, int position) {
+                if (position <= 0) return null;
+                for (int index = position - 1; index >= 0; index--) {
+                    TreeNode candidate = siblings.get(index);
+                    if (isContainer(candidate.viewBean)) return candidate;
+                }
+                return null;
             }
 
             private CharSequence highlight(String text, String query, int bgColor, int fgColor) {

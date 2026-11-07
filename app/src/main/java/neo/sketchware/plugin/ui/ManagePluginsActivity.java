@@ -11,7 +11,7 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -44,7 +44,7 @@ import neo.sketchware.plugin.marketplace.PluginVersionUtils;
 import pro.sketchware.BuildConfig;
 import pro.sketchware.R;
 
-public final class ManagePluginsActivity extends AppCompatActivity implements PluginMarketplaceAdapter.Listener {
+public final class ManagePluginsActivity extends PaletteAwareAppCompatActivity implements PluginMarketplaceAdapter.Listener {
 
     private RecyclerView recyclerView;
     private PluginMarketplaceAdapter adapter;

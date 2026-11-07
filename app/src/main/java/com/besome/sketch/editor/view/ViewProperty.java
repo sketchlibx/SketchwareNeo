@@ -75,13 +75,32 @@ public class ViewProperty extends LinearLayout implements Kw {
     private boolean showAllVisible = true;
     private String currentlySelectedViewId = null;
     private OnViewMoveListener onViewMoveListener;
+    private ViewTreeDrawer activeTreeDrawer;
 
     public interface OnViewMoveListener {
         boolean onMoveRequested(String sourceViewId, String targetParentId);
+
+        default boolean onTreeActionRequested(String sourceViewId, String action, String targetViewId) {
+            return false;
+        }
+
+        default ArrayList<ViewBean> onReloadViews() {
+            return null;
+        }
     }
 
     public void setOnViewMoveListener(OnViewMoveListener listener) {
         onViewMoveListener = listener;
+    }
+
+    public boolean dismissTreeDrawer() {
+        if (activeTreeDrawer != null && activeTreeDrawer.isShowing()) {
+            activeTreeDrawer.dismiss();
+            activeTreeDrawer = null;
+            return true;
+        }
+        activeTreeDrawer = null;
+        return false;
     }
 
     public ViewProperty(Context context) {
@@ -350,10 +369,22 @@ public class ViewProperty extends LinearLayout implements Kw {
                             return onViewMoveListener != null
                                     && onViewMoveListener.onMoveRequested(sourceViewId, targetParentId);
                         }
+
+                        @Override
+                        public boolean onTreeActionRequested(String sourceViewId, String action, String targetViewId) {
+                            return onViewMoveListener != null
+                                    && onViewMoveListener.onTreeActionRequested(sourceViewId, action, targetViewId);
+                        }
+
+                        @Override
+                        public ArrayList<ViewBean> onReloadViews() {
+                            return onViewMoveListener == null ? null : onViewMoveListener.onReloadViews();
+                        }
                     },
                     currentlySelectedViewId
                 );
 
+                activeTreeDrawer = drawer;
                 drawer.show((FragmentActivity) context);
             }
         } else {

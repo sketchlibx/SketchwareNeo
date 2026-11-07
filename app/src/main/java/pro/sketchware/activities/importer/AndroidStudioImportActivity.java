@@ -15,7 +15,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.core.view.WindowCompat;
 
 import com.google.android.material.chip.Chip;
@@ -55,7 +55,7 @@ import pro.sketchware.utility.FileUtil;
 import pro.sketchware.R;
 import pro.sketchware.databinding.ActivityAndroidStudioImportBinding;
 
-public class AndroidStudioImportActivity extends AppCompatActivity {
+public class AndroidStudioImportActivity extends PaletteAwareAppCompatActivity {
     private static final int MAX_TREE_ENTRIES = 50000;
     private static final long MAX_TREE_BYTES = 1024L * 1024L * 1024L;
     private static final String[] SKIP_DIRS = {".git", ".gradle", ".idea", "build", ".cxx", "captures", "intermediates", "tmp"};

@@ -351,16 +351,12 @@ public class ManageXMLCommandActivity extends BaseAppCompatActivity {
                                         editor.setEditorLanguage(
                                                 CodeEditorLanguages.loadTextMateLanguage(
                                                         CodeEditorLanguages.SCOPE_NAME_XML));
-                                        if (ThemeUtils.isDarkThemeEnabled(
-                                                getApplicationContext())) {
-                                            editor.setColorScheme(
-                                                    CodeEditorColorSchemes.loadTextMateColorScheme(
-                                                            CodeEditorColorSchemes.THEME_DRACULA));
-                                        } else {
-                                            editor.setColorScheme(
-                                                    CodeEditorColorSchemes.loadTextMateColorScheme(
-                                                            CodeEditorColorSchemes.THEME_GITHUB));
-                                        }
+                                        Context editorContext = editor.getContext();
+                                        editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(
+                                                editorContext,
+                                                CodeEditorColorSchemes.isDarkAppearance(editorContext)
+                                                        ? CodeEditorColorSchemes.THEME_DRACULA
+                                                        : CodeEditorColorSchemes.THEME_GITHUB));
 
                                         AlertDialog dialog = dialogBuilder.create();
                                         dialog.setView(

@@ -8,7 +8,7 @@ import android.text.TextWatcher;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -33,7 +33,7 @@ import dev.sketchlibx.filepicker.FilePickerOptions;
 import neo.sketchware.plugin.PluginManager;
 import pro.sketchware.utility.SketchwareUtil;
 
-public class InstalledPluginsActivity extends AppCompatActivity {
+public class InstalledPluginsActivity extends PaletteAwareAppCompatActivity {
 
     private RecyclerView recyclerView;
     private PluginListAdapter adapter;

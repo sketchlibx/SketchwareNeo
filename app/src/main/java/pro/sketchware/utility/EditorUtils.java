@@ -1,7 +1,5 @@
 package pro.sketchware.utility;
 
-import static pro.sketchware.utility.ThemeUtils.isDarkThemeEnabled;
-
 import android.content.Context;
 import android.graphics.Typeface;
 
@@ -62,8 +60,8 @@ public class EditorUtils {
         editor.setEditorLanguage(language);
         String profile = CodeEditorColorSchemes.getSelectedProfile(editor.getContext());
         if (isTextMate) {
-            editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(
-                    isDarkThemeEnabled(editor.getContext())
+            editor.setColorScheme(CodeEditorColorSchemes.loadTextMateColorScheme(editor.getContext(),
+                    CodeEditorColorSchemes.isDarkAppearance(editor.getContext())
                             ? CodeEditorColorSchemes.THEME_DRACULA
                             : CodeEditorColorSchemes.THEME_GITHUB));
         } else if (CodeEditorColorSchemes.PROFILE_DRACULA.equals(profile)) {

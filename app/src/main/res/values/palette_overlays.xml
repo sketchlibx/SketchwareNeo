@@ -1,0 +1,192 @@
+<resources>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Blue" parent="">
+        <item name="colorPrimary">@color/palette_blue_primary</item>
+        <item name="colorOnPrimary">@color/palette_blue_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_blue_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_blue_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_blue_secondary</item>
+        <item name="colorOnSecondary">@color/palette_blue_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_blue_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_blue_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_blue_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_blue_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_blue_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_blue_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_blue_primary</item>
+        <item name="colorSurfaceTint">@color/palette_blue_primary</item>
+        <item name="colorControlActivated">@color/palette_blue_primary</item>
+        <item name="android:colorAccent">@color/palette_blue_primary</item>
+        <item name="colorAccent">@color/palette_blue_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Red" parent="">
+        <item name="colorPrimary">@color/palette_red_primary</item>
+        <item name="colorOnPrimary">@color/palette_red_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_red_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_red_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_red_secondary</item>
+        <item name="colorOnSecondary">@color/palette_red_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_red_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_red_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_red_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_red_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_red_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_red_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_red_primary</item>
+        <item name="colorSurfaceTint">@color/palette_red_primary</item>
+        <item name="colorControlActivated">@color/palette_red_primary</item>
+        <item name="android:colorAccent">@color/palette_red_primary</item>
+        <item name="colorAccent">@color/palette_red_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Green" parent="">
+        <item name="colorPrimary">@color/palette_green_primary</item>
+        <item name="colorOnPrimary">@color/palette_green_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_green_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_green_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_green_secondary</item>
+        <item name="colorOnSecondary">@color/palette_green_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_green_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_green_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_green_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_green_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_green_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_green_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_green_primary</item>
+        <item name="colorSurfaceTint">@color/palette_green_primary</item>
+        <item name="colorControlActivated">@color/palette_green_primary</item>
+        <item name="android:colorAccent">@color/palette_green_primary</item>
+        <item name="colorAccent">@color/palette_green_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Purple" parent="">
+        <item name="colorPrimary">@color/palette_purple_primary</item>
+        <item name="colorOnPrimary">@color/palette_purple_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_purple_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_purple_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_purple_secondary</item>
+        <item name="colorOnSecondary">@color/palette_purple_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_purple_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_purple_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_purple_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_purple_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_purple_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_purple_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_purple_primary</item>
+        <item name="colorSurfaceTint">@color/palette_purple_primary</item>
+        <item name="colorControlActivated">@color/palette_purple_primary</item>
+        <item name="android:colorAccent">@color/palette_purple_primary</item>
+        <item name="colorAccent">@color/palette_purple_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Amber" parent="">
+        <item name="colorPrimary">@color/palette_amber_primary</item>
+        <item name="colorOnPrimary">@color/palette_amber_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_amber_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_amber_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_amber_secondary</item>
+        <item name="colorOnSecondary">@color/palette_amber_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_amber_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_amber_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_amber_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_amber_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_amber_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_amber_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_amber_primary</item>
+        <item name="colorSurfaceTint">@color/palette_amber_primary</item>
+        <item name="colorControlActivated">@color/palette_amber_primary</item>
+        <item name="android:colorAccent">@color/palette_amber_primary</item>
+        <item name="colorAccent">@color/palette_amber_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Teal" parent="">
+        <item name="colorPrimary">@color/palette_teal_primary</item>
+        <item name="colorOnPrimary">@color/palette_teal_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_teal_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_teal_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_teal_secondary</item>
+        <item name="colorOnSecondary">@color/palette_teal_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_teal_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_teal_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_teal_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_teal_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_teal_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_teal_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_teal_primary</item>
+        <item name="colorSurfaceTint">@color/palette_teal_primary</item>
+        <item name="colorControlActivated">@color/palette_teal_primary</item>
+        <item name="android:colorAccent">@color/palette_teal_primary</item>
+        <item name="colorAccent">@color/palette_teal_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Indigo" parent="">
+        <item name="colorPrimary">@color/palette_indigo_primary</item>
+        <item name="colorOnPrimary">@color/palette_indigo_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_indigo_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_indigo_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_indigo_secondary</item>
+        <item name="colorOnSecondary">@color/palette_indigo_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_indigo_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_indigo_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_indigo_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_indigo_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_indigo_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_indigo_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_indigo_primary</item>
+        <item name="colorSurfaceTint">@color/palette_indigo_primary</item>
+        <item name="colorControlActivated">@color/palette_indigo_primary</item>
+        <item name="android:colorAccent">@color/palette_indigo_primary</item>
+        <item name="colorAccent">@color/palette_indigo_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Pink" parent="">
+        <item name="colorPrimary">@color/palette_pink_primary</item>
+        <item name="colorOnPrimary">@color/palette_pink_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_pink_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_pink_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_pink_secondary</item>
+        <item name="colorOnSecondary">@color/palette_pink_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_pink_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_pink_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_pink_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_pink_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_pink_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_pink_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_pink_primary</item>
+        <item name="colorSurfaceTint">@color/palette_pink_primary</item>
+        <item name="colorControlActivated">@color/palette_pink_primary</item>
+        <item name="android:colorAccent">@color/palette_pink_primary</item>
+        <item name="colorAccent">@color/palette_pink_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Orange" parent="">
+        <item name="colorPrimary">@color/palette_orange_primary</item>
+        <item name="colorOnPrimary">@color/palette_orange_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_orange_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_orange_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_orange_secondary</item>
+        <item name="colorOnSecondary">@color/palette_orange_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_orange_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_orange_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_orange_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_orange_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_orange_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_orange_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_orange_primary</item>
+        <item name="colorSurfaceTint">@color/palette_orange_primary</item>
+        <item name="colorControlActivated">@color/palette_orange_primary</item>
+        <item name="android:colorAccent">@color/palette_orange_primary</item>
+        <item name="colorAccent">@color/palette_orange_primary</item>
+    </style>
+    <style name="ThemeOverlay.SketchwarePro.Palette.Antique" parent="">
+        <item name="colorPrimary">@color/palette_antique_primary</item>
+        <item name="colorOnPrimary">@color/palette_antique_on_primary</item>
+        <item name="colorPrimaryContainer">@color/palette_antique_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/palette_antique_on_primary_container</item>
+        <item name="colorSecondary">@color/palette_antique_secondary</item>
+        <item name="colorOnSecondary">@color/palette_antique_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/palette_antique_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/palette_antique_on_secondary_container</item>
+        <item name="colorTertiary">@color/palette_antique_tertiary</item>
+        <item name="colorOnTertiary">@color/palette_antique_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/palette_antique_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/palette_antique_on_tertiary_container</item>
+        <item name="colorPrimaryInverse">@color/palette_antique_primary</item>
+        <item name="colorSurfaceTint">@color/palette_antique_primary</item>
+        <item name="colorControlActivated">@color/palette_antique_primary</item>
+        <item name="android:colorAccent">@color/palette_antique_primary</item>
+        <item name="colorAccent">@color/palette_antique_primary</item>
+    </style>
+</resources>

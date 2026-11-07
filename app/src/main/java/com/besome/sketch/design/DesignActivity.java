@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.ColorStateList;
@@ -29,6 +30,7 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -61,12 +63,16 @@ import com.besome.sketch.lib.base.BaseAppCompatActivity;
 import com.besome.sketch.lib.ui.CustomViewPager;
 import com.besome.sketch.tools.CompileLogActivity;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.textfield.TextInputLayout;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.tabs.TabLayout;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.topjohnwu.superuser.Shell;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import org.eclipse.jgit.api.Git;
@@ -151,6 +157,12 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+    private final OnBackPressedCallback designBackCallback = new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            handleDesignBack();
+        }
+    };
     
     public final ActivityResultLauncher<Intent> changeOpenFile = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         if (result.getResultCode() == Activity.RESULT_OK) {
@@ -183,6 +195,12 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
     private PopupMenu bottomPopupMenu;
     private MaterialButton btnRun;
     private MaterialButton btnOptions;
+    private MaterialButton btnDevicePreview;
+    private View designAppBar;
+    private View designBottomBar;
+    private boolean previewFullscreen;
+    private int appBarVisibility = View.VISIBLE;
+    private int bottomBarVisibility = View.VISIBLE;
     private ProjectFileBean projectFile;
     private TextView fileName;
     private String currentJavaFileName;
@@ -525,20 +543,152 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
 
     @Override
     public void onBackPressed() {
-        if (drawer.isDrawerOpen(GravityCompat.END)) {
+        super.onBackPressed();
+    }
+
+    private void handleDesignBack() {
+        if (previewFullscreen) {
+            setPreviewFullscreen(false);
+            return;
+        }
+        if (drawer != null && drawer.isDrawerOpen(GravityCompat.END)) {
             drawer.closeDrawer(GravityCompat.END);
-        } else if (viewTabAdapter != null && viewTabAdapter.isPropertyViewVisible()) {
+            return;
+        }
+        if (viewTabAdapter != null && viewTabAdapter.dismissTreeDrawer()) return;
+        if (viewTabAdapter != null && viewTabAdapter.isPropertyViewVisible()) {
             hideViewPropertyView();
+            return;
+        }
+        if (currentTabNumber > 0) {
+            currentTabNumber--;
+            viewPager.setCurrentItem(currentTabNumber);
+        } else if (t.c("P12I2")) {
+            k();
+            saveChangesAndCloseProject();
         } else {
-            if (currentTabNumber > 0) {
-                currentTabNumber--;
-                viewPager.setCurrentItem(currentTabNumber);
-            } else if (t.c("P12I2")) {
-                k();
-                saveChangesAndCloseProject();
-            } else {
-                showSaveBeforeQuittingDialog();
+            showSaveBeforeQuittingDialog();
+        }
+    }
+
+    private void showDevicePreviewSheet() {
+        if (currentTabNumber != 0 || viewTabAdapter == null) {
+            SketchwareUtil.toast("Device preview settings are available in the layout editor.");
+            return;
+        }
+        View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_device_preview, null, false);
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        ChipGroup presets = sheet.findViewById(R.id.device_preset_group);
+        ChipGroup frames = sheet.findViewById(R.id.device_frame_group);
+        TextInputLayout widthLayout = sheet.findViewById(R.id.device_width_layout);
+        TextInputLayout heightLayout = sheet.findViewById(R.id.device_height_layout);
+        TextInputEditText widthInput = sheet.findViewById(R.id.device_width_input);
+        TextInputEditText heightInput = sheet.findViewById(R.id.device_height_input);
+
+        SharedPreferences preferences = getSharedPreferences("design_preview", MODE_PRIVATE);
+        String widthKey = "width_" + sc_id;
+        String heightKey = "height_" + sc_id;
+        String frameKey = "frame_" + sc_id;
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0f) density = 1f;
+        int defaultWidth = Math.max(240, Math.round(getResources().getDisplayMetrics().widthPixels / density));
+        int defaultHeight = Math.max(400, Math.round(getResources().getDisplayMetrics().heightPixels / density));
+        int width = preferences.getInt(widthKey, defaultWidth);
+        int height = preferences.getInt(heightKey, defaultHeight);
+        boolean phoneFrame = preferences.getBoolean(frameKey, false);
+        widthInput.setText(String.valueOf(width));
+        heightInput.setText(String.valueOf(height));
+        frames.check(phoneFrame ? R.id.chip_frame_phone : R.id.chip_frame_none);
+
+        int presetId = R.id.chip_device_custom;
+        if (width == 360 && height == 800) presetId = R.id.chip_device_phone;
+        else if (width == 800 && height == 1280) presetId = R.id.chip_device_tablet;
+        else if (width == 393 && height == 852) presetId = R.id.chip_device_iphone;
+        presets.check(presetId);
+
+        sheet.findViewById(R.id.chip_device_phone).setOnClickListener(v -> {
+            widthInput.setText("360");
+            heightInput.setText("800");
+            presets.check(R.id.chip_device_phone);
+        });
+        sheet.findViewById(R.id.chip_device_tablet).setOnClickListener(v -> {
+            widthInput.setText("800");
+            heightInput.setText("1280");
+            presets.check(R.id.chip_device_tablet);
+        });
+        sheet.findViewById(R.id.chip_device_iphone).setOnClickListener(v -> {
+            widthInput.setText("393");
+            heightInput.setText("852");
+            presets.check(R.id.chip_device_iphone);
+        });
+        sheet.findViewById(R.id.chip_device_custom).setOnClickListener(v -> presets.check(R.id.chip_device_custom));
+
+        Runnable clearErrors = () -> {
+            widthLayout.setError(null);
+            heightLayout.setError(null);
+        };
+        widthInput.setOnFocusChangeListener((v, hasFocus) -> { if (hasFocus) presets.check(R.id.chip_device_custom); });
+        heightInput.setOnFocusChangeListener((v, hasFocus) -> { if (hasFocus) presets.check(R.id.chip_device_custom); });
+
+        View.OnClickListener apply = v -> {
+            clearErrors.run();
+            int selectedWidth;
+            int selectedHeight;
+            try {
+                selectedWidth = Integer.parseInt(widthInput.getText() == null ? "" : widthInput.getText().toString().trim());
+                selectedHeight = Integer.parseInt(heightInput.getText() == null ? "" : heightInput.getText().toString().trim());
+            } catch (NumberFormatException error) {
+                widthLayout.setError("Enter a valid width");
+                heightLayout.setError("Enter a valid height");
+                return;
             }
+            if (selectedWidth < 200 || selectedWidth > 2000) {
+                widthLayout.setError("Use 200–2000 dp");
+                return;
+            }
+            if (selectedHeight < 300 || selectedHeight > 3000) {
+                heightLayout.setError("Use 300–3000 dp");
+                return;
+            }
+            boolean usePhoneFrame = frames.getCheckedChipId() == R.id.chip_frame_phone;
+            preferences.edit().putInt(widthKey, selectedWidth).putInt(heightKey, selectedHeight)
+                    .putBoolean(frameKey, usePhoneFrame).apply();
+            viewTabAdapter.setPreviewDeviceSettings(selectedWidth, selectedHeight, usePhoneFrame);
+            if (v.getId() == R.id.btn_device_fullscreen) {
+                dialog.dismiss();
+                setPreviewFullscreen(true);
+            } else {
+                dialog.dismiss();
+            }
+        };
+        sheet.findViewById(R.id.btn_apply_device).setOnClickListener(apply);
+        sheet.findViewById(R.id.btn_device_fullscreen).setOnClickListener(apply);
+        dialog.setContentView(sheet);
+        dialog.setOnShowListener(ignored -> {
+            dialog.getBehavior().setMaxHeight(Math.round(getResources().getDisplayMetrics().heightPixels * 0.82f));
+            dialog.getBehavior().setFitToContents(true);
+            dialog.getBehavior().setSkipCollapsed(true);
+            dialog.getBehavior().setState(BottomSheetBehavior.STATE_EXPANDED);
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+        });
+        dialog.show();
+    }
+
+    private void setPreviewFullscreen(boolean fullscreen) {
+        if (previewFullscreen == fullscreen) return;
+        previewFullscreen = fullscreen;
+        if (fullscreen) {
+            appBarVisibility = designAppBar == null ? View.VISIBLE : designAppBar.getVisibility();
+            bottomBarVisibility = designBottomBar == null ? View.VISIBLE : designBottomBar.getVisibility();
+            if (designAppBar != null) designAppBar.setVisibility(View.GONE);
+            if (designBottomBar != null) designBottomBar.setVisibility(View.GONE);
+            if (viewTabAdapter != null) viewTabAdapter.setPreviewFullscreen(true);
+        } else {
+            if (designAppBar != null) designAppBar.setVisibility(appBarVisibility);
+            if (designBottomBar != null) designBottomBar.setVisibility(bottomBarVisibility);
+            if (viewTabAdapter != null) viewTabAdapter.setPreviewFullscreen(false);
         }
     }
 
@@ -563,6 +713,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         enableEdgeToEdgeNoContrast();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.design);
+        getOnBackPressedDispatcher().addCallback(this, designBackCallback);
+        designAppBar = findViewById(R.id.design_appbar);
+        designBottomBar = findViewById(R.id.bottom_bar);
         if (!isStoragePermissionGranted()) {
             finish();
         }
@@ -594,6 +747,8 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
         fileName = findViewById(R.id.file_name);
 
         findViewById(R.id.file_name_container).setOnClickListener(this);
+        btnDevicePreview = findViewById(R.id.btn_device_preview);
+        btnDevicePreview.setOnClickListener(v -> showDevicePreviewSheet());
 
         btnRun = findViewById(R.id.btn_run);
         btnRun.setOnClickListener(v -> {
@@ -704,6 +859,9 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
                 }
                 
                 updateSourceMenuVisibility(position);
+                if (btnDevicePreview != null) {
+                    btnDevicePreview.setVisibility(position == 0 ? View.VISIBLE : View.GONE);
+                }
 
                 if (position == 0) {
                     if (viewTabAdapter != null) {
@@ -722,6 +880,7 @@ public class DesignActivity extends BaseAppCompatActivity implements View.OnClic
             }
         });
         updateSourceMenuVisibility(viewPager.getCurrentItem());
+        btnDevicePreview.setVisibility(viewPager.getCurrentItem() == 0 ? View.VISIBLE : View.GONE);
         viewPager.getAdapter().notifyDataSetChanged();
         ((TabLayout) findViewById(R.id.tab_layout)).setupWithViewPager(viewPager);
 

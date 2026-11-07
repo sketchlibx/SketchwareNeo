@@ -4,6 +4,7 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.Typeface;
 import android.os.Handler;
 import android.os.Vibrator;
@@ -101,6 +102,12 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
     private LinearLayout paletteGroup;
     private String a;
     private LinearLayout aa;
+    private LinearLayout layoutPalette;
+    private FrameLayout previewSurface;
+    private int previewWidthDp = 360;
+    private int previewHeightDp = 800;
+    private boolean phoneFrameEnabled;
+    private boolean previewFullscreen;
     private String b;
     private int screenType;
     private boolean da = true;
@@ -516,6 +523,12 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
         historyChangeListener = ayVar;
     }
 
+    public void notifyHistoryChanged() {
+        if (historyChangeListener != null) {
+            historyChangeListener.a();
+        }
+    }
+
     public void setOnPropertyClickListener(Iw iw) {
         propertyClickListener = iw;
     }
@@ -536,6 +549,22 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
         }
     }
 
+    public void setPreviewDeviceSettings(int widthDp, int heightDp, boolean phoneFrame) {
+        if (widthDp < 200 || widthDp > 2000 || heightDp < 300 || heightDp > 3000) return;
+        previewWidthDp = widthDp;
+        previewHeightDp = heightDp;
+        phoneFrameEnabled = phoneFrame;
+        isLayoutChanged = true;
+        requestLayout();
+    }
+
+    public void setPreviewFullscreen(boolean fullscreen) {
+        previewFullscreen = fullscreen;
+        if (layoutPalette != null) layoutPalette.setVisibility(fullscreen ? View.GONE : View.VISIBLE);
+        isLayoutChanged = true;
+        requestLayout();
+    }
+
     private void initialize(Context context) {
         wB.a(context, this, R.layout.view_editor);
 
@@ -545,7 +574,8 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
         deleteIcon = findViewById(R.id.icon_delete);
         deleteText = findViewById(R.id.text_delete);
         deleteView = findViewById(R.id.delete_view);
-        FrameLayout shape = findViewById(R.id.shape);
+        previewSurface = findViewById(R.id.shape);
+        layoutPalette = findViewById(R.id.layout_palette);
         paletteGroup = findViewById(R.id.palette_group);
 
         addPaletteGroupItems();
@@ -558,12 +588,16 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
         defaultIconHeight = (int) (defaultIconHeight * dip);
         displayWidth = getResources().getDisplayMetrics().widthPixels;
         displayHeight = getResources().getDisplayMetrics().heightPixels;
+        float displayDensity = getResources().getDisplayMetrics().density;
+        if (displayDensity <= 0f) displayDensity = 1f;
+        previewWidthDp = Math.max(240, Math.round(displayWidth / displayDensity));
+        previewHeightDp = Math.max(400, Math.round(displayHeight / displayDensity));
 
         aa = new LinearLayout(context);
         aa.setOrientation(LinearLayout.VERTICAL);
         aa.setGravity(Gravity.CENTER);
         aa.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, displayHeight));
-        shape.addView(aa);
+        previewSurface.addView(aa);
 
         bgStatus = new LinearLayout(context);
         bgStatus.setBackgroundColor(0xff0084c2);
@@ -585,7 +619,7 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
                 ViewGroup.LayoutParams.MATCH_PARENT));
         imgPhoneTopBg.setScaleType(ImageView.ScaleType.FIT_END);
         bgStatus.addView(imgPhoneTopBg);
-        shape.addView(bgStatus);
+        previewSurface.addView(bgStatus);
 
         toolbar = new LinearLayout(context);
         toolbar.setBackgroundColor(0xff008dcd);
@@ -603,12 +637,12 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
         tvToolbar.setText("Toolbar");
         tvToolbar.setTypeface(null, Typeface.BOLD);
         toolbar.addView(tvToolbar);
-        shape.addView(toolbar);
+        previewSurface.addView(toolbar);
 
         viewPane = new ViewPane(getContext());
         viewPane.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, displayHeight));
         viewPane.setOnTouchListener(this);
-        shape.addView(viewPane);
+        previewSurface.addView(viewPane);
 
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         useVibrate = new DB(context, "P12").a("P12I0", true);
@@ -931,70 +965,88 @@ public class ViewEditor extends RelativeLayout implements View.OnClickListener, 
     private void a() {
         toolbar.setVisibility(S ? View.VISIBLE : View.GONE);
         bgStatus.setVisibility(T ? View.GONE : View.VISIBLE);
-
         viewPane.setVisibility(View.VISIBLE);
-        displayWidth = getResources().getDisplayMetrics().widthPixels;
-        displayHeight = getResources().getDisplayMetrics().heightPixels;
-        boolean isLandscapeMode = displayWidth > displayHeight;
-        int var4 = (int) (dip * (!isLandscapeMode ? 12.0F : 24.0F));
-        int var5 = (int) (dip * (!isLandscapeMode ? 20.0F : 10.0F));
-        int statusBarHeight = GB.f(getContext());
-        int toolBarHeight = GB.a(getContext());
-        int var9 = displayWidth - (int) (120.0F * dip);
-        int var8 = displayHeight - statusBarHeight - toolBarHeight - (int) (dip * 48.0F) - (int) (dip * 48.0F);
-        if (screenType == 0 && da) {
-            Log.d("ViewEditor", "hmmm");
-            var8 -= (int) (dip * 56.0F);
+
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0f) density = 1f;
+        int surfaceWidth = previewSurface == null ? 0 : previewSurface.getWidth();
+        int surfaceHeight = previewSurface == null ? 0 : previewSurface.getHeight();
+        if (surfaceWidth <= 0) surfaceWidth = Math.max(1, getWidth() - (previewFullscreen ? 0 : (int) (120f * density)));
+        if (surfaceHeight <= 0) surfaceHeight = Math.max(1, getHeight());
+        if (surfaceWidth <= 0) surfaceWidth = getResources().getDisplayMetrics().widthPixels;
+        if (surfaceHeight <= 0) surfaceHeight = getResources().getDisplayMetrics().heightPixels;
+
+        int deviceWidth = Math.max((int) (200f * density), (int) (previewWidthDp * density));
+        int deviceHeight = Math.max((int) (300f * density), (int) (previewHeightDp * density));
+        int statusBarHeight = Math.max(0, GB.f(getContext()));
+        int toolBarHeight = Math.max(0, GB.a(getContext()));
+        int topBars = (bgStatus.getVisibility() == View.VISIBLE ? statusBarHeight : 0)
+                + (toolbar.getVisibility() == View.VISIBLE ? toolBarHeight : 0);
+        if (deviceHeight - topBars < (int) (160f * density)) {
+            deviceHeight = topBars + (int) (160f * density);
         }
 
-        float var11 = Math.min((float) var9 / (float) displayWidth, (float) var8 / (float) displayHeight);
-        float var3 = Math.min((float) (var9 - var4 * 2) / (float) displayWidth, (float) (var8 - var5 * 2) / (float) displayHeight);
+        int bezel = phoneFrameEnabled ? Math.max(1, (int) (8f * density)) : 0;
+        int outerWidth = deviceWidth + bezel * 2;
+        int outerHeight = deviceHeight + bezel * 2;
+        int reservedBottomSpace = screenType == 0 && da ? (int) (56f * density) : 0;
+        int usableSurfaceHeight = Math.max(1, surfaceHeight - reservedBottomSpace);
+        int availableWidth = Math.max(1, surfaceWidth - (int) (24f * density));
+        int availableHeight = Math.max(1, usableSurfaceHeight - (int) (24f * density));
+        float scale = Math.min(availableWidth / (float) outerWidth, availableHeight / (float) outerHeight);
+        scale = Math.max(0.05f, Math.min(1f, scale));
 
-        aa.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, displayHeight));
-        aa.setScaleX(var11);
-        aa.setScaleY(var11);
-        aa.setX(-((int) ((displayWidth - displayWidth * var11) / 2.0F)));
-        aa.setY(-((int) ((displayHeight - displayHeight * var11) / 2.0F)));
-        int var10 = var4 - (int) ((displayWidth - displayWidth * var3) / 2.0F);
-        int var13 = var5;
+        int frameLeft = Math.round((surfaceWidth - outerWidth * scale) / 2f);
+        int frameTop = Math.round((usableSurfaceHeight - outerHeight * scale) / 2f);
+        aa.setLayoutParams(new FrameLayout.LayoutParams(outerWidth, outerHeight));
+        if (phoneFrameEnabled) {
+            GradientDrawable frame = new GradientDrawable();
+            frame.setColor(0xff111318);
+            frame.setCornerRadius(42f * density);
+            frame.setStroke(Math.max(1, (int) density), ThemeUtils.getColor(getContext(), R.attr.colorOutlineVariant));
+            aa.setBackground(frame);
+        } else {
+            aa.setBackgroundColor(Color.TRANSPARENT);
+        }
+        aa.setPivotX(0f);
+        aa.setPivotY(0f);
+        aa.setScaleX(scale);
+        aa.setScaleY(scale);
+        aa.setX(frameLeft);
+        aa.setY(frameTop);
+
+        int contentLeft = frameLeft + Math.round(bezel * scale);
+        int contentTop = frameTop + Math.round(bezel * scale);
         if (bgStatus.getVisibility() == View.VISIBLE) {
-            bgStatus.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, statusBarHeight));
-            bgStatus.setScaleX(var3);
-            bgStatus.setScaleY(var3);
-            var11 = statusBarHeight;
-            float var12 = var11 * var3;
-            bgStatus.setX(var10);
-            bgStatus.setY(var5 - (int) ((var11 - var12) / 2.0F));
-            var13 = var5 + (int) var12;
+            bgStatus.setLayoutParams(new FrameLayout.LayoutParams(deviceWidth, statusBarHeight));
+            bgStatus.setPivotX(0f);
+            bgStatus.setPivotY(0f);
+            bgStatus.setScaleX(scale);
+            bgStatus.setScaleY(scale);
+            bgStatus.setX(contentLeft);
+            bgStatus.setY(contentTop);
         }
 
-        var8 = var13;
+        int toolbarTop = contentTop + (bgStatus.getVisibility() == View.VISIBLE ? Math.round(statusBarHeight * scale) : 0);
         if (toolbar.getVisibility() == View.VISIBLE) {
-            toolbar.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, toolBarHeight));
-            toolbar.setScaleX(var3);
-            toolbar.setScaleY(var3);
-            var11 = (float) toolBarHeight * var3;
-            toolbar.setX(var10);
-            toolbar.setY(var13 - (int) (((float) toolBarHeight - var11) / 2.0F));
-            var8 = var13 + (int) var11;
+            toolbar.setLayoutParams(new FrameLayout.LayoutParams(deviceWidth, toolBarHeight));
+            toolbar.setPivotX(0f);
+            toolbar.setPivotY(0f);
+            toolbar.setScaleX(scale);
+            toolbar.setScaleY(scale);
+            toolbar.setX(contentLeft);
+            toolbar.setY(toolbarTop);
         }
 
-        var13 = displayHeight;
-        if (bgStatus.getVisibility() == View.VISIBLE) {
-            var13 = displayHeight - statusBarHeight;
-        }
-
-        var5 = var13;
-        if (toolbar.getVisibility() == View.VISIBLE) {
-            var5 = var13 - toolBarHeight;
-        }
-
-        viewPane.setLayoutParams(new FrameLayout.LayoutParams(displayWidth, var5));
-        viewPane.setScaleX(var3);
-        viewPane.setScaleY(var3);
-        var11 = var5;
-        viewPane.setX(var10);
-        viewPane.setY(var8 - (int) ((var11 - var3 * var11) / 2.0F));
+        int paneTop = toolbarTop + (toolbar.getVisibility() == View.VISIBLE ? Math.round(toolBarHeight * scale) : 0);
+        int paneHeight = Math.max(1, deviceHeight - topBars);
+        viewPane.setLayoutParams(new FrameLayout.LayoutParams(deviceWidth, paneHeight));
+        viewPane.setPivotX(0f);
+        viewPane.setPivotY(0f);
+        viewPane.setScaleX(scale);
+        viewPane.setScaleY(scale);
+        viewPane.setX(contentLeft);
+        viewPane.setY(paneTop);
         isLayoutChanged = false;
     }
 

@@ -14,7 +14,7 @@ import android.widget.Toast;
 import android.widget.ArrayAdapter;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import com.besome.sketch.lib.base.PaletteAwareAppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
@@ -49,7 +49,7 @@ import neo.sketchware.plugin.marketplace.PluginVersionUtils;
 import pro.sketchware.BuildConfig;
 import pro.sketchware.R;
 
-public final class PluginDetailsActivity extends AppCompatActivity {
+public final class PluginDetailsActivity extends PaletteAwareAppCompatActivity {
     public static final String EXTRA_PLUGIN_ID = "plugin_id";
     public static final String EXTRA_CATALOG_JSON = "catalog_item_json";
 

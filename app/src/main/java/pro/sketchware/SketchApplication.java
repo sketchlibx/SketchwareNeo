@@ -10,6 +10,8 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.google.android.material.color.DynamicColors;
+
 import com.besome.sketch.tools.CollectErrorActivity;
 
 import pro.sketchware.utility.theme.ThemeManager;
@@ -39,6 +41,9 @@ public class SketchApplication extends Application {
         });
         super.onCreate();
         ThemeManager.applyTheme(this, ThemeManager.getCurrentTheme(this));
+        if (ThemeManager.isDynamicColorsEnabled(this)) {
+            DynamicColors.applyToActivitiesIfAvailable(this);
+        }
         AppUpdateJobService.schedule(this);
         AppUpdateManager.fetchLatest(this);
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {

@@ -1,6 +1,8 @@
 package a.a.a;
 
 import android.animation.ObjectAnimator;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -13,6 +15,7 @@ import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.NonNull;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.besome.sketch.beans.HistoryViewBean;
 import com.besome.sketch.beans.ProjectFileBean;
@@ -28,10 +31,17 @@ import com.besome.sketch.editor.view.palette.PaletteWidget;
 import com.besome.sketch.editor.manage.library.material3.Material3LibraryManager;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.Set;
 
 import mod.hey.studios.util.Helper;
 import pro.sketchware.R;
 import pro.sketchware.utility.SketchwareUtil;
+import pro.sketchware.managers.inject.InjectRootLayoutManager;
 import pro.sketchware.widgets.WidgetsCreatorManager;
 
 public class ViewEditorFragment extends qA {
@@ -43,6 +53,7 @@ public class ViewEditorFragment extends qA {
     private ObjectAnimator showPropertyViewAnimator;
     private ObjectAnimator hidePropertyViewAnimator;
     private boolean isPropertyViewVisible;
+    private boolean propertyVisibleBeforeFullscreen;
     private boolean isDragging = false;
     private String sc_id;
 
@@ -83,7 +94,22 @@ public class ViewEditorFragment extends qA {
         });
         viewProperty.setOnEventClickListener(eventBean -> toLogicEditorActivity(eventBean.targetId, eventBean.eventName, eventBean.eventName));
         viewProperty.setOnPropertyTargetChangeListener(viewEditor::updateSelection);
-        viewProperty.setOnViewMoveListener(this::moveViewInTree);
+        viewProperty.setOnViewMoveListener(new ViewProperty.OnViewMoveListener() {
+            @Override
+            public boolean onMoveRequested(String sourceViewId, String targetParentId) {
+                return moveViewInTree(sourceViewId, targetParentId);
+            }
+
+            @Override
+            public boolean onTreeActionRequested(String sourceViewId, String action, String targetViewId) {
+                return handleViewTreeAction(sourceViewId, action, targetViewId);
+            }
+
+            @Override
+            public ArrayList<ViewBean> onReloadViews() {
+                return loadCurrentViewBeans();
+            }
+        });
         viewEditor.setOnWidgetSelectedListener(new cy() {
             @Override
             public void a() {
@@ -139,6 +165,15 @@ public class ViewEditorFragment extends qA {
         this.projectFileBean = projectFileBean;
         isFabEnabled = projectFileBean.hasActivityOption(ProjectFileBean.OPTION_ACTIVITY_FAB);
         viewEditor.initialize(sc_id, projectFileBean);
+        SharedPreferences previewPreferences = requireContext().getSharedPreferences("design_preview", Context.MODE_PRIVATE);
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0f) density = 1f;
+        int defaultWidth = Math.max(240, Math.round(getResources().getDisplayMetrics().widthPixels / density));
+        int defaultHeight = Math.max(400, Math.round(getResources().getDisplayMetrics().heightPixels / density));
+        int previewWidth = previewPreferences.getInt("width_" + sc_id, defaultWidth);
+        int previewHeight = previewPreferences.getInt("height_" + sc_id, defaultHeight);
+        boolean previewFrame = previewPreferences.getBoolean("frame_" + sc_id, false);
+        viewEditor.setPreviewDeviceSettings(previewWidth, previewHeight, previewFrame);
         viewEditor.h();
         viewProperty.a(sc_id, this.projectFileBean);
         e();
@@ -165,66 +200,72 @@ public class ViewEditorFragment extends qA {
     private boolean moveViewInTree(String sourceId, String targetParentId) {
         if (sourceId == null || targetParentId == null || sourceId.equals(targetParentId)
                 || sourceId.startsWith("_") || projectFileBean == null || sc_id == null) return false;
-        ArrayList<ViewBean> beans;
-        try {
-            beans = jC.a(sc_id).d(projectFileBean.getXmlName());
-        } catch (RuntimeException exception) {
-            SketchwareUtil.toastError("Unable to load the view tree");
-            return false;
-        }
-        if (beans == null) return false;
-        ViewBean source = null;
-        ViewBean target = null;
-        for (ViewBean bean : beans) {
-            if (bean == null) continue;
-            if (sourceId.equals(bean.id)) source = bean;
-            if (targetParentId.equals(bean.id)) target = bean;
-        }
-        if (source == null || target == null || !isTreeContainer(target)) return false;
+        boolean moveToRoot = "root".equals(targetParentId);
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        if (beans.isEmpty()) return false;
+        ViewBean source = findViewBean(beans, sourceId);
+        ViewBean target = moveToRoot ? null : findViewBean(beans, targetParentId);
+        if (source == null || (!moveToRoot && (target == null || !isTreeContainer(target)))) return false;
 
-        String cursorId = target.id;
-        java.util.HashSet<String> visited = new java.util.HashSet<>();
-        while (cursorId != null && !cursorId.isEmpty() && !"root".equals(cursorId)) {
-            if (source.id.equals(cursorId)) {
-                SketchwareUtil.toastError("A view cannot be moved into itself or its own child");
-                return false;
+        if (!moveToRoot) {
+            String cursorId = target.id;
+            HashSet<String> visited = new HashSet<>();
+            while (cursorId != null && !cursorId.isEmpty() && !"root".equals(cursorId)) {
+                if (source.id.equals(cursorId)) {
+                    SketchwareUtil.toastError("A view cannot be moved into itself or its own child");
+                    return false;
+                }
+                if (!visited.add(cursorId)) {
+                    SketchwareUtil.toastError("The current view hierarchy contains a parent cycle");
+                    return false;
+                }
+                ViewBean parent = findViewBean(beans, cursorId);
+                cursorId = parent == null ? null : parent.parent;
             }
-            if (!visited.add(cursorId)) {
-                SketchwareUtil.toastError("The current view hierarchy contains a parent cycle");
-                return false;
-            }
-            ViewBean parent = null;
-            for (ViewBean candidate : beans) {
-                if (candidate != null && cursorId.equals(candidate.id)) { parent = candidate; break; }
-            }
-            cursorId = parent == null ? null : parent.parent;
         }
 
-        String previousParent = source.parent;
+        int destinationParentType;
+        if (moveToRoot) {
+            try {
+                ViewBean rootBean = new InjectRootLayoutManager(sc_id).toBean(projectFileBean.getXmlName());
+                if (rootBean == null) throw new IllegalStateException("Root layout is unavailable");
+                destinationParentType = rootBean.type;
+            } catch (RuntimeException error) {
+                SketchwareUtil.toastError("Could not determine this layout's root type");
+                return false;
+            }
+        } else {
+            destinationParentType = target.type;
+        }
+
+        String previousParent = normalizeParentId(source.parent);
+        source.parent = previousParent;
         int previousIndex = source.index;
         int previousParentType = source.parentType;
         String previousPreParent = source.preParent;
         int previousPreIndex = source.preIndex;
         int previousPreParentType = source.preParentType;
-        java.util.HashMap<String, String> previousParentAttributes = source.parentAttributes == null
-                ? new java.util.HashMap<>() : new java.util.HashMap<>(source.parentAttributes);
+        HashMap<String, String> previousParentAttributes = source.parentAttributes == null
+                ? new HashMap<>() : new HashMap<>(source.parentAttributes);
 
-        int nextIndex = 0;
-        for (ViewBean bean : beans) {
-            if (bean != null && !source.id.equals(bean.id) && target.id.equals(bean.parent)) {
-                nextIndex = Math.max(nextIndex, bean.index + 1);
-            }
-        }
-        source.preParent = previousParent == null || previousParent.isEmpty() ? "root" : previousParent;
+        ArrayList<ViewBean> oldSiblings = getSiblings(beans, previousParent);
+        oldSiblings.remove(source);
+        ArrayList<ViewBean> newSiblings = getSiblings(beans, targetParentId);
+        newSiblings.remove(source);
+
+        source.preParent = previousParent;
         source.preIndex = previousIndex;
         source.preParentType = previousParentType;
-        source.parent = target.id;
-        source.parentType = target.type;
-        source.index = nextIndex;
-        source.parentAttributes = source.parentAttributes == null ? new java.util.HashMap<>() : source.parentAttributes;
-        if (!target.id.equals(previousParent)) source.parentAttributes.clear();
+        source.parent = moveToRoot ? "root" : targetParentId;
+        source.parentType = destinationParentType;
+        source.index = newSiblings.size();
+        if (!source.parent.equals(previousParent)) {
+            if (source.parentAttributes == null) source.parentAttributes = new HashMap<>();
+            else source.parentAttributes.clear();
+        }
+        newSiblings.add(source);
 
-        ItemView moved = viewEditor.b(source, true);
+        ItemView moved = viewEditor.b(source, false);
         if (moved == null) {
             source.parent = previousParent;
             source.index = previousIndex;
@@ -233,16 +274,256 @@ public class ViewEditorFragment extends qA {
             source.preIndex = previousPreIndex;
             source.preParentType = previousPreParentType;
             source.parentAttributes = previousParentAttributes;
-            viewEditor.b(source, false);
             SketchwareUtil.toastError("The canvas could not apply this move");
             return false;
         }
-        viewEditor.a(moved, true);
+
+        recordViewMove(source, previousParent, previousIndex, previousParentType);
+        recordSiblingOrder(oldSiblings);
+        recordSiblingOrder(newSiblings);
+        viewEditor.notifyHistoryChanged();
         n();
         viewProperty.a(source.id);
         viewProperty.e();
         invalidateOptionsMenu();
         return true;
+    }
+
+    private String normalizeParentId(String parentId) {
+        return parentId == null || parentId.isEmpty() ? "root" : parentId;
+    }
+
+    private void recordViewMove(ViewBean bean, String previousParent, int previousIndex, int previousParentType) {
+        if (bean == null) return;
+        bean.preParent = normalizeParentId(previousParent);
+        bean.preIndex = previousIndex;
+        bean.preParentType = previousParentType;
+        cC.c(sc_id).b(projectFileBean.getXmlName(), bean);
+        bean.preParent = "";
+        bean.preIndex = -1;
+        bean.preParentType = -1;
+    }
+
+    private void recordSiblingOrder(ArrayList<ViewBean> siblings) {
+        if (siblings == null) return;
+        for (int i = 0; i < siblings.size(); i++) {
+            ViewBean bean = siblings.get(i);
+            if (bean == null || bean.index == i) continue;
+            int previousIndex = bean.index;
+            String parent = normalizeParentId(bean.parent);
+            bean.preParent = parent;
+            bean.preIndex = previousIndex;
+            bean.preParentType = bean.parentType;
+            bean.index = i;
+            cC.c(sc_id).b(projectFileBean.getXmlName(), bean);
+            bean.preParent = "";
+            bean.preIndex = -1;
+            bean.preParentType = -1;
+        }
+    }
+
+    private boolean handleViewTreeAction(String sourceId, String action, String targetId) {
+        if (sourceId == null || action == null || projectFileBean == null || sc_id == null) return false;
+        return switch (action) {
+            case "MOVE_UP" -> moveSiblingBy(sourceId, -1);
+            case "MOVE_DOWN" -> moveSiblingBy(sourceId, 1);
+            case "MOVE_BEFORE" -> moveRelativeTo(sourceId, targetId, false);
+            case "MOVE_AFTER" -> moveRelativeTo(sourceId, targetId, true);
+            case "MOVE_OUT" -> moveOutOfParent(sourceId);
+            case "MOVE_INTO" -> moveViewInTree(sourceId, targetId);
+            case "COPY" -> copyViewTree(sourceId);
+            case "DELETE" -> confirmDeleteFromTree(sourceId);
+            default -> false;
+        };
+    }
+
+    private ArrayList<ViewBean> loadCurrentViewBeans() {
+        try {
+            ArrayList<ViewBean> beans = jC.a(sc_id).d(projectFileBean.getXmlName());
+            return beans == null ? new ArrayList<>() : beans;
+        } catch (RuntimeException exception) {
+            SketchwareUtil.toastError("Unable to load the view hierarchy");
+            return new ArrayList<>();
+        }
+    }
+
+    private ViewBean findViewBean(ArrayList<ViewBean> beans, String id) {
+        if (beans == null || id == null) return null;
+        for (ViewBean bean : beans) {
+            if (bean != null && id.equals(bean.id)) return bean;
+        }
+        return null;
+    }
+
+    private ArrayList<ViewBean> getSiblings(ArrayList<ViewBean> beans, String parentId) {
+        String normalizedParent = normalizeParentId(parentId);
+        ArrayList<ViewBean> siblings = new ArrayList<>();
+        for (ViewBean bean : beans) {
+            if (bean != null && normalizeParentId(bean.parent).equals(normalizedParent)) siblings.add(bean);
+        }
+        siblings.sort(Comparator.comparingInt(bean -> bean.index));
+        return siblings;
+    }
+
+    private boolean moveSiblingBy(String sourceId, int delta) {
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        ViewBean source = findViewBean(beans, sourceId);
+        if (source == null) return false;
+        ArrayList<ViewBean> siblings = getSiblings(beans, source.parent);
+        int position = siblings.indexOf(source);
+        int targetPosition = position + delta;
+        if (position < 0 || targetPosition < 0 || targetPosition >= siblings.size()) return false;
+        return moveRelativeTo(sourceId, siblings.get(targetPosition).id, delta > 0);
+    }
+
+    private boolean moveRelativeTo(String sourceId, String targetId, boolean after) {
+        if (sourceId == null || targetId == null || sourceId.equals(targetId)) return false;
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        ViewBean source = findViewBean(beans, sourceId);
+        ViewBean target = findViewBean(beans, targetId);
+        if (source == null || target == null
+                || !normalizeParentId(source.parent).equals(normalizeParentId(target.parent))) return false;
+        ArrayList<ViewBean> siblings = getSiblings(beans, source.parent);
+        int sourcePosition = siblings.indexOf(source);
+        int targetPosition = siblings.indexOf(target);
+        if (sourcePosition < 0 || targetPosition < 0) return false;
+
+        int previousIndex = source.index;
+        String previousParentValue = source.parent;
+        String previousParent = normalizeParentId(previousParentValue);
+        source.parent = previousParent;
+        int previousParentType = source.parentType;
+        siblings.remove(sourcePosition);
+        int insertPosition = targetPosition + (after ? 1 : 0);
+        if (sourcePosition < targetPosition) insertPosition--;
+        insertPosition = Math.max(0, Math.min(insertPosition, siblings.size()));
+        siblings.add(insertPosition, source);
+        source.index = insertPosition;
+        source.preParent = previousParent;
+        source.preIndex = previousIndex;
+        source.preParentType = previousParentType;
+
+        ItemView moved = viewEditor.b(source, false);
+        if (moved == null) {
+            source.parent = previousParentValue;
+            source.index = previousIndex;
+            source.preParent = "";
+            source.preIndex = -1;
+            source.preParentType = -1;
+            SketchwareUtil.toastError("The canvas could not reorder this component");
+            return false;
+        }
+        recordViewMove(source, previousParent, previousIndex, previousParentType);
+        recordSiblingOrder(siblings);
+        viewEditor.notifyHistoryChanged();
+        refreshTreeSelection(source.id);
+        return true;
+    }
+
+    private boolean moveOutOfParent(String sourceId) {
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        ViewBean source = findViewBean(beans, sourceId);
+        if (source == null || source.parent == null || source.parent.isEmpty() || "root".equals(source.parent)) return false;
+        ViewBean parent = findViewBean(beans, source.parent);
+        String targetParentId = parent == null || parent.parent == null || parent.parent.isEmpty()
+                ? "root" : parent.parent;
+        return moveViewInTree(sourceId, targetParentId);
+    }
+
+    private boolean copyViewTree(String sourceId) {
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        ViewBean source = findViewBean(beans, sourceId);
+        if (source == null || sourceId.startsWith("_")) return false;
+        ArrayList<ViewBean> originals;
+        try {
+            originals = jC.a(sc_id).b(projectFileBean.getXmlName(), source);
+        } catch (RuntimeException exception) {
+            SketchwareUtil.toastError("Unable to copy this component");
+            return false;
+        }
+        if (originals == null || originals.isEmpty()) originals = new ArrayList<>(Collections.singletonList(source));
+
+        Set<String> usedIds = new HashSet<>();
+        for (ViewBean bean : beans) if (bean != null && bean.id != null) usedIds.add(bean.id);
+        HashMap<String, String> idMap = new HashMap<>();
+        ArrayList<ViewBean> copies = new ArrayList<>();
+        HashMap<Integer, Integer> nextSuffix = new HashMap<>();
+        for (ViewBean original : originals) {
+            if (original == null || original.id == null) continue;
+            String prefix = wq.b(original.type);
+            int next = nextSuffix.containsKey(original.type) ? nextSuffix.get(original.type) : findNextViewSuffix(prefix, usedIds);
+            String newId;
+            do { newId = prefix + (++next); } while (usedIds.contains(newId));
+            nextSuffix.put(original.type, next);
+            usedIds.add(newId);
+            idMap.put(original.id, newId);
+        }
+        int rootIndex = 0;
+        for (ViewBean bean : beans) {
+            if (bean != null && Objects.equals(bean.parent, source.parent)) rootIndex = Math.max(rootIndex, bean.index + 1);
+        }
+        for (ViewBean original : originals) {
+            if (original == null || original.id == null || !idMap.containsKey(original.id)) continue;
+            ViewBean clone = original.clone();
+            String originalId = original.id;
+            clone.id = idMap.get(originalId);
+            clone.parent = idMap.containsKey(original.parent) ? idMap.get(original.parent) : original.parent;
+            clone.preId = "";
+            clone.preParent = "";
+            clone.preIndex = -1;
+            clone.preParentType = -1;
+            if (originalId.equals(source.id)) clone.index = rootIndex;
+            try {
+                jC.a(sc_id).a(projectFileBean, clone);
+                copies.add(clone);
+            } catch (RuntimeException exception) {
+                for (ViewBean saved : copies) jC.a(sc_id).a(projectFileBean.getXmlName(), saved);
+                SketchwareUtil.toastError("The component could not be copied safely");
+                return false;
+            }
+        }
+        if (copies.isEmpty()) return false;
+        viewEditor.a(copies, true);
+        refreshTreeSelection(idMap.get(source.id));
+        return true;
+    }
+
+    private int findNextViewSuffix(String prefix, Set<String> usedIds) {
+        int next = 0;
+        for (String id : usedIds) {
+            if (id == null || !id.startsWith(prefix)) continue;
+            try { next = Math.max(next, Integer.parseInt(id.substring(prefix.length()))); }
+            catch (NumberFormatException ignored) { }
+        }
+        return next;
+    }
+
+    private boolean confirmDeleteFromTree(String sourceId) {
+        ArrayList<ViewBean> beans = loadCurrentViewBeans();
+        ViewBean source = findViewBean(beans, sourceId);
+        if (source == null || sourceId.startsWith("_")) return false;
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Delete component?")
+                .setMessage("Delete " + sourceId + " and all views inside it?")
+                .setNegativeButton(Helper.getResString(R.string.common_word_cancel), null)
+                .setPositiveButton(Helper.getResString(R.string.common_word_delete), (dialog, which) -> {
+                    viewEditor.deleteWidget(source);
+                    if (requireActivity() instanceof DesignActivity designActivity) {
+                        designActivity.hideViewPropertyView();
+                    }
+                    n();
+                    invalidateOptionsMenu();
+                    SketchwareUtil.toast(Helper.getResString(R.string.common_word_deleted));
+                })
+                .show();
+        return true;
+    }
+
+    private void refreshTreeSelection(String selectedId) {
+        n();
+        if (selectedId != null) viewProperty.a(selectedId);
+        viewProperty.e();
+        invalidateOptionsMenu();
     }
 
     private boolean isTreeContainer(ViewBean bean) {
@@ -453,6 +734,25 @@ public class ViewEditorFragment extends qA {
 
     public boolean isPropertyViewVisible() {
         return isPropertyViewVisible;
+    }
+
+    public boolean dismissTreeDrawer() {
+        return viewProperty != null && viewProperty.dismissTreeDrawer();
+    }
+
+    public void setPreviewDeviceSettings(int widthDp, int heightDp, boolean phoneFrame) {
+        if (viewEditor != null) viewEditor.setPreviewDeviceSettings(widthDp, heightDp, phoneFrame);
+    }
+
+    public void setPreviewFullscreen(boolean fullscreen) {
+        if (viewEditor != null) viewEditor.setPreviewFullscreen(fullscreen);
+        if (fullscreen) {
+            propertyVisibleBeforeFullscreen = isPropertyViewVisible;
+            a(false);
+        } else if (propertyVisibleBeforeFullscreen) {
+            propertyVisibleBeforeFullscreen = false;
+            a(true);
+        }
     }
 
     private void onRedo() {

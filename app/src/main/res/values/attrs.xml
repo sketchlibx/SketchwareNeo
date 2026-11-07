@@ -1,4 +1,5 @@
 <resources>
+    <attr name="colorSurfaceTint" format="color" />
     <attr name="circle_color" format="color" />
     <attr name="circle_fill" format="color" />
     <attr name="circle_progress_color" format="color" />

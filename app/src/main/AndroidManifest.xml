@@ -417,6 +417,11 @@
         <activity
             android:name=".activities.preview.LayoutPreviewActivity"
             android:configChanges="orientation|screenSize" />
+
+        <activity
+            android:name=".activities.editor.view.XmlLayoutStructureActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize" />
             
         <activity
             android:name="neo.sketchware.plugin.ui.InstalledPluginsActivity"
